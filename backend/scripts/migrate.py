@@ -8,6 +8,13 @@ the "type already exists" crash-loop on Render: two processes both checking
 import asyncio
 import subprocess
 import sys
+from pathlib import Path
+
+# Ensure the project root (parent of this scripts/ folder) is importable —
+# running `python scripts/migrate.py` only puts scripts/ itself on sys.path,
+# not the app root, so `from app.core.config import settings` would
+# otherwise fail with "No module named 'app'".
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import asyncpg
 
@@ -32,3 +39,4 @@ async def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
+
