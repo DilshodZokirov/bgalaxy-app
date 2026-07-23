@@ -16,11 +16,24 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-member_role = postgresql.ENUM("admin", "member", name="memberrole")
+member_role = postgresql.ENUM("admin", "member", name="memberrole", create_type=False)
 
 
 def upgrade() -> None:
-    member_role.create(op.get_bind(), checkfirst=True)
+    # A plain checkfirst=True create() does "does it exist? then create" as
+    # two separate steps, which can race if more than one process ever runs
+    # this migration at once. This DO block asks Postgres itself to create
+    # the type and silently ignore a "already exists" — atomic, no race
+    # possible no matter how many processes hit it at the same instant.
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE memberrole AS ENUM ('admin', 'member');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+        """
+    )
 
     op.create_table(
         "users",
@@ -71,3 +84,4 @@ def downgrade() -> None:
     op.drop_index("ix_users_email", table_name="users")
     op.drop_table("users")
     member_role.drop(op.get_bind(), checkfirst=True)
+
