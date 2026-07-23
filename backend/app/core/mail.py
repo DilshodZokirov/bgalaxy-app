@@ -3,9 +3,54 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import requests
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+RESEND_URL = "https://api.resend.com/emails"
+
+
+def _send_email(to_email: str, subject: str, html: str) -> bool:
+    """Sends one HTML email. Tries Resend (HTTPS API) first — this is what
+    actually works on hosts like Render's free tier, which blocks outbound
+    SMTP ports entirely. Falls back to SMTP if RESEND_API_KEY isn't set
+    (handy for local development). Never raises — a failed/unconfigured
+    email should never break the calling request."""
+    if settings.resend_api_key:
+        try:
+            response = requests.post(
+                RESEND_URL,
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json={"from": settings.smtp_from, "to": [to_email], "subject": subject, "html": html},
+                timeout=10,
+            )
+            response.raise_for_status()
+            return True
+        except Exception:
+            logger.exception("Failed to send email via Resend to %s", to_email)
+            return False
+
+    if not settings.smtp_host:
+        logger.info("Neither RESEND_API_KEY nor SMTP configured — skipping email to %s", to_email)
+        return False
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = settings.smtp_from
+    message["To"] = to_email
+    message.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.starttls()
+            if settings.smtp_user:
+                server.login(settings.smtp_user, settings.smtp_password)
+            server.sendmail(settings.smtp_from, [to_email], message.as_string())
+        return True
+    except Exception:
+        logger.exception("Failed to send email via SMTP to %s", to_email)
+        return False
 
 
 def _invite_email_html(company_name: str, invite_link: str) -> str:
@@ -77,27 +122,12 @@ def _verification_email_html(full_name: str, verify_link: str) -> str:
 
 def send_verification_email(to_email: str, full_name: str, verify_link: str) -> bool:
     """Sends the email-verification link. Same never-raises contract as
-    send_invite_email — registration should succeed even if SMTP fails."""
-    if not settings.smtp_host:
-        logger.info("SMTP not configured — skipping verification email to %s", to_email)
-        return False
-
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "Emailingizni tasdiqlang — BGalaxy"
-    message["From"] = settings.smtp_from
-    message["To"] = to_email
-    message.attach(MIMEText(_verification_email_html(full_name, verify_link), "html"))
-
-    try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            if settings.smtp_user:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from, [to_email], message.as_string())
-        return True
-    except Exception:
-        logger.exception("Failed to send verification email to %s", to_email)
-        return False
+    send_invite_email — registration should succeed even if sending fails."""
+    return _send_email(
+        to_email,
+        "Emailingizni tasdiqlang — BGalaxy",
+        _verification_email_html(full_name, verify_link),
+    )
 
 
 def _password_reset_email_html(full_name: str, reset_link: str) -> str:
@@ -135,32 +165,14 @@ def _password_reset_email_html(full_name: str, reset_link: str) -> str:
 
 
 def send_password_reset_email(to_email: str, full_name: str, reset_link: str) -> bool:
-    if not settings.smtp_host:
-        logger.info("SMTP not configured — skipping password reset email to %s", to_email)
-        return False
-
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "Parolni tiklash — BGalaxy"
-    message["From"] = settings.smtp_from
-    message["To"] = to_email
-    message.attach(MIMEText(_password_reset_email_html(full_name, reset_link), "html"))
-
-    try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            if settings.smtp_user:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from, [to_email], message.as_string())
-        return True
-    except Exception:
-        logger.exception("Failed to send password reset email to %s", to_email)
-        return False
+    return _send_email(
+        to_email,
+        "Parolni tiklash — BGalaxy",
+        _password_reset_email_html(full_name, reset_link),
+    )
 
 
 def send_password_changed_email(to_email: str, full_name: str) -> bool:
-    if not settings.smtp_host:
-        return False
-
     html = f"""
     <div style="font-family: 'Poppins', Arial, sans-serif; background:#0a0e17; padding:32px;">
       <div style="max-width:480px;margin:0 auto;background:#111827;border-radius:14px;
@@ -173,45 +185,16 @@ def send_password_changed_email(to_email: str, full_name: str) -> bool:
       </div>
     </div>
     """
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "Parolingiz almashtirildi — BGalaxy"
-    message["From"] = settings.smtp_from
-    message["To"] = to_email
-    message.attach(MIMEText(html, "html"))
-
-    try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            if settings.smtp_user:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from, [to_email], message.as_string())
-        return True
-    except Exception:
-        logger.exception("Failed to send password-changed email to %s", to_email)
-        return False
+    return _send_email(to_email, "Parolingiz almashtirildi — BGalaxy", html)
 
 
 def send_invite_email(to_email: str, company_name: str, invite_link: str) -> bool:
-    """Sends the branded invite email. Returns True if sent, False if SMTP
-    isn't configured or sending failed (never raises — invite creation
+    """Sends the branded invite email. Returns True if sent, False if
+    nothing is configured or sending failed (never raises — invite creation
     should still succeed and the link is always returned to the caller)."""
-    if not settings.smtp_host:
-        logger.info("SMTP not configured — skipping invite email to %s", to_email)
-        return False
+    return _send_email(
+        to_email,
+        f"{company_name} kompaniyasiga taklif — BGalaxy",
+        _invite_email_html(company_name, invite_link),
+    )
 
-    message = MIMEMultipart("alternative")
-    message["Subject"] = f"{company_name} kompaniyasiga taklif — BGalaxy"
-    message["From"] = settings.smtp_from
-    message["To"] = to_email
-    message.attach(MIMEText(_invite_email_html(company_name, invite_link), "html"))
-
-    try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            if settings.smtp_user:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from, [to_email], message.as_string())
-        return True
-    except Exception:
-        logger.exception("Failed to send invite email to %s", to_email)
-        return False

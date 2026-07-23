@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "BGalaxy <no-reply@bgalaxy.local>"
+    # Preferred over SMTP in production — Resend uses HTTPS, so it isn't
+    # blocked by hosts (like Render's free tier) that block outbound SMTP
+    # ports. Leave empty to fall back to smtp_host below.
+    resend_api_key: str = ""
 
     # Google Sign-In (OAuth) — leave empty to hide the Google button
     google_client_id: str = ""
@@ -50,3 +54,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
