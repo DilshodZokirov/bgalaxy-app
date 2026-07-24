@@ -12,7 +12,9 @@ class WarehouseSettingsUpdate(BaseModel):
 class ProductCreate(BaseModel):
     name: str
     price: float = 0
-    quantity: int = 0
+    quantity: float = 0
+    unit: str = "dona"  # "dona" | "kg" | "litr"
+    image_url: str | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -23,6 +25,8 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = None
     price: float | None = None
+    unit: str | None = None
+    image_url: str | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -35,7 +39,9 @@ class ProductOut(BaseModel):
     company_id: uuid.UUID
     name: str
     price: float
-    quantity: int
+    quantity: float
+    unit: str
+    image_url: str | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -49,7 +55,7 @@ class ProductOut(BaseModel):
 
 
 class StockAdjustment(BaseModel):
-    change: int  # positive = kirim, negative = chiqim
+    change: float  # positive = kirim, negative = chiqim
     note: str | None = None
 
 
@@ -58,7 +64,7 @@ class StockMovementOut(BaseModel):
     product_id: uuid.UUID
     user_id: uuid.UUID
     user_name: str | None = None
-    change: int
+    change: float
     note: str | None = None
     created_at: datetime
 

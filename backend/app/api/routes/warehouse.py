@@ -103,6 +103,7 @@ async def create_product(
     existing_query = select(WarehouseProduct).where(
         WarehouseProduct.company_id == company_id,
         func.lower(WarehouseProduct.name) == payload.name.strip().lower(),
+        WarehouseProduct.unit == payload.unit,
     )
     if company.warehouse_type == "clothing":
         existing_query = existing_query.where(
@@ -135,6 +136,8 @@ async def create_product(
         name=payload.name,
         price=payload.price,
         quantity=payload.quantity,
+        unit=payload.unit,
+        image_url=payload.image_url,
         size=size,
         color=color,
         expiry_date=expiry_date,
