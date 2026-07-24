@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
 
@@ -10,6 +11,32 @@ export default function MeetingsHub() {
   const [partners, setPartners] = useState([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
+
+  const [company, setCompany] = useState(null);
+  const [activeGroupCall, setActiveGroupCall] = useState(null);
+  const [activePartnerMeetings, setActivePartnerMeetings] = useState([]);
+
+  useEffect(() => {
+    api
+      .getMyCompanies()
+      .then((list) => setCompany(pickActiveCompany(list)))
+      .catch(() => {});
+    refreshActive();
+    const interval = setInterval(refreshActive, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function refreshActive() {
+    api.getActivePartnerMeetings().then(setActivePartnerMeetings).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!company) return;
+    api
+      .getActiveGroupCall(company.id)
+      .then((res) => setActiveGroupCall(res.active ? res : null))
+      .catch(() => {});
+  }, [company]);
 
   function addPartner(u) {
     setPartners((prev) => (prev.some((p) => p.id === u.id) ? prev : [...prev, u]));
@@ -32,12 +59,55 @@ export default function MeetingsHub() {
     }
   }
 
+  const hasActive = activeGroupCall || activePartnerMeetings.length > 0;
+
   return (
     <AppShell>
       <div className="page-header">
         <h1>Uchrashuvlar</h1>
         <p>Qanday turdagi uchrashuv boshlaysiz?</p>
       </div>
+
+      {hasActive && (
+        <div style={{ maxWidth: 820, marginBottom: 24 }}>
+          <h3 style={{ fontSize: 14, margin: "0 0 10px", color: "var(--text-dim)" }}>🟢 Faol uchrashuvlar</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {activeGroupCall && (
+              <div
+                className="card"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px" }}
+              >
+                <div>
+                  <strong style={{ fontSize: 13.5 }}>👥 Guruh uchrashuvi — {company?.name}</strong>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                    {activeGroupCall.participants.map((p) => p.name).join(", ")}
+                  </div>
+                </div>
+                <button style={{ width: "auto", padding: "8px 16px" }} onClick={() => navigate("/group-meeting")}>
+                  Kirish
+                </button>
+              </div>
+            )}
+            {activePartnerMeetings.map((m) => (
+              <div
+                key={m.room_name}
+                className="card"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px" }}
+              >
+                <div>
+                  <strong style={{ fontSize: 13.5 }}>🌍 Hamkorlar bilan uchrashuv</strong>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                    {m.participants.map((p) => p.name).join(", ")}
+                  </div>
+                </div>
+                <button style={{ width: "auto", padding: "8px 16px" }} onClick={() => navigate(`/partner-call/${m.room_name}`)}>
+                  Kirish
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, maxWidth: 820 }}>
         <div className="card" onClick={() => navigate("/group-meeting")} style={{ cursor: "pointer" }}>

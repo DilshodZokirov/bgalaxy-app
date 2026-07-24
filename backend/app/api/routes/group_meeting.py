@@ -12,6 +12,7 @@ from app.models.notification import Notification
 from app.models.user import User
 from app.services.notify import ping_notifications
 from app.services.permissions import require_permission
+from app.services import livekit_admin
 
 router = APIRouter(prefix="/companies/{company_id}/group-call", tags=["group-call"])
 
@@ -79,3 +80,46 @@ async def get_group_call_token(
     )
 
     return {"token": token.to_jwt(), "url": settings.livekit_url, "room_name": room_name}
+
+
+@router.get("/active")
+async def get_active_group_call(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lets the Uchrashuvlar hub show "this company has an ongoing group
+    call, tap to rejoin" instead of only ever offering to start a fresh
+    one."""
+    await require_permission(db, company_id, current_user.id, "start_meeting")
+    room_name = f"company-{company_id}"
+    participants = await livekit_admin.list_room_participants(room_name)
+    return {
+        "active": len(participants) > 0,
+        "room_name": room_name,
+        "participants": [{"identity": p["identity"], "name": p["name"]} for p in participants],
+    }
+
+
+@router.post("/mute/{user_id}")
+async def mute_group_call_participant(
+    company_id: str,
+    user_id: str,
+    kind: str = "audio",
+    muted: bool = True,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Host controls — requires host_meeting_controls, same as the office
+    used to grant only to Admin/Menejer by default. Works on the shared
+    company-wide room only (partner meetings have their own version of
+    this, gated on being the meeting's starter instead)."""
+    if kind not in ("audio", "video"):
+        raise HTTPException(status_code=400, detail="kind 'audio' yoki 'video' bo'lishi kerak")
+    await require_permission(db, company_id, current_user.id, "host_meeting_controls")
+
+    room_name = f"company-{company_id}"
+    ok = await livekit_admin.mute_participant_track(room_name, user_id, kind, muted)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi xonada topilmadi yoki mos trek yo'q")
+    return {"muted": muted, "kind": kind}

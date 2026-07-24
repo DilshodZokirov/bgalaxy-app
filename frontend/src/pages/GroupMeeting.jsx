@@ -12,6 +12,8 @@ export default function GroupMeeting() {
   const [connection, setConnection] = useState(null); // { token, url }
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [canHost, setCanHost] = useState(false);
+  const [participants, setParticipants] = useState([]);
 
   useEffect(() => {
     api
@@ -19,6 +21,35 @@ export default function GroupMeeting() {
       .then((list) => setCompany(pickActiveCompany(list)))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!company) return;
+    api
+      .getMyPermissions(company.id)
+      .then((p) => setCanHost(!!p.permissions?.host_meeting_controls))
+      .catch(() => {});
+  }, [company]);
+
+  useEffect(() => {
+    if (!connection || !company) return;
+    function refresh() {
+      api
+        .getActiveGroupCall(company.id)
+        .then((res) => setParticipants(res.participants || []))
+        .catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, [connection, company]);
+
+  async function handleMute(identity, kind, muted) {
+    try {
+      await api.muteGroupCallParticipant(company.id, identity, kind, muted);
+    } catch {
+      // ignore — best-effort UI action
+    }
+  }
 
   async function handleJoin() {
     setError(null);
@@ -49,7 +80,7 @@ export default function GroupMeeting() {
 
   if (connection) {
     return (
-      <div style={{ height: "100vh" }} data-lk-theme="default">
+      <div style={{ height: "100vh", position: "relative" }} data-lk-theme="default">
         <LiveKitRoom
           serverUrl={connection.url}
           token={connection.token}
@@ -64,6 +95,35 @@ export default function GroupMeeting() {
         >
           <VideoConference />
         </LiveKitRoom>
+
+        {canHost && participants.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 260,
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 14,
+              zIndex: 50,
+              maxHeight: "60vh",
+              overflowY: "auto",
+            }}
+          >
+            <strong style={{ fontSize: 12.5, display: "block", marginBottom: 10 }}>👑 Ishtirokchilarni boshqarish</strong>
+            {participants.map((p) => (
+              <div key={p.identity} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 12 }}>{p.name}</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "audio", true)} title="Ovozini o'chirish">🔇</button>
+                  <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "video", true)} title="Kamerasini o'chirish">📷</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

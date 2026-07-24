@@ -16,6 +16,8 @@ export default function PartnerCall() {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState(null);
   const [addedMsg, setAddedMsg] = useState(null);
+  const [isHost, setIsHost] = useState(false);
+  const [participants, setParticipants] = useState([]);
 
   useEffect(() => {
     api
@@ -23,6 +25,31 @@ export default function PartnerCall() {
       .then(setConnection)
       .catch((err) => setError(err.message));
   }, [roomName]);
+
+  useEffect(() => {
+    if (!connection) return;
+    function refresh() {
+      api
+        .getActivePartnerMeetings()
+        .then((list) => {
+          const mine = list.find((m) => m.room_name === roomName);
+          setIsHost(!!mine?.is_host);
+          setParticipants(mine?.participants || []);
+        })
+        .catch(() => {});
+    }
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, [connection, roomName]);
+
+  async function handleMute(identity, kind, muted) {
+    try {
+      await api.mutePartnerMeetingParticipant(roomName, identity, kind, muted);
+    } catch {
+      // ignore — best-effort UI action
+    }
+  }
 
   function addPartner(u) {
     setAddPartners((prev) => (prev.some((p) => p.id === u.id) ? prev : [...prev, u]));
@@ -118,6 +145,35 @@ export default function PartnerCall() {
       >
         <VideoConference />
       </LiveKitRoom>
+
+      {isHost && participants.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 70,
+            right: 16,
+            width: 260,
+            background: "var(--panel)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            padding: 14,
+            zIndex: 50,
+            maxHeight: "60vh",
+            overflowY: "auto",
+          }}
+        >
+          <strong style={{ fontSize: 12.5, display: "block", marginBottom: 10 }}>👑 Ishtirokchilarni boshqarish</strong>
+          {participants.map((p) => (
+            <div key={p.identity} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 12 }}>{p.name}</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "audio", true)} title="Ovozini o'chirish">🔇</button>
+                <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "video", true)} title="Kamerasini o'chirish">📷</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showAdd && (
         <div

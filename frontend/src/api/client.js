@@ -139,6 +139,9 @@ export const api = {
   getNotifications: () => request("/notifications"),
   getGroupCallToken: (companyId) =>
     request(`/companies/${companyId}/group-call/token`, { method: "POST" }),
+  getActiveGroupCall: (companyId) => request(`/companies/${companyId}/group-call/active`),
+  muteGroupCallParticipant: (companyId, userId, kind, muted) =>
+    request(`/companies/${companyId}/group-call/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
   getOfficeVoiceToken: (companyId) =>
     request(`/companies/${companyId}/office/voice-token`, { method: "POST" }),
   getOfficePresence: (companyId) => request(`/companies/${companyId}/office/presence`),
@@ -156,6 +159,9 @@ export const api = {
     request("/partner-meetings/join", { method: "POST", body: { room_name: roomName } }),
   addToPartnerMeeting: (roomName, partnerIds) =>
     request(`/partner-meetings/${roomName}/add`, { method: "POST", body: { partner_ids: partnerIds } }),
+  getActivePartnerMeetings: () => request("/partner-meetings/active"),
+  mutePartnerMeetingParticipant: (roomName, userId, kind, muted) =>
+    request(`/partner-meetings/${roomName}/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
   getTasks: (companyId) => request(`/companies/${companyId}/tasks`),
   createTask: (companyId, data) =>
     request(`/companies/${companyId}/tasks`, { method: "POST", body: data }),
