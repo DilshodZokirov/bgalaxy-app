@@ -197,4 +197,3 @@ def send_invite_email(to_email: str, company_name: str, invite_link: str) -> boo
         f"{company_name} kompaniyasiga taklif — BGalaxy",
         _invite_email_html(company_name, invite_link),
     )
-

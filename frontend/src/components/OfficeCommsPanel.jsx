@@ -136,7 +136,7 @@ function MessagesSection({ conversations, onRefresh }) {
   );
 }
 
-function SendSection({ mode, setMode }) {
+function SendSection({ mode, setMode, onBeforeRecording, onAfterRecording }) {
   const [target, setTarget] = useState(null);
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
@@ -153,18 +153,23 @@ function SendSection({ mode, setMode }) {
     chunksRef.current = [];
     const constraints = mode === "video" ? { audio: true, video: true } : { audio: true };
     try {
+      // The office voice chat keeps the mic open in the background — release
+      // it first so this recording actually gets audio instead of silence.
+      onBeforeRecording?.();
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const recorder = new MediaRecorder(stream);
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
       recorder.onstop = () => {
         setBlob(new Blob(chunksRef.current, { type: mode === "video" ? "video/webm" : "audio/webm" }));
         stream.getTracks().forEach((t) => t.stop());
+        onAfterRecording?.();
       };
       recorder.start();
       recorderRef.current = recorder;
       setRecording(true);
     } catch (err) {
       setError("Mikrofon/kamera ruxsati berilmadi yoki topilmadi: " + (err.message || err.name));
+      onAfterRecording?.();
     }
   }
 
@@ -328,7 +333,7 @@ function CallSection({ companyId, activeCall, onStartCall, onHangup, micOn, togg
   );
 }
 
-export default function OfficeCommsPanel({ companyId, open, onOpenChange, incomingCall, onIncomingHandled, onUnreadChange, onCallStateChange, keybinds, onKeybindChange, callSignal }) {
+export default function OfficeCommsPanel({ companyId, open, onOpenChange, incomingCall, onIncomingHandled, onUnreadChange, onCallStateChange, keybinds, onKeybindChange, callSignal, onBeforeRecording, onAfterRecording }) {
   const [sectionIndex, setSectionIndex] = useState(0);
   const [view, setView] = useState("home");
   const [unreadCount, setUnreadCount] = useState(0);
@@ -598,7 +603,7 @@ export default function OfficeCommsPanel({ companyId, open, onOpenChange, incomi
             ) : (
               <>
                 {section === "messages" && <MessagesSection conversations={conversations} onRefresh={refreshConversations} />}
-                {section === "send" && <SendSection mode={sendMode} setMode={setSendMode} />}
+                {section === "send" && <SendSection mode={sendMode} setMode={setSendMode} onBeforeRecording={onBeforeRecording} onAfterRecording={onAfterRecording} />}
                 {section === "call" && (
                   <CallSection
                     companyId={companyId}

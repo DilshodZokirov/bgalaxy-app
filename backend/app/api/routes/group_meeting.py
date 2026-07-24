@@ -1,13 +1,25 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.database import get_db
+from app.models.company import TeamMembership
+from app.models.notification import Notification
 from app.models.user import User
+from app.services.notify import ping_notifications
 from app.services.permissions import require_permission
 
 router = APIRouter(prefix="/companies/{company_id}/group-call", tags=["group-call"])
+
+# Tracks the last time we notified the company about a fresh group call, so
+# joining an ALREADY-active call doesn't re-notify everyone — only treated
+# as a new "meeting started" event if nobody's joined in a while.
+_last_notified: dict[str, datetime] = {}
+NOTIFY_COOLDOWN = timedelta(minutes=5)
 
 
 @router.post("/token")
@@ -24,6 +36,30 @@ async def get_group_call_token(
         )
 
     await require_permission(db, company_id, current_user.id, "start_meeting")
+
+    now = datetime.now(timezone.utc)
+    last = _last_notified.get(company_id)
+    if last is None or now - last > NOTIFY_COOLDOWN:
+        _last_notified[company_id] = now
+        members_result = await db.execute(
+            select(TeamMembership.user_id).where(
+                TeamMembership.company_id == company_id, TeamMembership.approved == True  # noqa: E712
+            )
+        )
+        member_ids = [str(uid) for (uid,) in members_result.all() if str(uid) != str(current_user.id)]
+        for member_id in member_ids:
+            db.add(
+                Notification(
+                    user_id=member_id,
+                    type="group_call_started",
+                    message=f"{current_user.full_name} guruh uchrashuvini boshladi.",
+                    related_user_id=current_user.id,
+                    company_id=company_id,
+                )
+            )
+        await db.commit()
+        for member_id in member_ids:
+            await ping_notifications(member_id)
 
     from livekit import api as livekit_api
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, wsUrl } from "../api/client";
+import { setActiveCompanyId } from "../hooks/useCompany";
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -81,6 +82,18 @@ export default function NotificationBell() {
     navigate(`/partner-call/${n.invite_token}`);
   }
 
+  async function handleJoinGroupCall(n) {
+    try {
+      await api.markNotificationRead(n.id);
+      markLocally(n.id, { read: true });
+    } catch {
+      // ignore
+    }
+    setOpen(false);
+    if (n.company_id) setActiveCompanyId(n.company_id);
+    navigate("/group-meeting");
+  }
+
   async function handleAccept(id) {
     try {
       await api.acceptJoinRequest(id);
@@ -153,6 +166,7 @@ export default function NotificationBell() {
                 n.type === "direct_chat_invite" ||
                 n.type === "invite" ||
                 n.type === "partner_call" ||
+                n.type === "group_call_started" ||
                 n.type === "task_assigned" ||
                 n.type === "task_update" ||
                 n.type === "direct_message");
@@ -192,6 +206,13 @@ export default function NotificationBell() {
                 ) : n.type === "partner_call" ? (
                   <div className="notif-item-actions">
                     <button onClick={() => handleJoinPartnerCall(n)}>🎥 Qo'shilish</button>
+                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
+                      Yopish
+                    </button>
+                  </div>
+                ) : n.type === "group_call_started" ? (
+                  <div className="notif-item-actions">
+                    <button onClick={() => handleJoinGroupCall(n)}>🎥 Qo'shilish</button>
                     <button className="secondary" onClick={() => handleDismiss(n.id)}>
                       Yopish
                     </button>

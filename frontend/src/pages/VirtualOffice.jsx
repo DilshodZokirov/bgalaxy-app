@@ -168,6 +168,18 @@ export default function VirtualOffice() {
     setMicOn(next);
   }
 
+  // The office voice chat holds the microphone open the whole time this
+  // page is mounted. Recording a voice/video message needs exclusive
+  // access to the same hardware, so we release it here first and put it
+  // back exactly how the user had it once recording is done.
+  function pauseOfficeMicForRecording() {
+    roomRef.current?.localParticipant.setMicrophoneEnabled(false);
+  }
+
+  function resumeOfficeMicAfterRecording() {
+    if (micOn) roomRef.current?.localParticipant.setMicrophoneEnabled(true);
+  }
+
   function enterFullscreen() {
     wrapRef.current?.requestFullscreen?.();
   }
@@ -393,6 +405,8 @@ export default function VirtualOffice() {
           keybinds={keybinds}
           onKeybindChange={updateKeybind}
           callSignal={callSignal}
+          onBeforeRecording={pauseOfficeMicForRecording}
+          onAfterRecording={resumeOfficeMicAfterRecording}
         />
 
         {incomingPrompt && (
