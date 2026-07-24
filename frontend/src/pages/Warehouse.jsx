@@ -11,6 +11,8 @@ function emptyForm(type) {
     name: "",
     price: "",
     quantity: "",
+    unit: "dona",
+    image_url: "",
     size: type === "clothing" ? "" : undefined,
     color: type === "clothing" ? "" : undefined,
     expiry_date: type === "food" ? "" : undefined,
@@ -19,11 +21,31 @@ function emptyForm(type) {
   };
 }
 
+const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
+
+function resizeToDataUrl(file, maxWidth = 800) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
 }
 
-function ProductModal({ company, product, onClose, onSaved }) {
+function ProductModal({ company, product, products, onClose, onSaved }) {
   const isEdit = !!product;
   const [form, setForm] = useState(() =>
     isEdit
@@ -31,6 +53,8 @@ function ProductModal({ company, product, onClose, onSaved }) {
           name: product.name,
           price: String(product.price),
           quantity: String(product.quantity),
+          unit: product.unit || "dona",
+          image_url: product.image_url || "",
           size: product.size ?? "",
           color: product.color ?? "",
           expiry_date: product.expiry_date ?? "",
@@ -41,9 +65,36 @@ function ProductModal({ company, product, onClose, onSaved }) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   function setField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function pickPrototype(existing) {
+    setForm((prev) => ({
+      ...prev,
+      name: existing.name,
+      unit: existing.unit === "kg" ? "kg" : existing.unit,
+      image_url: existing.image_url || prev.image_url,
+      size: existing.size ?? prev.size,
+      color: existing.color ?? prev.color,
+      sku: existing.sku ?? prev.sku,
+    }));
+  }
+
+  async function handleImageFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const dataUrl = await resizeToDataUrl(file);
+      setField("image_url", dataUrl);
+    } catch {
+      setError("Rasmni yuklashda xatolik");
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -51,9 +102,19 @@ function ProductModal({ company, product, onClose, onSaved }) {
     setError(null);
     setSaving(true);
     try {
+      // "Tonna" is just a convenience input — always stored converted to kg.
+      let quantity = Number(form.quantity) || 0;
+      let unit = form.unit;
+      if (unit === "tonna") {
+        quantity *= 1000;
+        unit = "kg";
+      }
+
       const payload = {
         name: form.name,
         price: Number(form.price) || 0,
+        unit,
+        image_url: form.image_url || null,
         notes: form.notes || null,
       };
       if (company.warehouse_type === "clothing") {
@@ -70,7 +131,7 @@ function ProductModal({ company, product, onClose, onSaved }) {
       if (isEdit) {
         await api.updateWarehouseProduct(company.id, product.id, payload);
       } else {
-        await api.createWarehouseProduct(company.id, { ...payload, quantity: Number(form.quantity) || 0 });
+        await api.createWarehouseProduct(company.id, { ...payload, quantity });
       }
       onSaved();
       onClose();
@@ -92,6 +153,39 @@ function ProductModal({ company, product, onClose, onSaved }) {
           <button type="button" className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
         </div>
 
+        {!isEdit && products?.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 11.5, color: "var(--text-dim)", margin: "0 0 6px" }}>
+              Mavjud mahsulotdan tanlang (soni avtomatik qo'shiladi) — yoki pastga yangisini yozing:
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 90, overflowY: "auto" }}>
+              {products.map((p) => (
+                <span
+                  key={p.id}
+                  onClick={() => pickPrototype(p)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: form.name === p.name ? "var(--blue)" : "var(--panel-2)",
+                    color: form.name === p.name ? "#fff" : "var(--text)",
+                    borderRadius: 999,
+                    padding: "4px 10px 4px 4px",
+                    fontSize: 11.5,
+                    cursor: "pointer",
+                  }}
+                >
+                  {p.image_url ? (
+                    <img src={p.image_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover" }} />
+                  ) : (
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--border)", display: "inline-block" }} />
+                  )}
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <input type="text" placeholder="Mahsulot nomi" value={form.name} onChange={(e) => setField("name", e.target.value)} required />
         {!isEdit && (
           <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "-6px 0 10px" }}>
@@ -100,7 +194,15 @@ function ProductModal({ company, product, onClose, onSaved }) {
         )}
         <input type="number" placeholder="Narxi (so'm)" value={form.price} onChange={(e) => setField("price", e.target.value)} min="0" step="0.01" required />
         {!isEdit && (
-          <input type="number" placeholder="Boshlang'ich soni" value={form.quantity} onChange={(e) => setField("quantity", e.target.value)} min="0" required />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input type="number" placeholder="Boshlang'ich soni" value={form.quantity} onChange={(e) => setField("quantity", e.target.value)} min="0" step="0.001" required style={{ flex: 2 }} />
+            <select value={form.unit} onChange={(e) => setField("unit", e.target.value)} style={{ flex: 1, background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px" }}>
+              <option value="dona">dona</option>
+              <option value="kg">kg</option>
+              <option value="tonna">tonna</option>
+              <option value="litr">litr</option>
+            </select>
+          </div>
         )}
 
         {company.warehouse_type === "clothing" && (
@@ -118,6 +220,16 @@ function ProductModal({ company, product, onClose, onSaved }) {
         {company.warehouse_type === "technology" && (
           <input type="text" placeholder="SKU / model raqami" value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
         )}
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: "var(--text-dim)", display: "block", marginBottom: 4 }}>Rasm (ixtiyoriy)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {form.image_url && (
+              <img src={form.image_url} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />
+            )}
+            <input type="file" accept="image/*" onChange={handleImageFile} disabled={imageUploading} />
+          </div>
+        </div>
 
         <textarea placeholder="Izoh (ixtiyoriy)" value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} style={{ width: "100%", resize: "vertical" }} />
 
@@ -176,7 +288,7 @@ function StockModal({ company, product, onClose, onSaved }) {
             <button type="button" className={direction === "in" ? "" : "secondary"} style={{ flex: 1 }} onClick={() => setDirection("in")}>⬇️ Kirim</button>
             <button type="button" className={direction === "out" ? "" : "secondary"} style={{ flex: 1 }} onClick={() => setDirection("out")}>⬆️ Chiqim</button>
           </div>
-          <input type="number" placeholder="Miqdori" value={change} onChange={(e) => setChange(e.target.value)} min="1" required />
+          <input type="number" placeholder={`Miqdori (${UNIT_LABELS[product.unit] || product.unit})`} value={change} onChange={(e) => setChange(e.target.value)} min="0.001" step="0.001" required />
           <input type="text" placeholder="Izoh (ixtiyoriy)" value={note} onChange={(e) => setNote(e.target.value)} />
           {error && <p className="error">{error}</p>}
           <button type="submit" disabled={saving}>{saving ? "Saqlanmoqda..." : "Tasdiqlash"}</button>
@@ -188,7 +300,7 @@ function StockModal({ company, product, onClose, onSaved }) {
           {history.map((h) => (
             <div key={h.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 12 }}>
               <span style={{ color: h.change > 0 ? "var(--green)" : "#f87171" }}>
-                {h.change > 0 ? "+" : ""}{h.change} {h.note ? `— ${h.note}` : ""}
+                {h.change > 0 ? "+" : ""}{h.change} {UNIT_LABELS[product.unit] || product.unit} {h.note ? `— ${h.note}` : ""}
               </span>
               <span style={{ color: "var(--text-dim)" }}>{h.user_name}</span>
             </div>
@@ -286,6 +398,9 @@ export default function Warehouse() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
         {products.map((p) => (
           <div key={p.id} className="card">
+            {p.image_url && (
+              <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <strong style={{ fontSize: 14.5 }}>{p.name}</strong>
               <span
@@ -297,7 +412,7 @@ export default function Warehouse() {
                   color: p.quantity > 0 ? "var(--green)" : "#f87171",
                 }}
               >
-                {p.quantity} dona
+                {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
               </span>
             </div>
             <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>{money(p.price)}</div>
@@ -315,8 +430,8 @@ export default function Warehouse() {
         ))}
       </div>
 
-      {showAdd && <ProductModal company={company} onClose={() => setShowAdd(false)} onSaved={refreshProducts} />}
-      {editProduct && <ProductModal company={company} product={editProduct} onClose={() => setEditProduct(null)} onSaved={refreshProducts} />}
+      {showAdd && <ProductModal company={company} products={products} onClose={() => setShowAdd(false)} onSaved={refreshProducts} />}
+      {editProduct && <ProductModal company={company} product={editProduct} products={products} onClose={() => setEditProduct(null)} onSaved={refreshProducts} />}
       {stockProduct && <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />}
     </AppShell>
   );
