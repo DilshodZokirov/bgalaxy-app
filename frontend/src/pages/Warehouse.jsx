@@ -93,6 +93,11 @@ function ProductModal({ company, product, onClose, onSaved }) {
         </div>
 
         <input type="text" placeholder="Mahsulot nomi" value={form.name} onChange={(e) => setField("name", e.target.value)} required />
+        {!isEdit && (
+          <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "-6px 0 10px" }}>
+            Agar shu nomdagi mahsulot allaqachon bo'lsa, yangi qator ochilmaydi — kiritgan soningiz mavjudiga qo'shiladi.
+          </p>
+        )}
         <input type="number" placeholder="Narxi (so'm)" value={form.price} onChange={(e) => setField("price", e.target.value)} min="0" step="0.01" required />
         {!isEdit && (
           <input type="number" placeholder="Boshlang'ich soni" value={form.quantity} onChange={(e) => setField("quantity", e.target.value)} min="0" required />

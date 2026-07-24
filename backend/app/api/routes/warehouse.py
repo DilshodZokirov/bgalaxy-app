@@ -1,7 +1,7 @@
 import uuid as uuid_lib
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -97,6 +97,37 @@ async def create_product(
     color = payload.color if company.warehouse_type == "clothing" else None
     expiry_date = payload.expiry_date if company.warehouse_type == "food" else None
     sku = payload.sku if company.warehouse_type == "technology" else None
+
+    # Same product (by name, plus size/color for clothing or sku for tech)
+    # already exists — don't create a duplicate row, just add to its stock.
+    existing_query = select(WarehouseProduct).where(
+        WarehouseProduct.company_id == company_id,
+        func.lower(WarehouseProduct.name) == payload.name.strip().lower(),
+    )
+    if company.warehouse_type == "clothing":
+        existing_query = existing_query.where(
+            WarehouseProduct.size == size, WarehouseProduct.color == color
+        )
+    elif company.warehouse_type == "technology":
+        existing_query = existing_query.where(WarehouseProduct.sku == sku)
+    existing_result = await db.execute(existing_query)
+    existing = existing_result.scalar_one_or_none()
+
+    if existing is not None:
+        if payload.quantity:
+            existing.quantity += payload.quantity
+            db.add(
+                StockMovement(
+                    id=uuid_lib.uuid4(),
+                    product_id=existing.id,
+                    user_id=current_user.id,
+                    change=payload.quantity,
+                    note="Qo'shimcha zaxira (mavjud mahsulotga qo'shildi)",
+                )
+            )
+            await db.commit()
+            await db.refresh(existing)
+        return existing
 
     product = WarehouseProduct(
         id=uuid_lib.uuid4(),
