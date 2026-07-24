@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BG — Sayt bo'ylab sayohat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --panel: #111827;
+    --panel2: #1a2333;
+    --border: rgba(255,255,255,0.08);
+    --cyan: #22d3ee;
+    --purple: #7c3aed;
+    --blue: #3b82f6;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #f87171;
+    --white: #f3f5f9;
+    --dim: #8b93a7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #000; font-family: 'Inter', sans-serif; overflow: hidden; }
+
+  #app {
+    position: relative; width: 100%; height: 100vh;
+    display: flex;
+    background: var(--bg);
+    color: var(--white);
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar {
+    width: 220px; min-width: 220px; height: 100%;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 20px 12px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 22px;
+  }
+  .logo .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Sora'; font-weight: 800; font-size: 13px;
+  }
+  .logo span { font-family: 'Sora'; font-weight: 700; font-size: 14.5px; letter-spacing: 0.02em; }
+
+  .navitem {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 10px;
+    font-size: 13.5px; color: var(--dim);
+    margin-bottom: 3px;
+    position: relative;
+    transition: background 0.35s ease, color 0.35s ease;
+  }
+  .navitem .ic { font-size: 16px; width: 20px; text-align: center; }
+  .navitem.active { background: rgba(59,130,246,0.14); color: var(--white); }
+  .navitem.active::before {
+    content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px;
+    background: linear-gradient(180deg, var(--blue), var(--cyan)); border-radius: 3px;
+  }
+
+  /* fake cursor */
+  #cursor {
+    position: absolute; width: 18px; height: 18px; z-index: 100;
+    pointer-events: none;
+    transition: left 0.65s cubic-bezier(.2,.7,.3,1), top 0.65s cubic-bezier(.2,.7,.3,1);
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  }
+  #cursor svg { width: 100%; height: 100%; }
+  .click-ring {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--cyan); left: 4px; top: 4px;
+    opacity: 0; transform: scale(0.4);
+  }
+  .click-ring.fire { animation: ring 0.5s ease-out; }
+  @keyframes ring { 0%{opacity:0.9; transform:scale(0.4);} 100%{opacity:0; transform:scale(2.6);} }
+
+  /* ---------- Topbar ---------- */
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #topbar {
+    height: 56px; min-height: 56px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+  }
+  #pagetitle { font-family: 'Sora'; font-weight: 700; font-size: 15px; }
+  #topbar .right { display: flex; align-items: center; gap: 14px; color: var(--dim); font-size: 14px; }
+  .avatar-dot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,var(--purple),var(--cyan)); }
+
+  /* ---------- content ---------- */
+  #content { flex: 1; position: relative; overflow: hidden; }
+  .page {
+    position: absolute; inset: 0;
+    padding: 26px 30px;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    pointer-events: none;
+    overflow: auto;
+  }
+  .page.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  .grid { display: grid; gap: 14px; }
+  .stat-label { font-size: 11.5px; color: var(--dim); margin-bottom: 6px; }
+  .stat-value { font-family: 'Sora'; font-weight: 800; font-size: 22px; }
+  .pill { display: inline-block; font-size: 10.5px; padding: 3px 9px; border-radius: 999px; font-family: 'IBM Plex Mono'; }
+
+  /* narration caption */
+  #caption {
+    position: absolute; left: 24px; right: 24px; bottom: 20px; z-index: 90;
+    text-align: center;
+  }
+  #caption span {
+    display: inline-block;
+    background: rgba(5,7,11,0.82);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+    padding: 10px 20px; border-radius: 999px;
+    font-size: 13.5px; color: var(--white);
+    max-width: 720px;
+  }
+
+  #progress-wrap { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.06); z-index: 95; }
+  #progress-bar { height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); width: 0%; }
+
+  #controls { position: absolute; top: 16px; right: 16px; z-index: 95; display: flex; gap: 8px; }
+  #controls button {
+    font-family: 'IBM Plex Mono'; font-size: 11px;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--dim);
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  }
+  #controls button:hover { color: var(--white); }
+
+  #tc {
+    position: absolute; top: 18px; left: 16px; z-index: 95;
+    font-family: 'IBM Plex Mono'; font-size: 11.5px; color: var(--dim);
+    background: rgba(0,0,0,0.35); padding: 5px 10px; border-radius: 999px;
+  }
+
+  /* small ui bits reused across pages */
+  .chip { padding: 4px 10px; border-radius: 999px; font-size: 11px; background: var(--panel2); color: var(--dim); }
+  .kanban-col { background: var(--panel); border-radius: 12px; padding: 12px; min-width: 200px; flex: 1; }
+  .kanban-card { background: var(--panel2); border-radius: 9px; padding: 10px; margin-bottom: 8px; font-size: 12px; border: 1px solid var(--border); }
+  .msg-bubble { background: var(--panel2); border-radius: 12px; padding: 10px 14px; font-size: 12.5px; max-width: 60%; margin-bottom: 10px; }
+  .msg-bubble.me { background: rgba(59,130,246,0.18); margin-left: auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="logo"><div class="mark">BG</div><span>Business Galaxy</span></div>
+    <div id="navlist"></div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div id="pagetitle">Dashboard</div>
+      <div class="right"><span>🔔</span><div class="avatar-dot"></div></div>
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <div id="cursor"><svg viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="1"><path d="M4 2 L4 20 L9 15.5 L12.5 22 L15 20.5 L11.5 14 L18 14 Z"/></svg><div class="click-ring" id="ring"></div></div>
+
+  <div id="tc"><span id="tcval">0:00</span> / 3:00</div>
+  <div id="controls"><button id="restartBtn">↺ Qaytadan</button><button id="playBtn">⏸ Pauza</button></div>
+  <div id="caption"><span id="capval"></span></div>
+  <div id="progress-wrap"><div id="progress-bar"></div></div>
+</div>
+
+<script>
+const pages = [
+  {
+    key: 'dashboard', title: 'Dashboard', icon: '🏠', dur: 22,
+    caption: "Kirgach — kompaniyangizning umumiy holati bir qarashda.",
+    html: `
+      <div class="grid" style="grid-template-columns: repeat(4,1fr); margin-bottom:16px;">
+        <div class="card"><div class="stat-label">Umumiy daromad</div><div class="stat-value">248M so'm</div></div>
+        <div class="card"><div class="stat-label">Faol xodimlar</div><div class="stat-value">17</div></div>
+        <div class="card"><div class="stat-label">Bajarilgan vazifalar</div><div class="stat-value">86%</div></div>
+        <div class="card"><div class="stat-label">Faol uchrashuvlar</div><div class="stat-value">2</div></div>
+      </div>
+      <div class="grid" style="grid-template-columns: 2fr 1fr;">
+        <div class="card" style="height:220px; display:flex; align-items:flex-end; gap:10px; padding:20px;">
+          ${[40,65,50,80,60,90,70].map(h=>`<div style="flex:1; height:${h}%; border-radius:6px 6px 0 0; background:linear-gradient(180deg,var(--cyan),var(--blue));"></div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="stat-label" style="margin-bottom:10px;">🏆 Oyning eng faol xodimi</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="avatar-dot" style="width:40px;height:40px;"></div>
+            <div><div style="font-weight:600; font-size:13px;">Malika Yusupova</div><div style="font-size:11px; color:var(--dim);">32 vazifa bajarildi</div></div>
+          </div>
+        </div>
+      </div>`
+  },
+  {
+    key: 'chat', title: 'Chat', icon: '💬', dur: 20,
+    caption: "Kanallar va shaxsiy suhbatlar — jamoaviy muloqot bir joyda.",
+    html: `
+      <div style="display:flex; gap:16px; height:100%;">
+        <div style="width:200px;">
+          <div class="stat-label" style="margin-bottom:8px;">KANALLAR</div>
+          <div class="chip" style="display:block; margin-bottom:6px; background:rgba(59,130,246,0.18); color:var(--white);"># umumiy</div>
+          <div class="chip" style="display:block; margin-bottom:6px;"># marketing</div>
+          <div class="chip" style="display:block; margin-bottom:6px;"># dasturlash</div>
+        </div>
+        <div class="card" style="flex:1; display:flex; flex-direction:column; justify-content:flex-end;">
+          <div class="msg-bubble">Hisobotni yubordim, ko'rib chiqing 📊</div>
+          <div class="msg-bubble me">Rahmat, hoziroq ko'raman!</div>
+          <div class="msg-bubble">Ertangi uchrashuv soat 10:00 da</div>
+        </div>
+      </div>`
+  },
+  {
+    key: 'office', title: 'Virtual Ofis', icon: '🏢', dur: 24,
+    caption: "Jamoangiz — bitta 3D makonda, real vaqtli ovoz bilan birga ishlaydi.",
+    html: `
+      <div class="card" style="height:78%; position:relative; overflow:hidden; background:radial-gradient(circle at 50% 30%, #16233a, #0a0e17);">
+        <div style="position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size:44px 44px; transform:perspective(500px) rotateX(55deg); transform-origin:bottom;"></div>
+        <div style="position:absolute; left:35%; top:45%; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--cyan),var(--blue)); box-shadow:0 0 20px var(--cyan);"></div>
+        <div style="position:absolute; left:55%; top:60%; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--purple),var(--red)); box-shadow:0 0 20px var(--purple);"></div>
+        <div style="position:absolute; left:60%; top:35%; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--green),var(--cyan)); box-shadow:0 0 20px var(--green);"></div>
+      </div>
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:14px;">
+        <div class="chip">🎤 Mikrofon</div><div class="chip">📱 Telefon bo'limi</div><div class="chip">⏸ Pauza</div>
+      </div>`
+  },
+  {
+    key: 'meetings', title: 'Uchrashuvlar', icon: '📹', dur: 18,
+    caption: "Bir tugma bilan — guruh yoki istalgan hamkoringiz bilan video uchrashuv.",
+    html: `
+      <div class="grid" style="grid-template-columns:1fr 1fr; margin-bottom:16px;">
+        <div class="card"><div style="font-size:24px; margin-bottom:8px;">👥</div><div style="font-weight:600; font-size:13.5px;">Guruh uchrashuvi</div></div>
+        <div class="card"><div style="font-size:24px; margin-bottom:8px;">🌍</div><div style="font-weight:600; font-size:13.5px;">Hamkorlar bilan uchrashuv</div></div>
+      </div>
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <div><div class="pill" style="background:rgba(16,185,129,0.15); color:var(--green);">🟢 Faol</div> <span style="font-size:12.5px; margin-left:8px;">Guruh uchrashuvi — 3 kishi</span></div>
+        <div class="chip" style="background:var(--blue); color:#fff;">Kirish</div>
+      </div>`
+  },
+  {
+    key: 'ziyo', title: 'AI Ziyo', icon: '🤖', dur: 18,
+    caption: "Yordamga muhtoj bo'lsangiz — AI Ziyo doim yoningizda.",
+    html: `
+      <div class="card" style="height:78%; display:flex; flex-direction:column; justify-content:flex-end;">
+        <div class="msg-bubble me">Bu oyning eng ko'p sotilgan mahsuloti qaysi?</div>
+        <div class="msg-bubble">"Model X" — 340 dona sotildi, o'tgan oyga nisbatan 18% o'sish. Batafsil hisobotni Ombor bo'limidan ko'rishingiz mumkin.</div>
+      </div>`
+  },
+  {
+    key: 'tasks', title: 'Vazifalar', icon: '📋', dur: 20,
+    caption: "Kanban board orqali — kim, nima ustida ishlayotgani doim ko'rinadi.",
+    html: `
+      <div style="display:flex; gap:12px; height:100%;">
+        <div class="kanban-col"><div class="stat-label">Bajarilishi kerak</div><div class="kanban-card">Landing sahifa dizayni</div><div class="kanban-card">API hujjatlari</div></div>
+        <div class="kanban-col"><div class="stat-label">Jarayonda</div><div class="kanban-card">Ombor moduli</div></div>
+        <div class="kanban-col"><div class="stat-label">Tekshiruvda</div><div class="kanban-card">To'lov integratsiyasi</div></div>
+        <div class="kanban-col"><div class="stat-label">Bajarildi</div><div class="kanban-card" style="opacity:0.6;">Auth tizimi</div></div>
+      </div>`
+  },
+  {
+    key: 'accounting', title: 'Buxgalteriya', icon: '🧾', dur: 18,
+    caption: "Barcha moliyaviy hisobot, faktura va to'lovlar bir joyda.",
+    html: `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--dim); padding-bottom:10px; border-bottom:1px solid var(--border); margin-bottom:10px;">
+          <span>Sana</span><span>Turi</span><span>Summasi</span>
+        </div>
+        ${[["24.07","Faktura #1042","+ 4 200 000"],["23.07","Ish haqi","- 12 000 000"],["21.07","Faktura #1041","+ 2 800 000"]].map(r=>`
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; padding:8px 0;">
+          <span style="color:var(--dim);">${r[0]}</span><span>${r[1]}</span><span style="color:${r[2][0]==='+'?'var(--green)':'var(--red)'};">${r[2]} so'm</span>
+        </div>`).join('')}
+      </div>`
+  },
+  {
+    key: 'warehouse', title: 'Ombor', icon: '📦', dur: 20,
+    caption: "Mahsulot va zaxirangizni real vaqtda kuzating.",
+    html: `
+      <div class="grid" style="grid-template-columns: repeat(3,1fr);">
+        ${[["📺 Televizor","24 dona"],["👕 Ko'ylak (M)","150 dona"],["🍚 Guruch","480 kg"]].map(p=>`
+        <div class="card">
+          <div style="font-size:26px; margin-bottom:8px;">${p[0].split(' ')[0]}</div>
+          <div style="font-weight:600; font-size:13px;">${p[0].split(' ').slice(1).join(' ')}</div>
+          <div class="pill" style="background:rgba(16,185,129,0.15); color:var(--green); margin-top:8px;">${p[1]}</div>
+        </div>`).join('')}
+      </div>`
+  }
+];
+
+const navlist = document.getElementById('navlist');
+pages.forEach(p => {
+  const d = document.createElement('div');
+  d.className = 'navitem';
+  d.id = 'nav-' + p.key;
+  d.innerHTML = `<span class="ic">${p.icon}</span><span>${p.title}</span>`;
+  navlist.appendChild(d);
+});
+
+const content = document.getElementById('content');
+pages.forEach(p => {
+  const d = document.createElement('div');
+  d.className = 'page';
+  d.id = 'page-' + p.key;
+  d.innerHTML = p.html;
+  content.appendChild(d);
+});
+
+const totalDur = pages.reduce((a,p)=>a+p.dur,0);
+let idx = 0, elapsed = 0, playing = true, timer = null;
+
+function fmt(t){ const m=Math.floor(t/60), s=Math.floor(t%60); return m+':'+String(s).padStart(2,'0'); }
+
+function moveCursorTo(el) {
+  const r = el.getBoundingClientRect();
+  const cursor = document.getElementById('cursor');
+  cursor.style.left = (r.left + r.width/2 - 4) + 'px';
+  cursor.style.top = (r.top + r.height/2 - 2) + 'px';
+  setTimeout(() => {
+    const ring = document.getElementById('ring');
+    ring.classList.remove('fire'); void ring.offsetWidth; ring.classList.add('fire');
+  }, 650);
+}
+
+function showPage(i) {
+  const p = pages[i];
+  document.querySelectorAll('.navitem').forEach(n => n.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + p.key);
+  navEl.classList.add('active');
+  moveCursorTo(navEl);
+  setTimeout(() => {
+    document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
+    document.getElementById('page-' + p.key).classList.add('active');
+    document.getElementById('pagetitle').textContent = p.title;
+    document.getElementById('capval').textContent = p.caption;
+  }, 300);
+}
+
+function elapsedBefore(i){ let t=0; for(let k=0;k<i;k++) t+=pages[k].dur; return t; }
+
+function scheduleNext() {
+  if (!playing) return;
+  clearTimeout(timer);
+  const remain = pages[idx].dur - (elapsed - elapsedBefore(idx));
+  timer = setTimeout(() => {
+    if (idx < pages.length - 1) { idx++; showPage(idx); scheduleNext(); }
+  }, Math.max(50, remain*1000));
+}
+
+function tick() {
+  if (!playing) return;
+  elapsed += 0.1;
+  if (elapsed >= totalDur) elapsed = totalDur;
+  document.getElementById('tcval').textContent = fmt(elapsed);
+  document.getElementById('progress-bar').style.width = (elapsed/totalDur*100)+'%';
+}
+
+showPage(0);
+scheduleNext();
+setInterval(tick, 100);
+
+document.getElementById('playBtn').addEventListener('click', function(){
+  playing = !playing;
+  this.textContent = playing ? '⏸ Pauza' : '▶ Davom';
+  if (playing) scheduleNext(); else clearTimeout(timer);
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  clearTimeout(timer); idx=0; elapsed=0; playing=true;
+  document.getElementById('playBtn').textContent = '⏸ Pauza';
+  showPage(0); scheduleNext();
+});
+</script>
+</body>
+</html>
