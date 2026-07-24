@@ -145,6 +145,7 @@ async def create_product(
         notes=payload.notes,
     )
     db.add(product)
+    await db.flush()  # guarantees the product row exists before we reference its id below
     if payload.quantity:
         db.add(
             StockMovement(
