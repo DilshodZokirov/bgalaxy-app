@@ -16,6 +16,8 @@ class CompanyOut(BaseModel):
     slug: str
     owner_id: uuid.UUID
     logo_url: str | None = None
+    has_warehouse: bool = False
+    warehouse_type: str | None = None
 
     class Config:
         from_attributes = True

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, tasks, users
+from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, tasks, users, warehouse
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ app.include_router(complaints.router)
 app.include_router(office.router)
 app.include_router(group_meeting.router)
 app.include_router(partner_meeting.router)
+app.include_router(warehouse.router)
 
 
 @app.get("/health")

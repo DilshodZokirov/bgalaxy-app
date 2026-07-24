@@ -48,6 +48,25 @@ export const api = {
   createCompany: (data) => request("/companies", { method: "POST", body: data }),
   deleteCompany: (companyId) => request(`/companies/${companyId}`, { method: "DELETE" }),
   getMyCompanies: () => request("/companies/mine"),
+  updateWarehouseSettings: (companyId, hasWarehouse, warehouseType) =>
+    request(`/companies/${companyId}/warehouse/settings`, {
+      method: "PATCH",
+      body: { has_warehouse: hasWarehouse, warehouse_type: warehouseType },
+    }),
+  getWarehouseProducts: (companyId) => request(`/companies/${companyId}/warehouse/products`),
+  createWarehouseProduct: (companyId, data) =>
+    request(`/companies/${companyId}/warehouse/products`, { method: "POST", body: data }),
+  updateWarehouseProduct: (companyId, productId, data) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}`, { method: "PATCH", body: data }),
+  deleteWarehouseProduct: (companyId, productId) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}`, { method: "DELETE" }),
+  adjustWarehouseStock: (companyId, productId, change, note) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}/stock`, {
+      method: "POST",
+      body: { change, note },
+    }),
+  getWarehouseStockHistory: (companyId, productId) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}/history`),
   getMe: () => request("/auth/me"),
   getChannels: (companyId) => request(`/companies/${companyId}/channels`),
   createChannel: (companyId, data) =>

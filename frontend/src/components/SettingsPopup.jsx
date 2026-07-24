@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ProfileInfoSection, PinSection, AutoLockSection, DashboardUiSection } from "./SettingsSections";
+import { ProfileInfoSection, PinSection, AutoLockSection, DashboardUiSection, WarehouseSection } from "./SettingsSections";
 
 const NAV_GROUPS = [
   {
@@ -14,11 +14,15 @@ const NAV_GROUPS = [
     label: "Dashboard tahriri",
     items: [{ key: "ui", icon: "🎨", label: "UI tahriri" }],
   },
+  {
+    label: "Kompaniya",
+    items: [{ key: "warehouse", icon: "📦", label: "Ombor" }],
+  },
 ];
 
 export default function SettingsPopup({ user, onClose, onSaved }) {
   const [active, setActive] = useState("info");
-  const [expanded, setExpanded] = useState({ "Shaxsiy profil": true, "Dashboard tahriri": false });
+  const [expanded, setExpanded] = useState({ "Shaxsiy profil": true, "Dashboard tahriri": false, "Kompaniya": false });
 
   function toggleGroup(label) {
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -125,6 +129,12 @@ export default function SettingsPopup({ user, onClose, onSaved }) {
             <>
               <h3 style={{ fontSize: 16, margin: "0 0 16px" }}>🎨 UI tahriri</h3>
               <DashboardUiSection user={user} onSaved={onSaved} />
+            </>
+          )}
+          {active === "warehouse" && (
+            <>
+              <h3 style={{ fontSize: 16, margin: "0 0 16px" }}>📦 Ombor</h3>
+              <WarehouseSection />
             </>
           )}
         </div>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { pickActiveCompany } from "../hooks/useCompany";
 import { BACKGROUND_PRESETS } from "../data/backgrounds";
 import { UI_THEMES } from "../data/uiThemes";
 
@@ -444,6 +445,88 @@ export function DashboardUiSection({ user, onSaved }) {
         </button>
       )}
       {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+// ---------- 5. Ombor (kompaniya darajasidagi sozlama) ----------
+const WAREHOUSE_TYPE_LABELS = {
+  technology: "Texnologiya",
+  clothing: "Kiyim-kechak",
+  food: "Oziq-ovqat",
+};
+
+export function WarehouseSection() {
+  const [company, setCompany] = useState(null);
+  const [hasWarehouse, setHasWarehouse] = useState(false);
+  const [warehouseType, setWarehouseType] = useState("technology");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api
+      .getMyCompanies()
+      .then((list) => {
+        const active = pickActiveCompany(list);
+        setCompany(active);
+        if (active) {
+          setHasWarehouse(!!active.has_warehouse);
+          setWarehouseType(active.warehouse_type || "technology");
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleSave() {
+    if (!company) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await api.updateWarehouseSettings(company.id, hasWarehouse, hasWarehouse ? warehouseType : null);
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!company) {
+    return <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Avval kompaniya tanlang.</p>;
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 14px" }}>
+        <strong style={{ color: "var(--text)" }}>{company.name}</strong> uchun ombor bo'limini yoqing yoki o'chiring.
+      </p>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}>
+        <input type="checkbox" checked={hasWarehouse} onChange={(e) => setHasWarehouse(e.target.checked)} style={{ width: "auto" }} />
+        <span style={{ fontSize: 13 }}>Ombor bo'limini yoqish</span>
+      </label>
+
+      {hasWarehouse && (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 8px" }}>Korxonangiz nima ishlab chiqarish uchun mo'ljallangan?</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Object.entries(WAREHOUSE_TYPE_LABELS).map(([key, label]) => (
+              <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                <input type="radio" name="warehouse_type" checked={warehouseType === key} onChange={() => setWarehouseType(key)} style={{ width: "auto" }} />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="error">{error}</p>}
+      {saved && <p style={{ color: "var(--green)", fontSize: 12.5, margin: "0 0 12px" }}>✓ Saqlandi</p>}
+      <button className="secondary" disabled={saving} onClick={handleSave}>
+        {saving ? "Saqlanmoqda..." : "Saqlash"}
+      </button>
     </div>
   );
 }

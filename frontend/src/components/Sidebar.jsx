@@ -22,12 +22,18 @@ export default function Sidebar({ onOpenSettings }) {
   const [activeId, setActiveIdState] = useState(getActiveCompanyId());
   const [canManageAccounting, setCanManageAccounting] = useState(false);
   const [canViewAnalytics, setCanViewAnalytics] = useState(false);
+  const [hasWarehouse, setHasWarehouse] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("bgalaxy_sidebar_collapsed") === "1");
 
   useEffect(() => {
     api
       .getMyCompanies()
-      .then(setCompanies)
+      .then((list) => {
+        setCompanies(list);
+        const id = getActiveCompanyId() || list[0]?.id;
+        const active = list.find((c) => c.id === id) || list[0];
+        setHasWarehouse(!!active?.has_warehouse);
+      })
       .catch(() => {});
   }, []);
 
@@ -71,9 +77,12 @@ export default function Sidebar({ onOpenSettings }) {
   const navItems = canManageAccounting
     ? [...NAV_ITEMS, { icon: "🧾", label: "Buxgalteriya", to: "/accounting" }]
     : NAV_ITEMS;
-  const withAnalytics = canViewAnalytics
-    ? [...navItems, { icon: "📈", label: "Analitika", to: "/analytics" }]
+  const withWarehouse = hasWarehouse
+    ? [...navItems, { icon: "📦", label: "Ombor", to: "/warehouse" }]
     : navItems;
+  const withAnalytics = canViewAnalytics
+    ? [...withWarehouse, { icon: "📈", label: "Analitika", to: "/analytics" }]
+    : withWarehouse;
   const finalNavItems = user?.is_developer
     ? [...withAnalytics, { icon: "🛠️", label: "Developer paneli", to: "/developer" }]
     : withAnalytics;

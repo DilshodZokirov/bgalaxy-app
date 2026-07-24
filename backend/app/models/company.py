@@ -27,6 +27,8 @@ class Company(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    has_warehouse: Mapped[bool] = mapped_column(default=False)
+    warehouse_type: Mapped[str | None] = mapped_column(String(30), nullable=True)  # "technology"|"clothing"|"food"
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

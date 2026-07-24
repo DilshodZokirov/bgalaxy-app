@@ -24,6 +24,7 @@ import Tasks from "./pages/Tasks";
 import VerifyEmail from "./pages/VerifyEmail";
 import DeveloperPanel from "./pages/DeveloperPanel";
 import Analytics from "./pages/Analytics";
+import Warehouse from "./pages/Warehouse";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
@@ -174,6 +175,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/warehouse"
+          element={
+            <ProtectedRoute>
+              <Warehouse />
             </ProtectedRoute>
           }
         />
