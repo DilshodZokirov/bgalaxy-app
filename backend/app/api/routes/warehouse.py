@@ -159,7 +159,7 @@ async def create_product(
 
     if existing is not None:
         if payload.quantity:
-            existing.quantity += payload.quantity
+            existing.quantity = float(existing.quantity) + payload.quantity
             db.add(
                 StockMovement(
                     id=uuid_lib.uuid4(),
@@ -285,7 +285,7 @@ async def adjust_stock(
     if product is None:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
-    new_quantity = product.quantity + payload.change
+    new_quantity = float(product.quantity) + payload.change
     if new_quantity < 0:
         raise HTTPException(status_code=400, detail="Omborda yetarli mahsulot yo'q")
 
