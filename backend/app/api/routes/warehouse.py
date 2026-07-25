@@ -343,7 +343,9 @@ async def get_warehouse_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Statistika: qabul qilingan (kirim) mahsulotlar davr bo'yicha.
+    """Statistika: qabul qilingan (kirim) mahsulotlar davr bo'yicha, HAR BIR
+    mahsulot uchun alohida (turli birliklarni — dona/kg/litr — bitta songa
+    qo'shib bo'lmaydi, shuning uchun bu yerda hech narsa aralashtirilmaydi).
     "Sotilgan" hozircha har doim 0 — distributiv/savdo integratsiyasi
     ulanganda avtomatik hisoblanadigan bo'ladi."""
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
@@ -352,7 +354,7 @@ async def get_warehouse_dashboard(
     buckets, start, key_fn = _dashboard_buckets(period)
 
     result = await db.execute(
-        select(StockMovement.created_at, StockMovement.change)
+        select(StockMovement.created_at, StockMovement.change, WarehouseProduct.id, WarehouseProduct.name, WarehouseProduct.unit)
         .join(WarehouseProduct, WarehouseProduct.id == StockMovement.product_id)
         .where(
             WarehouseProduct.company_id == company_id,
@@ -360,26 +362,40 @@ async def get_warehouse_dashboard(
             StockMovement.change > 0,
         )
     )
-    received_by_bucket = {b: 0.0 for b in buckets}
-    for created_at, change in result.all():
-        key = key_fn(created_at.date())
-        if key in received_by_bucket:
-            received_by_bucket[key] += float(change)
+    rows = result.all()
 
-    trend = [{"label": b, "received": received_by_bucket[b], "sold": 0} for b in buckets]
-    total_received = sum(received_by_bucket.values())
+    # Trend line stays unit-agnostic on purpose — it counts KIRIM EVENTS per
+    # period bucket, not raw quantities, so mixing a "5 kg" delivery with a
+    # "5 dona" delivery in the same chart never produces a meaningless sum.
+    events_by_bucket = {b: 0 for b in buckets}
+    # Per-product totals, kept in each product's own unit — this is what
+    # actually answers "how much of THIS product came in this period".
+    by_product: dict[str, dict] = {}
+    for created_at, change, product_id_val, name, unit in rows:
+        key = key_fn(created_at.date())
+        if key in events_by_bucket:
+            events_by_bucket[key] += 1
+        entry = by_product.setdefault(str(product_id_val), {"name": name, "unit": unit, "received": 0.0})
+        entry["received"] += float(change)
+
+    trend = [{"label": b, "events": events_by_bucket[b]} for b in buckets]
+    by_product_list = sorted(by_product.values(), key=lambda e: e["received"], reverse=True)
 
     products_result = await db.execute(
-        select(func.count(WarehouseProduct.id), func.coalesce(func.sum(WarehouseProduct.quantity), 0)).where(
-            WarehouseProduct.company_id == company_id
-        )
+        select(WarehouseProduct.unit, func.count(WarehouseProduct.id), func.coalesce(func.sum(WarehouseProduct.quantity), 0))
+        .where(WarehouseProduct.company_id == company_id)
+        .group_by(WarehouseProduct.unit)
     )
-    product_count, total_quantity = products_result.one()
+    total_by_unit = {}
+    product_count = 0
+    for unit, count, qty in products_result.all():
+        total_by_unit[unit] = float(qty)
+        product_count += count
 
     return {
         "trend": trend,
-        "total_received": total_received,
+        "by_product": by_product_list,
+        "total_by_unit": total_by_unit,
         "total_sold": 0,
         "product_count": product_count,
-        "total_quantity": float(total_quantity),
     }

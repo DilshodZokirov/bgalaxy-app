@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
@@ -328,8 +328,6 @@ const PERIODS = [
   { key: "year", label: "1 yil" },
 ];
 
-const PIE_COLORS = ["var(--green)", "#f87171"];
-
 function WarehouseDashboard({ company }) {
   const [period, setPeriod] = useState("month");
   const [chartType, setChartType] = useState("line");
@@ -346,10 +344,9 @@ function WarehouseDashboard({ company }) {
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>;
 
-  const pieData = [
-    { name: "Qabul qilingan", value: data.total_received },
-    { name: "Sotilgan", value: data.total_sold },
-  ];
+  const unitEntries = Object.entries(data.total_by_unit || {});
+  const totalEvents = (data.trend || []).reduce((sum, t) => sum + t.events, 0);
+  const maxReceived = Math.max(1, ...data.by_product.map((p) => p.received));
 
   return (
     <div>
@@ -358,13 +355,21 @@ function WarehouseDashboard({ company }) {
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Jami mahsulot turi</div>
           <div style={{ fontSize: 22, fontWeight: 700 }}>{data.product_count}</div>
         </div>
-        <div className="card" style={{ flex: "1 1 160px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy zaxira</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{data.total_quantity}</div>
+        <div className="card" style={{ flex: "1 1 220px" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Umumiy zaxira (birlik bo'yicha)</div>
+          {unitEntries.length === 0 ? (
+            <div style={{ fontSize: 22, fontWeight: 700 }}>0</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {unitEntries.map(([unit, qty]) => (
+                <div key={unit}><span style={{ fontSize: 18, fontWeight: 700 }}>{qty}</span> <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{UNIT_LABELS[unit] || unit}</span></div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="card" style={{ flex: "1 1 160px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Qabul qilingan (davr)</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{data.total_received}</div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Kirim harakatlari (davr)</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{totalEvents}</div>
         </div>
         <div className="card" style={{ flex: "1 1 160px" }}>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan (davr)</div>
@@ -373,13 +378,13 @@ function WarehouseDashboard({ company }) {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <strong style={{ fontSize: 14 }}>📈 Qabul qilingan / sotilgan mahsulotlar</strong>
+          <strong style={{ fontSize: 14 }}>📈 Kirim harakatlari (davr bo'yicha)</strong>
           <div style={{ display: "flex", gap: 6 }}>
-            {["line", "bar", "pie"].map((t) => (
-              <button key={t} className={chartType === t ? "secondary" : "secondary"} style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
-                {t === "line" ? "📉 Chiziq" : t === "bar" ? "📊 Ustun" : "🥧 Doira"}
+            {["line", "bar"].map((t) => (
+              <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
+                {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
               </button>
             ))}
           </div>
@@ -393,42 +398,49 @@ function WarehouseDashboard({ company }) {
           ))}
         </div>
 
-        {chartType !== "pie" ? (
-          <ResponsiveContainer width="100%" height={260}>
-            {chartType === "line" ? (
-              <LineChart data={data.trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                <YAxis stroke="var(--text-dim)" fontSize={11} />
-                <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
-                <Legend />
-                <Line type="monotone" dataKey="received" name="Qabul qilingan" stroke="var(--green)" strokeWidth={2} />
-                <Line type="monotone" dataKey="sold" name="Sotilgan" stroke="#f87171" strokeWidth={2} />
-              </LineChart>
-            ) : (
-              <BarChart data={data.trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                <YAxis stroke="var(--text-dim)" fontSize={11} />
-                <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
-                <Legend />
-                <Bar dataKey="received" name="Qabul qilingan" fill="var(--green)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="sold" name="Sotilgan" fill="#f87171" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
-        ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
-                {pieData.map((entry, i) => (
-                  <Cell key={entry.name} fill={PIE_COLORS[i]} />
-                ))}
-              </Pie>
+        <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "0 0 12px" }}>
+          Turli mahsulotlar turli birlikda (dona/kg/litr) o'lchangani uchun, bu grafik ularni bitta noto'g'ri songa qo'shmaydi — shunchaki qancha marta zaxira qo'shilganini ko'rsatadi. Har bir mahsulotning aniq miqdori pastdagi ro'yxatda.
+        </p>
+
+        <ResponsiveContainer width="100%" height={220}>
+          {chartType === "line" ? (
+            <LineChart data={data.trend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+              <YAxis stroke="var(--text-dim)" fontSize={11} allowDecimals={false} />
               <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+              <Line type="monotone" dataKey="events" name="Kirim soni" stroke="var(--cyan, #22d3ee)" strokeWidth={2} />
+            </LineChart>
+          ) : (
+            <BarChart data={data.trend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+              <YAxis stroke="var(--text-dim)" fontSize={11} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
+              <Bar dataKey="events" name="Kirim soni" fill="var(--cyan, #22d3ee)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+
+      <div className="card">
+        <strong style={{ fontSize: 14, display: "block", marginBottom: 14 }}>📦 Mahsulotlar bo'yicha qabul qilingan (davr)</strong>
+        {data.by_product.length === 0 ? (
+          <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Bu davrda hech qanday kirim bo'lmagan.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {data.by_product.map((p) => (
+              <div key={p.name + p.unit}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
+                  <span>{p.name}</span>
+                  <span style={{ color: "var(--green)" }}>+{p.received} {UNIT_LABELS[p.unit] || p.unit}</span>
+                </div>
+                <div style={{ height: 6, background: "var(--panel-2)", borderRadius: 999 }}>
+                  <div style={{ height: "100%", width: `${(p.received / maxReceived) * 100}%`, background: "var(--green)", borderRadius: 999 }} />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
