@@ -8,6 +8,7 @@ from app.models.company import MemberRole
 class CompanyCreate(BaseModel):
     name: str
     slug: str
+    company_type: str = "kompaniya"  # "kompaniya" | "distributor" | "market"
 
 
 class CompanyOut(BaseModel):
@@ -16,6 +17,7 @@ class CompanyOut(BaseModel):
     slug: str
     owner_id: uuid.UUID
     logo_url: str | None = None
+    company_type: str = "kompaniya"
     has_warehouse: bool = False
     warehouse_type: str | None = None
 

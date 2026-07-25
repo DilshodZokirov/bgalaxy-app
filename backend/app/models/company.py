@@ -27,6 +27,7 @@ class Company(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    company_type: Mapped[str] = mapped_column(String(20), default="kompaniya")  # "kompaniya" | "distributor" | "market"
     has_warehouse: Mapped[bool] = mapped_column(default=False)
     warehouse_type: Mapped[str | None] = mapped_column(String(30), nullable=True)  # "technology"|"clothing"|"food"
     created_at: Mapped[datetime] = mapped_column(

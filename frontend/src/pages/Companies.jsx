@@ -15,11 +15,18 @@ function slugify(name) {
     .replace(/(^-|-$)/g, "");
 }
 
+const COMPANY_TYPES = [
+  { key: "kompaniya", icon: "🏭", label: "Kompaniya", desc: "Ishlab chiqarish" },
+  { key: "distributor", icon: "🚚", label: "Distributiv firma", desc: "Ombordan buyurtma qiladi" },
+  { key: "market", icon: "🏪", label: "Market", desc: "Distributivdan buyurtma qiladi" },
+];
+
 export default function Companies() {
   const { user } = useAuth();
   const [companies, setCompanies] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState("");
+  const [companyType, setCompanyType] = useState("kompaniya");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [permMap, setPermMap] = useState({});
@@ -65,9 +72,10 @@ export default function Companies() {
     setError(null);
     setLoading(true);
     try {
-      const res = await api.createCompany({ name, slug: slugify(name) });
+      const res = await api.createCompany({ name, slug: slugify(name), company_type: companyType });
       setActiveCompanyId(res.id);
       setName("");
+      setCompanyType("kompaniya");
       setShowCreateForm(false);
       refreshCompanies();
     } catch (err) {
@@ -162,6 +170,27 @@ export default function Companies() {
               onChange={(e) => setName(e.target.value)}
               required
             />
+            <label>Kompaniya turi</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {COMPANY_TYPES.map((t) => (
+                <div
+                  key={t.key}
+                  onClick={() => setCompanyType(t.key)}
+                  style={{
+                    cursor: "pointer",
+                    padding: "10px 8px",
+                    borderRadius: "var(--radius-sm)",
+                    border: `1px solid ${companyType === t.key ? "var(--blue)" : "var(--border)"}`,
+                    background: companyType === t.key ? "rgba(59,130,246,0.12)" : "var(--panel-2)",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{t.icon}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{t.label}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{t.desc}</div>
+                </div>
+              ))}
+            </div>
             {error && <p className="error">{error}</p>}
             <button type="submit" disabled={loading}>
               {loading ? "Yaratilmoqda..." : "+ Kompaniya yaratish"}
@@ -178,7 +207,12 @@ export default function Companies() {
                 {company.name.slice(0, 2).toUpperCase()}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{company.name}</div>
+                <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                  {company.name}
+                  <span style={{ fontSize: 10.5, color: "var(--text-dim)", background: "var(--panel-2)", padding: "2px 8px", borderRadius: 999 }}>
+                    {COMPANY_TYPES.find((t) => t.key === company.company_type)?.icon} {COMPANY_TYPES.find((t) => t.key === company.company_type)?.label || "Kompaniya"}
+                  </span>
+                </div>
                 <div style={{ fontSize: 13, color: "var(--text-dim)" }}>/{company.slug}</div>
               </div>
               {company.id === activeId ? (

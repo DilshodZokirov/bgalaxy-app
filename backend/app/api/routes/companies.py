@@ -24,7 +24,10 @@ async def create_company(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Slug already taken")
 
-    company = Company(name=payload.name, slug=payload.slug, owner_id=current_user.id)
+    if payload.company_type not in ("kompaniya", "distributor", "market"):
+        raise HTTPException(status_code=400, detail="Noto'g'ri kompaniya turi")
+
+    company = Company(name=payload.name, slug=payload.slug, owner_id=current_user.id, company_type=payload.company_type)
     db.add(company)
     await db.flush()
 
