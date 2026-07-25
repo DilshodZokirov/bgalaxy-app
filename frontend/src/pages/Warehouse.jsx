@@ -328,9 +328,16 @@ const PERIODS = [
   { key: "year", label: "1 yil" },
 ];
 
+const DASHBOARD_VIEWS = [
+  { key: "current", label: "📦 Mahsulotlar bo'yicha" },
+  { key: "budget", label: "💰 Umumiy byudjet" },
+  { key: "sold", label: "📈 Sotilgan tovarlar aylanmasi" },
+];
+
 function WarehouseDashboard({ company }) {
   const [period, setPeriod] = useState("month");
   const [chartType, setChartType] = useState("line");
+  const [view, setView] = useState("current");
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -347,9 +354,20 @@ function WarehouseDashboard({ company }) {
   const unitEntries = Object.entries(data.total_by_unit || {});
   const totalEvents = (data.trend || []).reduce((sum, t) => sum + t.events, 0);
   const maxReceived = Math.max(1, ...data.by_product.map((p) => p.received));
+  const maxBudget = Math.max(1, ...(data.by_product_budget || []).map((p) => p.value));
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {DASHBOARD_VIEWS.map((v) => (
+          <button key={v.key} className={view === v.key ? "" : "secondary"} style={{ width: "auto", padding: "8px 14px", fontSize: 12.5 }} onClick={() => setView(v.key)}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "current" && (
+      <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
         <div className="card" style={{ flex: "1 1 160px" }}>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Jami mahsulot turi</div>
@@ -443,6 +461,50 @@ function WarehouseDashboard({ company }) {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {view === "budget" && (
+        <>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy byudjet qiymati</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--cyan, #22d3ee)" }}>{money(data.total_budget_value)}</div>
+            <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>
+              Har bir mahsulot narxi × soni bo'yicha hisoblangan — shu sababli turli birlikdagi (dona/kg/litr) mahsulotlarni bemalol bitta qiymatda solishtirish mumkin.
+            </p>
+          </div>
+          <div className="card">
+            <strong style={{ fontSize: 14, display: "block", marginBottom: 14 }}>💰 Mahsulotlar bo'yicha byudjet</strong>
+            {(!data.by_product_budget || data.by_product_budget.length === 0) ? (
+              <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Hali mahsulot qo'shilmagan.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {data.by_product_budget.map((p) => (
+                  <div key={p.name + p.unit}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
+                      <span>{p.name} <span style={{ color: "var(--text-dim)" }}>({p.quantity} {UNIT_LABELS[p.unit] || p.unit})</span></span>
+                      <span style={{ color: "var(--cyan, #22d3ee)" }}>{money(p.value)}</span>
+                    </div>
+                    <div style={{ height: 6, background: "var(--panel-2)", borderRadius: 999 }}>
+                      <div style={{ height: "100%", width: `${(p.value / maxBudget) * 100}%`, background: "var(--cyan, #22d3ee)", borderRadius: 999 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {view === "sold" && (
+        <div className="card">
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan tovarlar aylanmasi (umumiy narxi)</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "#f87171" }}>{money(data.total_sold_value || 0)}</div>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>
+            Hozircha savdo ma'lumotlari yo'q. Distributiv firma moduli ulanganda, sotilgan har bir mahsulot bu yerda avtomatik hisoblanadi va aylanma real vaqtda ko'rinadi.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

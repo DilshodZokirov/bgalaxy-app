@@ -392,10 +392,28 @@ async def get_warehouse_dashboard(
         total_by_unit[unit] = float(qty)
         product_count += count
 
+    # "Umumiy byudjet" view — price ties every product to a common unit
+    # (so'm), so unlike raw quantities, these values CAN be meaningfully
+    # summed across a mix of dona/kg/litr products.
+    budget_result = await db.execute(
+        select(WarehouseProduct.name, WarehouseProduct.unit, WarehouseProduct.quantity, WarehouseProduct.price)
+        .where(WarehouseProduct.company_id == company_id)
+    )
+    by_product_budget = []
+    total_budget_value = 0.0
+    for name, unit, qty, price in budget_result.all():
+        value = float(qty) * float(price)
+        total_budget_value += value
+        by_product_budget.append({"name": name, "unit": unit, "quantity": float(qty), "price": float(price), "value": value})
+    by_product_budget.sort(key=lambda e: e["value"], reverse=True)
+
     return {
         "trend": trend,
         "by_product": by_product_list,
         "total_by_unit": total_by_unit,
         "total_sold": 0,
+        "total_sold_value": 0,
         "product_count": product_count,
+        "by_product_budget": by_product_budget,
+        "total_budget_value": total_budget_value,
     }
