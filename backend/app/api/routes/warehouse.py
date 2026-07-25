@@ -354,7 +354,10 @@ async def get_warehouse_dashboard(
     buckets, start, key_fn = _dashboard_buckets(period)
 
     result = await db.execute(
-        select(StockMovement.created_at, StockMovement.change, WarehouseProduct.id, WarehouseProduct.name, WarehouseProduct.unit)
+        select(
+            StockMovement.created_at, StockMovement.change,
+            WarehouseProduct.id, WarehouseProduct.name, WarehouseProduct.unit, WarehouseProduct.price,
+        )
         .join(WarehouseProduct, WarehouseProduct.id == StockMovement.product_id)
         .where(
             WarehouseProduct.company_id == company_id,
@@ -367,18 +370,25 @@ async def get_warehouse_dashboard(
     # Trend line stays unit-agnostic on purpose — it counts KIRIM EVENTS per
     # period bucket, not raw quantities, so mixing a "5 kg" delivery with a
     # "5 dona" delivery in the same chart never produces a meaningless sum.
+    # received_value (change × price, summed in so'm) IS safe to sum across
+    # units though — that's what powers the "Umumiy byudjet" trend chart.
     events_by_bucket = {b: 0 for b in buckets}
+    received_value_by_bucket = {b: 0.0 for b in buckets}
     # Per-product totals, kept in each product's own unit — this is what
     # actually answers "how much of THIS product came in this period".
     by_product: dict[str, dict] = {}
-    for created_at, change, product_id_val, name, unit in rows:
+    for created_at, change, product_id_val, name, unit, price in rows:
         key = key_fn(created_at.date())
         if key in events_by_bucket:
             events_by_bucket[key] += 1
+            received_value_by_bucket[key] += float(change) * float(price)
         entry = by_product.setdefault(str(product_id_val), {"name": name, "unit": unit, "received": 0.0})
         entry["received"] += float(change)
 
-    trend = [{"label": b, "events": events_by_bucket[b]} for b in buckets]
+    trend = [
+        {"label": b, "events": events_by_bucket[b], "received_value": received_value_by_bucket[b], "sold_value": 0}
+        for b in buckets
+    ]
     by_product_list = sorted(by_product.values(), key=lambda e: e["received"], reverse=True)
 
     products_result = await db.execute(

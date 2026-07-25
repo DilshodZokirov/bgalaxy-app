@@ -467,12 +467,52 @@ function WarehouseDashboard({ company }) {
       {view === "budget" && (
         <>
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy byudjet qiymati</div>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy byudjet qiymati (hozirgi zaxira)</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--cyan, #22d3ee)" }}>{money(data.total_budget_value)}</div>
             <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>
               Har bir mahsulot narxi × soni bo'yicha hisoblangan — shu sababli turli birlikdagi (dona/kg/litr) mahsulotlarni bemalol bitta qiymatda solishtirish mumkin.
             </p>
           </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <strong style={{ fontSize: 14 }}>📈 Qabul qilingan zaxira qiymati (davr bo'yicha)</strong>
+              <div style={{ display: "flex", gap: 6 }}>
+                {["line", "bar"].map((t) => (
+                  <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
+                    {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+              {PERIODS.map((p) => (
+                <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              {chartType === "line" ? (
+                <LineChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
+                  <Line type="monotone" dataKey="received_value" name="Qabul qilingan qiymat" stroke="var(--cyan, #22d3ee)" strokeWidth={2} />
+                </LineChart>
+              ) : (
+                <BarChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
+                  <Bar dataKey="received_value" name="Qabul qilingan qiymat" fill="var(--cyan, #22d3ee)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+
           <div className="card">
             <strong style={{ fontSize: 14, display: "block", marginBottom: 14 }}>💰 Mahsulotlar bo'yicha byudjet</strong>
             {(!data.by_product_budget || data.by_product_budget.length === 0) ? (
@@ -497,13 +537,54 @@ function WarehouseDashboard({ company }) {
       )}
 
       {view === "sold" && (
-        <div className="card">
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan tovarlar aylanmasi (umumiy narxi)</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#f87171" }}>{money(data.total_sold_value || 0)}</div>
-          <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>
-            Hozircha savdo ma'lumotlari yo'q. Distributiv firma moduli ulanganda, sotilgan har bir mahsulot bu yerda avtomatik hisoblanadi va aylanma real vaqtda ko'rinadi.
-          </p>
-        </div>
+        <>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan tovarlar aylanmasi (umumiy narxi)</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#f87171" }}>{money(data.total_sold_value || 0)}</div>
+            <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>
+              Hozircha savdo ma'lumotlari yo'q. Distributiv firma moduli ulanganda, sotilgan har bir mahsulot bu yerda avtomatik hisoblanadi va aylanma real vaqtda ko'rinadi.
+            </p>
+          </div>
+
+          <div className="card">
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <strong style={{ fontSize: 14 }}>📈 Sotuv aylanmasi (davr bo'yicha)</strong>
+              <div style={{ display: "flex", gap: 6 }}>
+                {["line", "bar"].map((t) => (
+                  <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
+                    {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+              {PERIODS.map((p) => (
+                <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              {chartType === "line" ? (
+                <LineChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
+                  <Line type="monotone" dataKey="sold_value" name="Sotuv qiymati" stroke="#f87171" strokeWidth={2} />
+                </LineChart>
+              ) : (
+                <BarChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
+                  <Bar dataKey="sold_value" name="Sotuv qiymati" fill="#f87171" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </div>
   );
