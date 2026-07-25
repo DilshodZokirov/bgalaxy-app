@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
@@ -13,6 +14,7 @@ function emptyForm(type) {
     quantity: "",
     unit: "dona",
     image_url: "",
+    low_stock_threshold: "",
     size: type === "clothing" ? "" : undefined,
     color: type === "clothing" ? "" : undefined,
     expiry_date: type === "food" ? "" : undefined,
@@ -55,6 +57,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
           quantity: String(product.quantity),
           unit: product.unit || "dona",
           image_url: product.image_url || "",
+          low_stock_threshold: product.low_stock_threshold ?? "",
           size: product.size ?? "",
           color: product.color ?? "",
           expiry_date: product.expiry_date ?? "",
@@ -77,6 +80,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
       name: existing.name,
       unit: existing.unit === "kg" ? "kg" : existing.unit,
       image_url: existing.image_url || prev.image_url,
+      low_stock_threshold: existing.low_stock_threshold ?? prev.low_stock_threshold,
       size: existing.size ?? prev.size,
       color: existing.color ?? prev.color,
       sku: existing.sku ?? prev.sku,
@@ -115,6 +119,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
         price: Number(form.price) || 0,
         unit,
         image_url: form.image_url || null,
+        low_stock_threshold: form.low_stock_threshold !== "" ? Number(form.low_stock_threshold) : null,
         notes: form.notes || null,
       };
       if (company.warehouse_type === "clothing") {
@@ -231,6 +236,14 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
           </div>
         </div>
 
+        <input
+          type="number"
+          placeholder={`Kam qolgan chegarasi (ixtiyoriy, ${UNIT_LABELS[form.unit === "tonna" ? "kg" : form.unit] || form.unit})`}
+          value={form.low_stock_threshold}
+          onChange={(e) => setField("low_stock_threshold", e.target.value)}
+          min="0"
+          step="0.001"
+        />
         <textarea placeholder="Izoh (ixtiyoriy)" value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} style={{ width: "100%", resize: "vertical" }} />
 
         {error && <p className="error">{error}</p>}
@@ -243,7 +256,6 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
 function StockModal({ company, product, onClose, onSaved }) {
   const [change, setChange] = useState("");
   const [note, setNote] = useState("");
-  const [direction, setDirection] = useState("in"); // in = kirim, out = chiqim
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
@@ -262,7 +274,7 @@ function StockModal({ company, product, onClose, onSaved }) {
     setSaving(true);
     setError(null);
     try {
-      await api.adjustWarehouseStock(company.id, product.id, direction === "in" ? amount : -amount, note || null);
+      await api.adjustWarehouseStock(company.id, product.id, amount, note || null);
       onSaved();
       onClose();
     } catch (err) {
@@ -279,19 +291,15 @@ function StockModal({ company, product, onClose, onSaved }) {
     >
       <div className="card" style={{ maxWidth: 440, width: "100%" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>{product.name} — zaxira</h3>
+          <h3 style={{ fontSize: 16, margin: 0 }}>{product.name} — zaxira qo'shish</h3>
           <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button type="button" className={direction === "in" ? "" : "secondary"} style={{ flex: 1 }} onClick={() => setDirection("in")}>⬇️ Kirim</button>
-            <button type="button" className={direction === "out" ? "" : "secondary"} style={{ flex: 1 }} onClick={() => setDirection("out")}>⬆️ Chiqim</button>
-          </div>
-          <input type="number" placeholder={`Miqdori (${UNIT_LABELS[product.unit] || product.unit})`} value={change} onChange={(e) => setChange(e.target.value)} min="0.001" step="0.001" required />
+          <input type="number" placeholder={`Qo'shiladigan miqdor (${UNIT_LABELS[product.unit] || product.unit})`} value={change} onChange={(e) => setChange(e.target.value)} min="0.001" step="0.001" required />
           <input type="text" placeholder="Izoh (ixtiyoriy)" value={note} onChange={(e) => setNote(e.target.value)} />
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={saving}>{saving ? "Saqlanmoqda..." : "Tasdiqlash"}</button>
+          <button type="submit" disabled={saving}>{saving ? "Saqlanmoqda..." : "➕ Qo'shish"}</button>
         </form>
 
         <p style={{ fontSize: 12.5, fontWeight: 700, margin: "0 0 8px" }}>Tarix</p>
@@ -311,6 +319,122 @@ function StockModal({ company, product, onClose, onSaved }) {
   );
 }
 
+const PERIODS = [
+  { key: "today", label: "Bugun" },
+  { key: "week", label: "1 hafta" },
+  { key: "month", label: "1 oy" },
+  { key: "3m", label: "3 oy" },
+  { key: "6m", label: "6 oy" },
+  { key: "year", label: "1 yil" },
+];
+
+const PIE_COLORS = ["var(--green)", "#f87171"];
+
+function WarehouseDashboard({ company }) {
+  const [period, setPeriod] = useState("month");
+  const [chartType, setChartType] = useState("line");
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    api
+      .getWarehouseDashboard(company.id, period)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, [company.id, period]);
+
+  if (error) return <p className="error">{error}</p>;
+  if (!data) return <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>;
+
+  const pieData = [
+    { name: "Qabul qilingan", value: data.total_received },
+    { name: "Sotilgan", value: data.total_sold },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
+        <div className="card" style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Jami mahsulot turi</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>{data.product_count}</div>
+        </div>
+        <div className="card" style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy zaxira</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>{data.total_quantity}</div>
+        </div>
+        <div className="card" style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Qabul qilingan (davr)</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{data.total_received}</div>
+        </div>
+        <div className="card" style={{ flex: "1 1 160px" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan (davr)</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#f87171" }}>{data.total_sold}</div>
+          <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 2 }}>Distributiv savdo ulanganda avtomatik hisoblanadi</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <strong style={{ fontSize: 14 }}>📈 Qabul qilingan / sotilgan mahsulotlar</strong>
+          <div style={{ display: "flex", gap: 6 }}>
+            {["line", "bar", "pie"].map((t) => (
+              <button key={t} className={chartType === t ? "secondary" : "secondary"} style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
+                {t === "line" ? "📉 Chiziq" : t === "bar" ? "📊 Ustun" : "🥧 Doira"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+          {PERIODS.map((p) => (
+            <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {chartType !== "pie" ? (
+          <ResponsiveContainer width="100%" height={260}>
+            {chartType === "line" ? (
+              <LineChart data={data.trend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                <YAxis stroke="var(--text-dim)" fontSize={11} />
+                <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
+                <Legend />
+                <Line type="monotone" dataKey="received" name="Qabul qilingan" stroke="var(--green)" strokeWidth={2} />
+                <Line type="monotone" dataKey="sold" name="Sotilgan" stroke="#f87171" strokeWidth={2} />
+              </LineChart>
+            ) : (
+              <BarChart data={data.trend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
+                <YAxis stroke="var(--text-dim)" fontSize={11} />
+                <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
+                <Legend />
+                <Bar dataKey="received" name="Qabul qilingan" fill="var(--green)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="sold" name="Sotilgan" fill="#f87171" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                {pieData.map((entry, i) => (
+                  <Cell key={entry.name} fill={PIE_COLORS[i]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Warehouse() {
   const navigate = useNavigate();
   const [company, setCompany] = useState(null);
@@ -320,6 +444,10 @@ export default function Warehouse() {
   const [showAdd, setShowAdd] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [stockProduct, setStockProduct] = useState(null);
+  const [tab, setTab] = useState("dashboard"); // "dashboard" | "products"
+  const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState("all"); // "all" | "low" | "out"
+  const [sortBy, setSortBy] = useState("recent"); // "recent" | "name" | "quantity"
 
   useEffect(() => {
     api
@@ -353,6 +481,52 @@ export default function Warehouse() {
     }
   }
 
+  async function handleQuickAdd(product) {
+    try {
+      await api.adjustWarehouseStock(company.id, product.id, 1, "Tezkor qo'shish");
+      refreshProducts();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function isLowStock(p) {
+    return p.low_stock_threshold != null && p.quantity > 0 && p.quantity <= p.low_stock_threshold;
+  }
+
+  function handleExportCsv() {
+    const header = ["Nomi", "Narxi", "Soni", "Birlik", "O'lcham", "Rang", "Muddat", "SKU", "Izoh"];
+    const rows = visibleProducts.map((p) => [
+      p.name, p.price, p.quantity, p.unit, p.size || "", p.color || "", p.expiry_date || "", p.sku || "", p.notes || "",
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ombor-${company.name}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const visibleProducts = products
+    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((p) => {
+      if (stockFilter === "low") return isLowStock(p);
+      if (stockFilter === "out") return p.quantity <= 0;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "quantity") return b.quantity - a.quantity;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+  const lowStockCount = products.filter(isLowStock).length;
+  const outOfStockCount = products.filter((p) => p.quantity <= 0).length;
+
   if (!company) {
     return (
       <AppShell>
@@ -384,51 +558,104 @@ export default function Warehouse() {
         <p>Ishlab chiqarish turi: {TYPE_LABELS[company.warehouse_type] || company.warehouse_type}</p>
       </div>
 
-      <button style={{ width: "auto", padding: "10px 18px", marginBottom: 18 }} onClick={() => setShowAdd(true)}>
-        + Yangi mahsulot
-      </button>
-
-      {error && <p className="error">{error}</p>}
-      {loading && <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
-
-      {!loading && products.length === 0 && (
-        <div className="empty-card"><p>Hali mahsulot qo'shilmagan.</p></div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-        {products.map((p) => (
-          <div key={p.id} className="card">
-            {p.image_url && (
-              <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-            )}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <strong style={{ fontSize: 14.5 }}>{p.name}</strong>
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                  background: p.quantity > 0 ? "rgba(16,185,129,0.15)" : "rgba(248,113,113,0.15)",
-                  color: p.quantity > 0 ? "var(--green)" : "#f87171",
-                }}
-              >
-                {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
-              </span>
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>{money(p.price)}</div>
-            {p.size && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>O'lcham: {p.size}{p.color ? `, Rang: ${p.color}` : ""}</div>}
-            {p.expiry_date && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Muddat: {p.expiry_date}</div>}
-            {p.sku && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>SKU: {p.sku}</div>}
-            {p.notes && <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>{p.notes}</div>}
-
-            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-              <button style={{ flex: 1, padding: "7px", fontSize: 12 }} onClick={() => setStockProduct(p)}>📦 Kirim/Chiqim</button>
-              <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} onClick={() => setEditProduct(p)}>✏️</button>
-              <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12, color: "#f87171" }} onClick={() => handleDelete(p)}>🗑️</button>
-            </div>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <button className={tab === "dashboard" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("dashboard")}>
+          📊 Dashboard
+        </button>
+        <button className={tab === "products" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("products")}>
+          📦 Ombor mahsulotlari
+        </button>
+        <button className="secondary" style={{ width: "auto", padding: "9px 16px", marginLeft: "auto" }} onClick={() => navigate("/dashboard")}>
+          ← Korxonaga qaytish
+        </button>
       </div>
+
+      {tab === "dashboard" && <WarehouseDashboard company={company} />}
+
+      {tab === "products" && (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+            <button style={{ width: "auto", padding: "10px 18px" }} onClick={() => setShowAdd(true)}>
+              + Yangi mahsulot
+            </button>
+            <input
+              type="text"
+              placeholder="🔍 Nomi bo'yicha qidirish..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: 220, margin: 0 }}
+            />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px 12px", fontSize: 13 }}>
+              <option value="recent">Yangi qo'shilgan</option>
+              <option value="name">Nomi (A-Z)</option>
+              <option value="quantity">Soni (ko'pdan kamga)</option>
+            </select>
+            <button className="secondary" style={{ width: "auto", padding: "9px 16px", marginLeft: "auto" }} onClick={handleExportCsv}>
+              ⬇️ Excel/CSV eksport
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+            <button className={stockFilter === "all" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5 }} onClick={() => setStockFilter("all")}>
+              Barchasi ({products.length})
+            </button>
+            <button className={stockFilter === "low" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5, color: stockFilter === "low" ? undefined : "var(--orange, #f59e0b)" }} onClick={() => setStockFilter("low")}>
+              ⚠️ Kam qolgan ({lowStockCount})
+            </button>
+            <button className={stockFilter === "out" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5, color: stockFilter === "out" ? undefined : "#f87171" }} onClick={() => setStockFilter("out")}>
+              ❌ Tugagan ({outOfStockCount})
+            </button>
+          </div>
+
+          {error && <p className="error">{error}</p>}
+          {loading && <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
+
+          {!loading && products.length === 0 && (
+            <div className="empty-card"><p>Hali mahsulot qo'shilmagan.</p></div>
+          )}
+          {!loading && products.length > 0 && visibleProducts.length === 0 && (
+            <div className="empty-card"><p>Qidiruv/filtr shartlariga mos mahsulot topilmadi.</p></div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+            {visibleProducts.map((p) => (
+              <div key={p.id} className="card" style={isLowStock(p) ? { borderColor: "rgba(245,158,11,0.5)" } : p.quantity <= 0 ? { borderColor: "rgba(248,113,113,0.5)" } : undefined}>
+                {p.image_url && (
+                  <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <strong style={{ fontSize: 14.5 }}>{p.name}</strong>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      background: p.quantity <= 0 ? "rgba(248,113,113,0.15)" : isLowStock(p) ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)",
+                      color: p.quantity <= 0 ? "#f87171" : isLowStock(p) ? "#f59e0b" : "var(--green)",
+                    }}
+                  >
+                    {p.quantity <= 0 ? "❌" : isLowStock(p) ? "⚠️" : ""} {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>{money(p.price)}</div>
+                {p.size && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>O'lcham: {p.size}{p.color ? `, Rang: ${p.color}` : ""}</div>}
+                {p.expiry_date && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Muddat: {p.expiry_date}</div>}
+                {p.sku && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>SKU: {p.sku}</div>}
+                {p.notes && <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>{p.notes}</div>}
+
+                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                  <button style={{ flex: 1, padding: "7px", fontSize: 12 }} onClick={() => setStockProduct(p)}>➕ Zaxira qo'shish</button>
+                  {p.unit === "dona" && (
+                    <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} onClick={() => handleQuickAdd(p)} title="Tez +1 qo'shish">+1</button>
+                  )}
+                  <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} onClick={() => setEditProduct(p)}>✏️</button>
+                  <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12, color: "#f87171" }} onClick={() => handleDelete(p)}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {showAdd && <ProductModal company={company} products={products} onClose={() => setShowAdd(false)} onSaved={refreshProducts} />}
       {editProduct && <ProductModal company={company} product={editProduct} products={products} onClose={() => setEditProduct(null)} onSaved={refreshProducts} />}

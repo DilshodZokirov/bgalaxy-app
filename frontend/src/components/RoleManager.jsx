@@ -11,6 +11,7 @@ const PERMISSION_LABELS = {
   manage_tasks: "Vazifalarni boshqarish (Loyiha menejeri)",
   view_analytics: "Kompaniya analitikasini ko'rish",
   manage_warehouse: "Ombor bo'limini boshqarish",
+  ombor_ishchi: "Ombor ishchisi (faqat ko'rish)",
 };
 const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS);
 

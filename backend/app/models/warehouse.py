@@ -18,6 +18,7 @@ class WarehouseProduct(Base):
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
     unit: Mapped[str] = mapped_column(String(10), default="dona")  # "dona" | "kg" | "litr"
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    low_stock_threshold: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
     # Type-specific fields — left null when they don't apply to the
     # company's warehouse_type (e.g. size stays null for a food warehouse).
     size: Mapped[str | None] = mapped_column(String(50), nullable=True)  # clothing

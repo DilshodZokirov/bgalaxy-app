@@ -20,6 +20,7 @@ PERMISSION_KEYS = [
     "manage_tasks",
     "view_analytics",
     "manage_warehouse",
+    "ombor_ishchi",
 ]
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -33,6 +34,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "manage_tasks": True,
         "view_analytics": True,
         "manage_warehouse": True,
+        "ombor_ishchi": True,
     },
     "Menejer": {
         "invite_members": False,
@@ -44,6 +46,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "manage_tasks": True,
         "view_analytics": True,
         "manage_warehouse": True,
+        "ombor_ishchi": True,
     },
     "Buxgalter": {
         "invite_members": False,
@@ -55,6 +58,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "manage_tasks": False,
         "view_analytics": False,
         "manage_warehouse": False,
+        "ombor_ishchi": False,
     },
     "Xodim": {
         "invite_members": False,
@@ -66,6 +70,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         "manage_tasks": False,
         "view_analytics": False,
         "manage_warehouse": False,
+        "ombor_ishchi": False,
     },
 }
 

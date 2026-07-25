@@ -1,4 +1,5 @@
 import uuid as uuid_lib
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -18,11 +19,52 @@ from app.schemas.warehouse import (
     StockMovementOut,
     WarehouseSettingsUpdate,
 )
-from app.services.permissions import require_permission
+from app.services.permissions import require_any_permission, require_permission
 
 router = APIRouter(prefix="/companies/{company_id}/warehouse", tags=["warehouse"])
 
 WAREHOUSE_TYPES = {"technology", "clothing", "food"}
+VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi"]
+
+
+def _day_key(d: date) -> str:
+    return d.strftime("%Y-%m-%d")
+
+
+def _week_key(d: date) -> str:
+    monday = d - timedelta(days=d.weekday())
+    return monday.strftime("%m-%d")
+
+
+def _month_key(d: date) -> str:
+    return d.strftime("%Y-%m")
+
+
+def _dashboard_buckets(period: str):
+    """Returns (bucket_keys, start_date, key_fn) — mirrors the granularity
+    pattern used on the Kompaniya Analitikasi trend charts."""
+    today = date.today()
+    if period == "today":
+        return [_day_key(today)], today, _day_key
+    if period == "week":
+        keys = [_day_key(today - timedelta(days=i)) for i in range(6, -1, -1)]
+        return keys, today - timedelta(days=6), _day_key
+    if period == "month":
+        this_monday = today - timedelta(days=today.weekday())
+        keys = [_week_key(this_monday - timedelta(weeks=i)) for i in range(3, -1, -1)]
+        return keys, today - timedelta(weeks=4), _week_key
+    months_map = {"3m": 3, "6m": 6, "year": 12}
+    n = months_map.get(period, 6)
+    keys = []
+    start_month = today.replace(day=1)
+    for i in range(n - 1, -1, -1):
+        y, m = start_month.year, start_month.month - i
+        while m <= 0:
+            m += 12
+            y -= 1
+        keys.append(f"{y:04d}-{m:02d}")
+    start = date(int(keys[0][:4]), int(keys[0][5:7]), 1)
+    return keys, start, _month_key
 
 
 async def _get_company(db: AsyncSession, company_id: str) -> Company:
@@ -72,6 +114,7 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     await _require_warehouse_enabled(db, company_id)
     result = await db.execute(
         select(WarehouseProduct)
@@ -138,6 +181,7 @@ async def create_product(
         quantity=payload.quantity,
         unit=payload.unit,
         image_url=payload.image_url,
+        low_stock_threshold=payload.low_stock_threshold,
         size=size,
         color=color,
         expiry_date=expiry_date,
@@ -267,6 +311,7 @@ async def get_stock_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     await _require_warehouse_enabled(db, company_id)
 
     result = await db.execute(
@@ -289,3 +334,52 @@ async def get_stock_history(
             )
         )
     return out
+
+
+@router.get("/dashboard")
+async def get_warehouse_dashboard(
+    company_id: str,
+    period: str = "month",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Statistika: qabul qilingan (kirim) mahsulotlar davr bo'yicha.
+    "Sotilgan" hozircha har doim 0 — distributiv/savdo integratsiyasi
+    ulanganda avtomatik hisoblanadigan bo'ladi."""
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
+    await _require_warehouse_enabled(db, company_id)
+
+    buckets, start, key_fn = _dashboard_buckets(period)
+
+    result = await db.execute(
+        select(StockMovement.created_at, StockMovement.change)
+        .join(WarehouseProduct, WarehouseProduct.id == StockMovement.product_id)
+        .where(
+            WarehouseProduct.company_id == company_id,
+            StockMovement.created_at >= start,
+            StockMovement.change > 0,
+        )
+    )
+    received_by_bucket = {b: 0.0 for b in buckets}
+    for created_at, change in result.all():
+        key = key_fn(created_at.date())
+        if key in received_by_bucket:
+            received_by_bucket[key] += float(change)
+
+    trend = [{"label": b, "received": received_by_bucket[b], "sold": 0} for b in buckets]
+    total_received = sum(received_by_bucket.values())
+
+    products_result = await db.execute(
+        select(func.count(WarehouseProduct.id), func.coalesce(func.sum(WarehouseProduct.quantity), 0)).where(
+            WarehouseProduct.company_id == company_id
+        )
+    )
+    product_count, total_quantity = products_result.one()
+
+    return {
+        "trend": trend,
+        "total_received": total_received,
+        "total_sold": 0,
+        "product_count": product_count,
+        "total_quantity": float(total_quantity),
+    }

@@ -55,3 +55,13 @@ async def require_permission(db: AsyncSession, company_id, user_id, permission_k
     info = await get_permissions(db, company_id, user_id)
     if not info["permissions"].get(permission_key, False):
         raise HTTPException(status_code=403, detail="Bu amal uchun ruxsatingiz yo'q")
+
+
+async def require_any_permission(db: AsyncSession, company_id, user_id, permission_keys: list[str]) -> None:
+    """Passes if the user has AT LEAST ONE of the given permission keys (or
+    is the owner) — used where several different roles should all be able
+    to do something, e.g. viewing the warehouse (manage_warehouse OR
+    ombor_ishchi)."""
+    info = await get_permissions(db, company_id, user_id)
+    if not any(info["permissions"].get(key, False) for key in permission_keys):
+        raise HTTPException(status_code=403, detail="Bu amal uchun ruxsatingiz yo'q")

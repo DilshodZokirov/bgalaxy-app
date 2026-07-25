@@ -54,6 +54,8 @@ export const api = {
       body: { has_warehouse: hasWarehouse, warehouse_type: warehouseType },
     }),
   getWarehouseProducts: (companyId) => request(`/companies/${companyId}/warehouse/products`),
+  getWarehouseDashboard: (companyId, period) =>
+    request(`/companies/${companyId}/warehouse/dashboard?period=${period}`),
   createWarehouseProduct: (companyId, data) =>
     request(`/companies/${companyId}/warehouse/products`, { method: "POST", body: data }),
   updateWarehouseProduct: (companyId, productId, data) =>

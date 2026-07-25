@@ -23,6 +23,7 @@ export default function Sidebar({ onOpenSettings }) {
   const [canManageAccounting, setCanManageAccounting] = useState(false);
   const [canViewAnalytics, setCanViewAnalytics] = useState(false);
   const [hasWarehouse, setHasWarehouse] = useState(false);
+  const [canViewWarehouse, setCanViewWarehouse] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("bgalaxy_sidebar_collapsed") === "1");
 
   useEffect(() => {
@@ -45,10 +46,12 @@ export default function Sidebar({ onOpenSettings }) {
       .then((info) => {
         setCanManageAccounting(info.is_owner || !!info.permissions?.manage_accounting);
         setCanViewAnalytics(info.is_owner || !!info.permissions?.view_analytics);
+        setCanViewWarehouse(info.is_owner || !!info.permissions?.manage_warehouse || !!info.permissions?.ombor_ishchi);
       })
       .catch(() => {
         setCanManageAccounting(false);
         setCanViewAnalytics(false);
+        setCanViewWarehouse(false);
       });
   }, [activeId, companies]);
 
@@ -77,7 +80,7 @@ export default function Sidebar({ onOpenSettings }) {
   const navItems = canManageAccounting
     ? [...NAV_ITEMS, { icon: "🧾", label: "Buxgalteriya", to: "/accounting" }]
     : NAV_ITEMS;
-  const withWarehouse = hasWarehouse
+  const withWarehouse = hasWarehouse && canViewWarehouse
     ? [...navItems, { icon: "📦", label: "Ombor", to: "/warehouse" }]
     : navItems;
   const withAnalytics = canViewAnalytics

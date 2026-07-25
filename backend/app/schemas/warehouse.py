@@ -15,6 +15,7 @@ class ProductCreate(BaseModel):
     quantity: float = 0
     unit: str = "dona"  # "dona" | "kg" | "litr"
     image_url: str | None = None
+    low_stock_threshold: float | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -27,6 +28,7 @@ class ProductUpdate(BaseModel):
     price: float | None = None
     unit: str | None = None
     image_url: str | None = None
+    low_stock_threshold: float | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -42,6 +44,7 @@ class ProductOut(BaseModel):
     quantity: float
     unit: str
     image_url: str | None = None
+    low_stock_threshold: float | None = None
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
