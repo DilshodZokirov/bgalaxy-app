@@ -1,7 +1,7 @@
 import io
 import os
 import uuid as uuid_lib
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import (
     APIRouter,
@@ -531,9 +531,9 @@ async def monthly_champion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """The top scorer for the current calendar month — powers the Dashboard
-    "Oyning eng faol ishchisi" widget. Returns null if nobody has any
-    completed (accepted/rejected) tasks yet this month."""
+    """Top scorer for the *previous* calendar month — Statistika → Jamoa
+    "O'tgan oyning eng faol ishchisi". Returns null if nobody completed
+    (accepted/rejected) tasks in that month."""
     result = await db.execute(
         select(TeamMembership.user_id).where(TeamMembership.company_id == company_id)
     )
@@ -542,14 +542,16 @@ async def monthly_champion(
         raise HTTPException(status_code=403, detail="Siz bu kompaniya a'zosi emassiz")
 
     today = date.today()
-    month_start = today.replace(day=1)
+    this_month_start = today.replace(day=1)
+    prev_month_end = this_month_start - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
 
     task_result = await db.execute(
         select(Task).where(
             Task.company_id == company_id,
             Task.status.in_(("accepted", "rejected")),
-            Task.completed_at >= month_start,
-            Task.completed_at <= today,
+            Task.completed_at >= prev_month_start,
+            Task.completed_at <= prev_month_end,
         )
     )
     tasks = task_result.scalars().all()
@@ -586,7 +588,9 @@ async def monthly_champion(
         "score": top["score"],
         "accepted": top["accepted"],
         "rejected": top["rejected"],
-        "month": month_start.strftime("%Y-%m"),
+        "month": prev_month_start.strftime("%Y-%m"),
+        "month_start": prev_month_start.isoformat(),
+        "month_end": prev_month_end.isoformat(),
     }
 
 

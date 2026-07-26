@@ -56,7 +56,6 @@ export default function Dashboard() {
   const [memberCount, setMemberCount] = useState(0);
   const [channelCount, setChannelCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
-  const [champion, setChampion] = useState(null);
 
   useEffect(() => {
     api
@@ -72,12 +71,10 @@ export default function Dashboard() {
     if (!company) {
       setMemberCount(0);
       setChannelCount(0);
-      setChampion(null);
       return;
     }
     api.getMembers(company.id).then((m) => setMemberCount(m.length)).catch(() => setMemberCount(0));
     api.getChannels(company.id).then((c) => setChannelCount(c.length)).catch(() => setChannelCount(0));
-    api.getMonthlyChampion(company.id).then(setChampion).catch(() => setChampion(null));
   }, [company]);
 
   useEffect(() => {
@@ -110,30 +107,6 @@ export default function Dashboard() {
             </div>
           </aside>
         </section>
-
-        {champion && (
-          <div className="galaxy-panel galaxy-champion">
-            {champion.avatar_url ? (
-              <img src={champion.avatar_url} alt="" />
-            ) : (
-              <div className="avatar-circle" style={{ width: 60, height: 60, fontSize: 20 }}>
-                {champion.full_name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
-              </div>
-            )}
-            <div>
-              <div className="galaxy-champion-label">OYNING ENG FAOL ISHCHISI</div>
-              <div className="galaxy-champion-name">{champion.full_name}</div>
-              <div className="muted">{champion.role_name || "Lavozimsiz"}</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
-                <span style={{ color: "#34d399" }}>✅ {champion.accepted} bajarilgan</span>
-                {"  ·  "}
-                <span style={{ color: "#f87171" }}>❌ {champion.rejected} rad etilgan</span>
-                {"  ·  "}
-                <strong>{champion.score > 0 ? `+${champion.score}` : champion.score} ball</strong>
-              </div>
-            </div>
-          </div>
-        )}
 
         {!company && !loadingCompany && (
           <div className="galaxy-panel galaxy-empty">
