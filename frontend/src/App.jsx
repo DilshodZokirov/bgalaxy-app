@@ -27,6 +27,7 @@ import Analytics from "./pages/Analytics";
 import Warehouse from "./pages/Warehouse";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import GalaxyDemo from "./pages/GalaxyDemo";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -44,6 +45,7 @@ export default function App() {
       <LockGate />
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/galaxy-demo" element={<GalaxyDemo />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
