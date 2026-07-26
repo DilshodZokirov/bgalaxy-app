@@ -1,18 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart,
+  Area,
+  AreaChart,
   Bar,
-  PieChart,
-  Pie,
+  BarChart,
+  CartesianGrid,
   Cell,
-  LineChart,
-  Line,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
@@ -33,6 +33,21 @@ const PERIOD_OPTIONS = [
   { value: "1w", label: "1 hafta" },
 ];
 
+const CHART_TYPES = [
+  { value: "area", label: "Chiziqli" },
+  { value: "bar", label: "Ustunli" },
+  { value: "pie", label: "Doira" },
+];
+
+const SERIES = [
+  { key: "income", name: "Kirim", color: "#22d3ee" },
+  { key: "expense", name: "Chiqim", color: "#f59e0b" },
+  { key: "payroll", name: "Oylik", color: "#a78bfa" },
+  { key: "balance", name: "Balans", color: "#38bdf8" },
+];
+
+const MONTH_SHORT = ["Yan", "Fev", "Mar", "Apr", "May", "Iyn", "Iyl", "Avg", "Sen", "Okt", "Noy", "Dek"];
+
 function currentMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -43,7 +58,44 @@ function isoDate(d) {
 }
 
 function money(n) {
-  return new Intl.NumberFormat("uz-UZ").format(n) + " so'm";
+  return new Intl.NumberFormat("uz-UZ").format(n || 0) + " so'm";
+}
+
+function compactMoney(n) {
+  const v = Number(n) || 0;
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)} mlrd`;
+  if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} mln`;
+  if (abs >= 1_000) return `${(v / 1_000).toFixed(0)} ming`;
+  return String(Math.round(v));
+}
+
+function formatBucketLabel(label) {
+  if (/^\d{4}-\d{2}$/.test(label)) {
+    const [y, m] = label.split("-");
+    return `${MONTH_SHORT[Number(m) - 1]} ${y.slice(2)}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+    const [, m, d] = label.split("-");
+    return `${Number(d)} ${MONTH_SHORT[Number(m) - 1]}`;
+  }
+  return label;
+}
+
+function StatsTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="acc-chart-tooltip">
+      <div className="acc-chart-tooltip-label">{formatBucketLabel(label)}</div>
+      {payload.map((p) => (
+        <div key={p.dataKey} className="acc-chart-tooltip-row">
+          <span className="acc-chart-tooltip-dot" style={{ background: p.color }} />
+          <span>{p.name}</span>
+          <strong>{money(p.value)}</strong>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function Accounting() {
@@ -114,12 +166,12 @@ function useDeniedCatch(onDenied) {
 /* ---------- shared: date-range popup (used by "Ko'rish" and "Yuklab olish") ---------- */
 
 const FORMULA_OPTIONS = [
-  { key: "sum", label: "Jami (SUM)" },
-  { key: "average", label: "O'rtacha (AVERAGE)" },
-  { key: "max", label: "Eng ko'p (MAX)" },
-  { key: "min", label: "Eng kam (MIN)" },
-  { key: "count", label: "Soni (COUNT)" },
-  { key: "median", label: "Mediana (MEDIAN)" },
+  { key: "sum", label: "Jami", hint: "SUM" },
+  { key: "average", label: "O'rtacha", hint: "AVERAGE" },
+  { key: "max", label: "Eng ko'p", hint: "MAX" },
+  { key: "min", label: "Eng kam", hint: "MIN" },
+  { key: "count", label: "Soni", hint: "COUNT" },
+  { key: "median", label: "Mediana", hint: "MEDIAN" },
 ];
 
 function DateRangeModal({ title, confirmLabel, onConfirm, onClose, allowExcel = false }) {
@@ -128,16 +180,27 @@ function DateRangeModal({ title, confirmLabel, onConfirm, onClose, allowExcel = 
   const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
   const [dateFrom, setDateFrom] = useState(isoDate(lastMonthStart));
   const [dateTo, setDateTo] = useState(isoDate(lastMonthEnd));
-  const [format, setFormat] = useState("csv");
-  const [formulas, setFormulas] = useState(["sum", "average"]);
+  const [format, setFormat] = useState(allowExcel ? "excel" : "csv");
+  const [formulas, setFormulas] = useState(["sum"]);
 
   function toggleFormula(key) {
     setFormulas((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]));
   }
 
+  function confirm() {
+    const selected = format === "excel" ? formulas : [];
+    onConfirm(dateFrom, dateTo, format, selected);
+  }
+
+  const actionLabel = allowExcel
+    ? format === "excel"
+      ? "Excelga chiqarish"
+      : "CSV yuklab olish"
+    : confirmLabel;
+
   return (
     <div className="acc-modal-backdrop" onClick={onClose}>
-      <div className="acc-modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+      <div className="acc-modal acc-download-modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: 15, margin: "0 0 14px" }}>{title}</h3>
         <label>Qachondan</label>
         <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ marginBottom: 10 }} />
@@ -146,40 +209,52 @@ function DateRangeModal({ title, confirmLabel, onConfirm, onClose, allowExcel = 
 
         {allowExcel && (
           <>
-            <label>Format</label>
-            <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                <input type="radio" checked={format === "csv"} onChange={() => setFormat("csv")} style={{ width: "auto" }} />
+            <label>Qaysi formatda yuklab olasiz?</label>
+            <div className="acc-format-pills">
+              <button type="button" className={`acc-pill ${format === "excel" ? "active" : ""}`} onClick={() => setFormat("excel")}>
+                Excel
+              </button>
+              <button type="button" className={`acc-pill ${format === "csv" ? "active" : ""}`} onClick={() => setFormat("csv")}>
                 CSV
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                <input type="radio" checked={format === "excel"} onChange={() => setFormat("excel")} style={{ width: "auto" }} />
-                Excel (formulalar bilan)
-              </label>
+              </button>
             </div>
 
             {format === "excel" && (
-              <>
-                <label>Formulalar (Excel'da tirik hisoblanadi)</label>
-                <div className="permission-grid" style={{ marginBottom: 16 }}>
+              <div className="acc-formula-box">
+                <div className="acc-formula-box-head">
+                  <div>
+                    <strong>Qaysi formulalar bilan Excelga chiqaray?</strong>
+                    <p>Tanlanganlar alohida «Xulosa» qatorida, tartibli chiqadi — ma'lumotlar aralashmaydi.</p>
+                  </div>
+                  <div className="acc-formula-box-actions">
+                    <button type="button" className="secondary" onClick={() => setFormulas(FORMULA_OPTIONS.map((f) => f.key))}>
+                      Hammasi
+                    </button>
+                    <button type="button" className="secondary" onClick={() => setFormulas([])}>
+                      Tozalash
+                    </button>
+                  </div>
+                </div>
+                <div className="acc-formula-grid">
                   {FORMULA_OPTIONS.map((f) => (
-                    <label className="permission-check" key={f.key}>
+                    <label className={`acc-formula-chip ${formulas.includes(f.key) ? "on" : ""}`} key={f.key}>
                       <input
                         type="checkbox"
                         checked={formulas.includes(f.key)}
                         onChange={() => toggleFormula(f.key)}
                       />
-                      {f.label}
+                      <span>{f.label}</span>
+                      <small>{f.hint}</small>
                     </label>
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => onConfirm(dateFrom, dateTo, format, formulas)}>{confirmLabel}</button>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button onClick={confirm}>{actionLabel}</button>
           <button className="secondary" onClick={onClose}>Bekor qilish</button>
         </div>
       </div>
@@ -250,108 +325,199 @@ function ReportPreviewModal({ data, onClose }) {
 /* ---------- shared: statistics modal (chart type + period picker) ---------- */
 
 function StatsModal({ companyId, onClose, onDenied }) {
-  const [chartType, setChartType] = useState("line");
+  const [chartType, setChartType] = useState("area");
   const [period, setPeriod] = useState("6m");
   const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState({ income: true, expense: true, payroll: true, balance: true });
   const catchDenied = useDeniedCatch(onDenied);
 
   useEffect(() => {
-    api.getAccountingStats(companyId, period).then(setStats).catch(catchDenied);
+    setLoading(true);
+    api
+      .getAccountingStats(companyId, period)
+      .then(setStats)
+      .catch(catchDenied)
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, period]);
 
+  const chartData = useMemo(
+    () => (stats?.buckets || []).map((b) => ({ ...b, label: b.label, display: formatBucketLabel(b.label) })),
+    [stats],
+  );
+
+  const pieData = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { name: "Kirim", value: Math.abs(stats.totals.total_income), color: "#22d3ee" },
+      { name: "Chiqim", value: Math.abs(stats.totals.total_expense), color: "#f59e0b" },
+      { name: "Oylik", value: Math.abs(stats.totals.total_payroll), color: "#a78bfa" },
+    ].filter((d) => d.value > 0);
+  }, [stats]);
+
+  function toggleSeries(key) {
+    setVisible((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (!Object.values(next).some(Boolean)) return prev;
+      return next;
+    });
+  }
+
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.value === period)?.label || period;
+
   return (
     <div className="acc-modal-backdrop" onClick={onClose}>
-      <div className="acc-modal" style={{ maxWidth: 780 }} onClick={(e) => e.stopPropagation()}>
+      <div className="acc-modal acc-stats-modal" onClick={(e) => e.stopPropagation()}>
         <div className="acc-modal-header">
-          <h3 style={{ fontSize: 16, margin: 0 }}>Statistika</h3>
+          <div>
+            <h3 style={{ fontSize: 17, margin: 0 }}>Statistika</h3>
+            <p className="acc-stats-sub">Moliyaviy oqim — {periodLabel}</p>
+          </div>
           <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕ Yopish</button>
         </div>
 
         <div className="acc-chart-controls">
-          <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
-            <option value="line">Line graph</option>
-            <option value="bar">Bar chart</option>
-            <option value="pie">Pie chart</option>
-          </select>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {PERIOD_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+          <div className="acc-format-pills">
+            {CHART_TYPES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className={`acc-pill ${chartType === t.value ? "active" : ""}`}
+                onClick={() => setChartType(t.value)}
+              >
+                {t.label}
+              </button>
             ))}
-          </select>
+          </div>
+          <div className="acc-format-pills">
+            {PERIOD_OPTIONS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                className={`acc-pill ${period === p.value ? "active" : ""}`}
+                onClick={() => setPeriod(p.value)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {stats && (
-          <>
-            <ResponsiveContainer width="100%" height={320}>
-              {chartType === "line" ? (
-                <LineChart data={stats.buckets}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={12} />
-                  <Tooltip contentStyle={{ background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: 8 }} />
+        {chartType !== "pie" && (
+          <div className="acc-series-toggles">
+            {SERIES.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={`acc-series-chip ${visible[s.key] ? "on" : ""}`}
+                style={{ "--series-color": s.color }}
+                onClick={() => toggleSeries(s.key)}
+              >
+                <span className="acc-series-dot" />
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="acc-chart-stage">
+          {loading && <div className="acc-chart-loading">Grafik yuklanmoqda…</div>}
+          {!loading && stats && chartData.length === 0 && (
+            <div className="acc-chart-loading">Bu davr uchun ma'lumot yo'q</div>
+          )}
+          {!loading && stats && chartData.length > 0 && (
+            <ResponsiveContainer width="100%" height={340}>
+              {chartType === "area" ? (
+                <AreaChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    {SERIES.map((s) => (
+                      <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={s.color} stopOpacity={0.45} />
+                        <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid stroke="rgba(148,163,184,0.18)" vertical={false} />
+                  <XAxis dataKey="display" stroke="var(--text-dim)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} tickFormatter={compactMoney} tickLine={false} axisLine={false} width={56} />
+                  <Tooltip content={<StatsTooltip />} />
                   <Legend />
-                  <Line type="monotone" dataKey="income" name="Kirim" stroke="#22d3ee" strokeWidth={2} />
-                  <Line type="monotone" dataKey="expense" name="Chiqim" stroke="#f59e0b" strokeWidth={2} />
-                  <Line type="monotone" dataKey="payroll" name="Oylik" stroke="#7c3aed" strokeWidth={2} />
-                  <Line type="monotone" dataKey="balance" name="Balans" stroke="#2563eb" strokeWidth={2} />
-                </LineChart>
+                  {SERIES.filter((s) => visible[s.key]).map((s) => (
+                    <Area
+                      key={s.key}
+                      type="monotone"
+                      dataKey={s.key}
+                      name={s.name}
+                      stroke={s.color}
+                      fill={`url(#grad-${s.key})`}
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 5, strokeWidth: 0 }}
+                    />
+                  ))}
+                </AreaChart>
               ) : chartType === "bar" ? (
-                <BarChart data={stats.buckets}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={12} />
-                  <Tooltip contentStyle={{ background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: 8 }} />
+                <BarChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }} barGap={4} barCategoryGap="28%">
+                  <CartesianGrid stroke="rgba(148,163,184,0.18)" vertical={false} />
+                  <XAxis dataKey="display" stroke="var(--text-dim)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--text-dim)" fontSize={11} tickFormatter={compactMoney} tickLine={false} axisLine={false} width={56} />
+                  <Tooltip content={<StatsTooltip />} />
                   <Legend />
-                  <Bar dataKey="income" name="Kirim" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" name="Chiqim" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="payroll" name="Oylik" fill="#7c3aed" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="balance" name="Balans" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                  {SERIES.filter((s) => visible[s.key]).map((s) => (
+                    <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[6, 6, 0, 0]} maxBarSize={28} />
+                  ))}
                 </BarChart>
               ) : (
                 <PieChart>
                   <Pie
-                    data={[
-                      { name: "Kirim", value: Math.abs(stats.totals.total_income) },
-                      { name: "Chiqim", value: Math.abs(stats.totals.total_expense) },
-                      { name: "Oylik", value: Math.abs(stats.totals.total_payroll) },
-                      { name: "Balans", value: Math.abs(stats.totals.balance) },
-                    ].filter((d) => d.value > 0)}
+                    data={pieData}
                     dataKey="value"
                     nameKey="name"
-                    outerRadius={110}
-                    label
+                    innerRadius={72}
+                    outerRadius={118}
+                    paddingAngle={3}
+                    stroke="rgba(15,23,42,0.35)"
+                    strokeWidth={2}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    <Cell fill="#22d3ee" />
-                    <Cell fill="#f59e0b" />
-                    <Cell fill="#7c3aed" />
-                    <Cell fill="#2563eb" />
+                    {pieData.map((d) => (
+                      <Cell key={d.name} fill={d.color} />
+                    ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: 8 }} />
+                  <Tooltip formatter={(v) => money(v)} contentStyle={{ background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: 10 }} />
                   <Legend />
+                  <text x="50%" y="48%" textAnchor="middle" fill="var(--text)" fontSize="13" fontWeight="600">
+                    Balans
+                  </text>
+                  <text x="50%" y="56%" textAnchor="middle" fill="var(--text-dim)" fontSize="12">
+                    {compactMoney(stats.totals.balance)}
+                  </text>
                 </PieChart>
               )}
             </ResponsiveContainer>
+          )}
+        </div>
 
-            <div className="acc-period-totals">
-              <div className="card stat-card cyan">
-                <div className="stat-label">Kirim</div>
-                <div className="stat-value" style={{ fontSize: 18 }}>{money(stats.totals.total_income)}</div>
-              </div>
-              <div className="card stat-card orange">
-                <div className="stat-label">Chiqim</div>
-                <div className="stat-value" style={{ fontSize: 18 }}>{money(stats.totals.total_expense)}</div>
-              </div>
-              <div className="card stat-card purple">
-                <div className="stat-label">Oylik</div>
-                <div className="stat-value" style={{ fontSize: 18 }}>{money(stats.totals.total_payroll)}</div>
-              </div>
-              <div className="card stat-card blue">
-                <div className="stat-label">Balans</div>
-                <div className="stat-value" style={{ fontSize: 18 }}>{money(stats.totals.balance)}</div>
-              </div>
+        {stats && (
+          <div className="acc-period-totals">
+            <div className="acc-kpi cyan">
+              <div className="stat-label">Kirim</div>
+              <div className="stat-value">{money(stats.totals.total_income)}</div>
             </div>
-          </>
+            <div className="acc-kpi orange">
+              <div className="stat-label">Chiqim</div>
+              <div className="stat-value">{money(stats.totals.total_expense)}</div>
+            </div>
+            <div className="acc-kpi purple">
+              <div className="stat-label">Oylik</div>
+              <div className="stat-value">{money(stats.totals.total_payroll)}</div>
+            </div>
+            <div className="acc-kpi blue">
+              <div className="stat-label">Balans</div>
+              <div className="stat-value">{money(stats.totals.balance)}</div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -598,8 +764,8 @@ function SummaryTab({ companyId, onDenied }) {
 
       {rangeModal && (
         <DateRangeModal
-          title={rangeModal === "view" ? "Qaysi davr uchun ko'rasiz?" : "Qaysi davr uchun yuklab olasiz?"}
-          confirmLabel={rangeModal === "view" ? "Ko'rish" : "Yuklab olish"}
+          title={rangeModal === "view" ? "Qaysi davr uchun ko'rasiz?" : "Hisobotni yuklab olish"}
+          confirmLabel={rangeModal === "view" ? "Ko'rish" : "Excelga chiqarish"}
           onConfirm={handleRangeConfirm}
           onClose={() => setRangeModal(null)}
           allowExcel={rangeModal === "download"}

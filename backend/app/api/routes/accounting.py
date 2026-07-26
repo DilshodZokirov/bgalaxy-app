@@ -5,7 +5,8 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 from sqlalchemy import func as sa_func
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.models.accounting import Invoice, PayrollEntry, Transaction
+from app.models.company import Company
 from app.models.user import User
 from app.schemas.accounting import (
     AccountingSummary,
@@ -790,33 +792,129 @@ FORMULA_FUNCS = {
     "median": ("MEDIAN", "Mediana"),
 }
 
+TX_TYPE_UZ = {"income": "Kirim", "expense": "Chiqim"}
+INV_STATUS_UZ = {
+    "draft": "Qoralama",
+    "sent": "Yuborilgan",
+    "paid": "To'langan",
+    "overdue": "Muddati o'tgan",
+}
+PAY_STATUS_UZ = {"paid": "To'langan", "pending": "Kutilmoqda"}
 
-def _write_sheet(ws, headers: list[str], rows: list[list], amount_col_index: int, formula_keys: list[str]):
-    """Writes a header row + data rows, then (if any rows exist) one summary
-    row per selected formula, using a real Excel formula over the amount
-    column so it recalculates if someone edits the numbers later."""
-    ws.append(headers)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="1E2938", end_color="1E2938", fill_type="solid")
+_XL_HEADER_FILL = PatternFill("solid", fgColor="0F766E")
+_XL_HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
+_XL_TITLE_FONT = Font(bold=True, size=15, color="0F172A")
+_XL_SUB_FONT = Font(size=11, color="475569")
+_XL_SECTION_FILL = PatternFill("solid", fgColor="CCFBF1")
+_XL_SECTION_FONT = Font(bold=True, size=11, color="115E59")
+_XL_FORMULA_FILL = PatternFill("solid", fgColor="F0FDFA")
+_XL_ZEBRA = PatternFill("solid", fgColor="F8FAFC")
+_XL_MONEY = '#,##0.00'
+_XL_THIN = Border(
+    left=Side(style="thin", color="CBD5E1"),
+    right=Side(style="thin", color="CBD5E1"),
+    top=Side(style="thin", color="CBD5E1"),
+    bottom=Side(style="thin", color="CBD5E1"),
+)
 
+
+def _autosize(ws, min_width: int = 12, max_width: int = 36) -> None:
+    for column_cells in ws.columns:
+        letter = get_column_letter(column_cells[0].column)
+        length = max((len(str(c.value)) if c.value is not None else 0) for c in column_cells)
+        ws.column_dimensions[letter].width = min(max(length + 2, min_width), max_width)
+
+
+def _write_sheet(
+    ws,
+    title: str,
+    period_label: str,
+    headers: list[str],
+    rows: list[list],
+    amount_col_index: int,
+    formula_keys: list[str],
+) -> float:
+    """Clean data table + optional Xulosa block with live Excel formulas."""
+    col_count = len(headers)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_count)
+    ws["A1"] = title
+    ws["A1"].font = _XL_TITLE_FONT
+    ws["A1"].alignment = Alignment(vertical="center")
+
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=col_count)
+    ws["A2"] = period_label
+    ws["A2"].font = _XL_SUB_FONT
+
+    header_row = 4
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=header)
+        cell.font = _XL_HEADER_FONT
+        cell.fill = _XL_HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = _XL_THIN
+
+    for offset, row in enumerate(rows):
+        excel_row = header_row + 1 + offset
+        for col_idx, value in enumerate(row, start=1):
+            cell = ws.cell(row=excel_row, column=col_idx, value=value)
+            cell.border = _XL_THIN
+            cell.alignment = Alignment(vertical="center")
+            if col_idx - 1 == amount_col_index and isinstance(value, (int, float)):
+                cell.number_format = _XL_MONEY
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+            if offset % 2 == 1:
+                cell.fill = _XL_ZEBRA
+
+    data_start = header_row + 1
+    data_end = header_row + len(rows)
+    amount_total = 0.0
     for row in rows:
-        ws.append(row)
+        value = row[amount_col_index]
+        if isinstance(value, (int, float)):
+            amount_total += float(value)
 
-    last_data_row = 1 + len(rows)
+    if rows:
+        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(col_count)}{data_end}"
+        ws.freeze_panes = f"A{header_row + 1}"
+
     if rows and formula_keys:
-        col_letter = chr(ord("A") + amount_col_index)
-        for key in formula_keys:
+        section_row = data_end + 2
+        ws.merge_cells(start_row=section_row, start_column=1, end_row=section_row, end_column=col_count)
+        section_cell = ws.cell(row=section_row, column=1, value="XULOSA (tanlangan formulalar)")
+        section_cell.font = _XL_SECTION_FONT
+        section_cell.fill = _XL_SECTION_FILL
+
+        col_letter = get_column_letter(amount_col_index + 1)
+        for i, key in enumerate(formula_keys):
             func, label = FORMULA_FUNCS.get(key, (None, None))
             if not func:
                 continue
-            summary_row = [""] * len(headers)
-            summary_row[0] = label
-            ws.append(summary_row)
-            new_row_idx = ws.max_row
-            formula_cell = ws.cell(row=new_row_idx, column=amount_col_index + 1)
-            formula_cell.value = f"={func}({col_letter}2:{col_letter}{last_data_row})"
-            ws.cell(row=new_row_idx, column=1).font = Font(bold=True)
+            excel_row = section_row + 1 + i
+            label_cell = ws.cell(row=excel_row, column=1, value=label)
+            label_cell.font = Font(bold=True, color="0F172A")
+            label_cell.fill = _XL_FORMULA_FILL
+            label_cell.border = _XL_THIN
+
+            for col_idx in range(2, col_count + 1):
+                filler = ws.cell(row=excel_row, column=col_idx, value="")
+                filler.fill = _XL_FORMULA_FILL
+                filler.border = _XL_THIN
+
+            formula_cell = ws.cell(
+                row=excel_row,
+                column=amount_col_index + 1,
+                value=f"={func}({col_letter}{data_start}:{col_letter}{data_end})",
+            )
+            formula_cell.font = Font(bold=True, color="0F766E")
+            formula_cell.number_format = _XL_MONEY if key != "count" else "0"
+            formula_cell.fill = _XL_FORMULA_FILL
+            formula_cell.border = _XL_THIN
+            formula_cell.alignment = Alignment(horizontal="right")
+
+    _autosize(ws)
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[header_row].height = 20
+    return amount_total
 
 
 @router.get("/report-excel")
@@ -824,12 +922,25 @@ async def download_report_excel(
     company_id: str,
     date_from: date,
     date_to: date,
-    formulas: str = "sum,average",
+    formulas: str = "sum",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     await _check(db, company_id, current_user.id)
-    formula_keys = [f.strip() for f in formulas.split(",") if f.strip() in FORMULA_FUNCS]
+    # Preserve user order, drop unknown/duplicates — avoids messy duplicate blocks.
+    seen: set[str] = set()
+    formula_keys: list[str] = []
+    for raw in formulas.split(","):
+        key = raw.strip()
+        if key in FORMULA_FUNCS and key not in seen:
+            seen.add(key)
+            formula_keys.append(key)
+
+    company = (
+        await db.execute(select(Company).where(Company.id == company_id))
+    ).scalar_one_or_none()
+    company_name = company.name if company else "Kompaniya"
+    period_label = f"Davr: {date_from} — {date_to}"
 
     tx_result = await db.execute(
         select(Transaction, User)
@@ -839,12 +950,13 @@ async def download_report_excel(
             Transaction.occurred_on >= date_from,
             Transaction.occurred_on <= date_to,
         )
-        .order_by(Transaction.occurred_on)
+        .order_by(Transaction.occurred_on, Transaction.created_at)
     )
     invoice_result = await db.execute(
         select(Invoice, User)
         .join(User, User.id == Invoice.created_by)
         .where(Invoice.company_id == company_id, Invoice.issue_date >= date_from, Invoice.issue_date <= date_to)
+        .order_by(Invoice.issue_date, Invoice.created_at)
     )
     payroll_result = await db.execute(
         select(PayrollEntry, User)
@@ -854,36 +966,127 @@ async def download_report_excel(
             PayrollEntry.period >= date_from.strftime("%Y-%m"),
             PayrollEntry.period <= date_to.strftime("%Y-%m"),
         )
+        .order_by(PayrollEntry.period, User.full_name)
     )
+
+    tx_rows = [
+        [
+            str(tx.occurred_on),
+            TX_TYPE_UZ.get(tx.type, tx.type),
+            tx.category,
+            float(tx.amount),
+            tx.description or "",
+            user.full_name,
+        ]
+        for tx, user in tx_result.all()
+    ]
+    inv_rows = [
+        [
+            inv.client_name,
+            float(inv.total_amount),
+            str(inv.issue_date),
+            INV_STATUS_UZ.get(inv.status, inv.status),
+            user.full_name,
+        ]
+        for inv, user in invoice_result.all()
+    ]
+    payroll_rows = [
+        [
+            employee.full_name,
+            entry.period,
+            float(entry.amount),
+            PAY_STATUS_UZ.get(entry.status, entry.status),
+        ]
+        for entry, employee in payroll_result.all()
+    ]
 
     wb = Workbook()
 
-    ws_tx = wb.active
-    ws_tx.title = "Tranzaksiyalar"
-    tx_rows = [
-        [str(tx.occurred_on), tx.type, tx.category, float(tx.amount), tx.description or "", user.full_name]
-        for tx, user in tx_result.all()
+    # --- Cover / Umumiy ---
+    ws_cover = wb.active
+    ws_cover.title = "Umumiy"
+    ws_cover["A1"] = "BG — Buxgalteriya hisoboti"
+    ws_cover["A1"].font = _XL_TITLE_FONT
+    ws_cover["A2"] = company_name
+    ws_cover["A2"].font = Font(bold=True, size=13, color="0F766E")
+    ws_cover["A3"] = period_label
+    ws_cover["A3"].font = _XL_SUB_FONT
+    ws_cover["A4"] = f"Yaratilgan: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
+    ws_cover["A4"].font = _XL_SUB_FONT
+
+    ws_cover["A6"] = "Bo'lim"
+    ws_cover["B6"] = "Yozuvlar"
+    ws_cover["C6"] = "Summa"
+    for cell in (ws_cover["A6"], ws_cover["B6"], ws_cover["C6"]):
+        cell.font = _XL_HEADER_FONT
+        cell.fill = _XL_HEADER_FILL
+        cell.border = _XL_THIN
+        cell.alignment = Alignment(horizontal="center")
+
+    section_stats = [
+        ("Tranzaksiyalar", len(tx_rows), sum(r[3] for r in tx_rows)),
+        ("Hisob-fakturalar", len(inv_rows), sum(r[1] for r in inv_rows)),
+        ("Ish haqi", len(payroll_rows), sum(r[2] for r in payroll_rows)),
     ]
-    _write_sheet(ws_tx, ["Sana", "Turi", "Kategoriya", "Summasi", "Izoh", "Kim kiritdi"], tx_rows, 3, formula_keys)
+    for i, (name, count, total) in enumerate(section_stats, start=7):
+        ws_cover.cell(row=i, column=1, value=name).border = _XL_THIN
+        count_cell = ws_cover.cell(row=i, column=2, value=count)
+        count_cell.border = _XL_THIN
+        count_cell.alignment = Alignment(horizontal="center")
+        total_cell = ws_cover.cell(row=i, column=3, value=total)
+        total_cell.border = _XL_THIN
+        total_cell.number_format = _XL_MONEY
+
+    ws_cover["A11"] = "Tanlangan formulalar"
+    ws_cover["A11"].font = Font(bold=True, color="115E59")
+    if formula_keys:
+        for i, key in enumerate(formula_keys):
+            _, label = FORMULA_FUNCS[key]
+            cell = ws_cover.cell(row=12 + i, column=1, value=f"• {label} ({FORMULA_FUNCS[key][0]})")
+            cell.font = Font(color="0F172A")
+        note_row = 12 + len(formula_keys) + 1
+    else:
+        ws_cover["A12"] = "• Formulalar tanlanmagan (faqat ma'lumotlar)"
+        note_row = 14
+    ws_cover.cell(
+        row=note_row,
+        column=1,
+        value="Har bir bo'lim varag'ida ma'lumotlar alohida, formulalar esa pastdagi «Xulosa» qismida tartibli joylashgan.",
+    ).font = _XL_SUB_FONT
+    _autosize(ws_cover, min_width=14, max_width=55)
+
+    ws_tx = wb.create_sheet("Tranzaksiyalar")
+    _write_sheet(
+        ws_tx,
+        "Tranzaksiyalar",
+        period_label,
+        ["Sana", "Turi", "Kategoriya", "Summasi", "Izoh", "Kim kiritdi"],
+        tx_rows,
+        3,
+        formula_keys,
+    )
 
     ws_inv = wb.create_sheet("Hisob-fakturalar")
-    inv_rows = [
-        [inv.client_name, float(inv.total_amount), str(inv.issue_date), inv.status, user.full_name]
-        for inv, user in invoice_result.all()
-    ]
-    _write_sheet(ws_inv, ["Mijoz", "Summasi", "Sana", "Holati", "Kim yaratdi"], inv_rows, 1, formula_keys)
+    _write_sheet(
+        ws_inv,
+        "Hisob-fakturalar",
+        period_label,
+        ["Mijoz", "Summasi", "Sana", "Holati", "Kim yaratdi"],
+        inv_rows,
+        1,
+        formula_keys,
+    )
 
     ws_payroll = wb.create_sheet("Ish haqi")
-    payroll_rows = [
-        [employee.full_name, entry.period, float(entry.amount), entry.status]
-        for entry, employee in payroll_result.all()
-    ]
-    _write_sheet(ws_payroll, ["Xodim", "Davr", "Summasi", "Holati"], payroll_rows, 2, formula_keys)
-
-    for ws in wb.worksheets:
-        for column_cells in ws.columns:
-            length = max((len(str(c.value)) if c.value is not None else 0) for c in column_cells)
-            ws.column_dimensions[column_cells[0].column_letter].width = min(max(length + 2, 10), 40)
+    _write_sheet(
+        ws_payroll,
+        "Ish haqi",
+        period_label,
+        ["Xodim", "Davr", "Summasi", "Holati"],
+        payroll_rows,
+        2,
+        formula_keys,
+    )
 
     buffer = io.BytesIO()
     wb.save(buffer)
