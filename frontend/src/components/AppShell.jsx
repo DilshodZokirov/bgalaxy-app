@@ -7,11 +7,27 @@ import GalaxySkyBackdrop from "./GalaxySkyBackdrop";
 import GalaxyAppBar from "./GalaxyAppBar";
 import { useAuth } from "../hooks/useAuth";
 
-export default function AppShell({ children, topLeft = null, hideAppBar = false }) {
+export default function AppShell({
+  children,
+  topLeft = null,
+  hideAppBar = false,
+  immersive = false,
+}) {
   const { user, refreshUser } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const theme = user?.theme || "dark";
   const skyMode = theme === "light" ? "day" : "night";
+
+  if (immersive) {
+    return (
+      <div className={`office-immersive-shell galaxy-shell-${skyMode}`}>
+        {children}
+        {showSettings && (
+          <SettingsPopup user={user} onClose={() => setShowSettings(false)} onSaved={refreshUser} />
+        )}
+      </div>
+    );
+  }
 
   const shellClass = ["app-shell", "galaxy-shell", `galaxy-shell-${skyMode}`].join(" ");
 
