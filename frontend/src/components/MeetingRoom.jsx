@@ -169,7 +169,7 @@ export default function MeetingRoom({
   const count = participants.length;
 
   return (
-    <div className="g4-room">
+    <div className="g4-room" data-lk-theme="default">
       <RoomAudioRenderer />
       <ConnectionStateToast />
 
