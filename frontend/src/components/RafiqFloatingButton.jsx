@@ -123,15 +123,11 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
           type="button"
           className={`ziyo-header-chip ${enabled ? `is-${status}` : "is-off"}`}
           onClick={() => navigate("/rafiq")}
-          title="AI Ziyo chatini ochish"
+          title={`AI Ziyo — ${enabled ? statusLabel : "O'chirilgan"}`}
         >
           <span className="ziyo-header-avatar">
-            <RafiqAvatar size={26} variant="photo" />
+            <RafiqAvatar size={18} variant="photo" />
             {enabled && status === "listening" && <span className="ziyo-header-pulse" aria-hidden />}
-          </span>
-          <span className="ziyo-header-copy">
-            <strong>Ziyo</strong>
-            <small>{enabled ? statusLabel : "O'chirilgan"}</small>
           </span>
         </button>
         <button
@@ -161,8 +157,7 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
           : "O'chirilgan — yoqish uchun bosing"
       }
     >
-      <RafiqAvatar size={34} variant="photo" />
-      <span>Ziyo</span>
+      <RafiqAvatar size={20} variant="photo" />
     </button>
   );
 }
