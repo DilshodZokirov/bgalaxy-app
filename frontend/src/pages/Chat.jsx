@@ -20,15 +20,31 @@ function fileKindLabel(fileName) {
   return ext.slice(0, 4);
 }
 
-function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
+function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId, excludeIds = [] }) {
   const [picked, setPicked] = useState([]);
+  const [teammates, setTeammates] = useState([]);
   const [error, setError] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const excluded = new Set(excludeIds.map(String));
+
+  useEffect(() => {
+    if (!companyId) return;
+    api
+      .getMembers(companyId)
+      .then((list) => setTeammates(list.filter((m) => m.approved !== false)))
+      .catch(() => setTeammates([]));
+  }, [companyId]);
 
   function add(u) {
-    setPicked((prev) => (prev.some((p) => p.id === u.id) ? prev : [...prev, u]));
+    const id = u.id || u.user_id;
+    if (excluded.has(String(id))) return;
+    setPicked((prev) => (prev.some((p) => String(p.id) === String(id)) ? prev : [...prev, { id, full_name: u.full_name, email: u.email }]));
+    setInfo(null);
+    setError(null);
   }
   function remove(id) {
-    setPicked((prev) => prev.filter((p) => p.id !== id));
+    setPicked((prev) => prev.filter((p) => String(p.id) !== String(id)));
   }
 
   return (
@@ -40,6 +56,32 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
             Yopish
           </button>
         </div>
+        <p className="chat-modal-hint">Kompaniya aʼzosini tanlang yoki ism/email bo‘yicha qidiring.</p>
+
+        {teammates.length > 0 && (
+          <div className="chat-teammate-list">
+            {teammates.slice(0, 12).map((m) => {
+              const id = m.user_id || m.id;
+              const alreadyIn = excluded.has(String(id));
+              const alreadyPicked = picked.some((p) => String(p.id) === String(id));
+              const disabled = alreadyIn || alreadyPicked;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`chat-teammate-item ${disabled ? "is-disabled" : ""}`}
+                  disabled={disabled}
+                  onClick={() => add(m)}
+                >
+                  <span className="avatar-circle chat-mini-avatar">{(m.full_name || "?").slice(0, 2).toUpperCase()}</span>
+                  <span>{m.full_name}</span>
+                  {alreadyIn ? <em>Kanalda</em> : alreadyPicked ? <em>Tanlandi</em> : <strong>+</strong>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {picked.length > 0 && (
           <div className="chat-chip-row">
             {picked.map((p) => (
@@ -52,22 +94,36 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
             ))}
           </div>
         )}
-        <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+        <UserSearchInput
+          selected={null}
+          onSelect={add}
+          onClear={() => {}}
+          disabledIds={[...excludeIds, ...picked.map((p) => p.id)]}
+          disabledLabel="Allaqachon kanalda"
+        />
         {error && <p className="error">{error}</p>}
+        {info && <p className="chat-success-msg">{info}</p>}
         <button
           type="button"
           className="chat-cta"
-          disabled={picked.length === 0}
+          disabled={picked.length === 0 || saving}
           onClick={async () => {
             setError(null);
+            setInfo(null);
+            setSaving(true);
             try {
-              await onConfirm(picked.map((p) => p.id));
+              const res = await onConfirm(picked.map((p) => p.id));
+              if (res?.message) setInfo(res.message);
+              else setInfo("Tayyor");
+              setTimeout(() => onClose(), 700);
             } catch (err) {
               setError(err.message);
+            } finally {
+              setSaving(false);
             }
           }}
         >
-          {confirmLabel}
+          {saving ? "Qo‘shilmoqda..." : confirmLabel}
         </button>
       </div>
     </div>
@@ -167,7 +223,13 @@ function NewChannelModal({ onClose, onConfirm }) {
               ))}
             </div>
           )}
-          <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+          <UserSearchInput
+            selected={null}
+            onSelect={add}
+            onClear={() => {}}
+            disabledIds={picked.map((p) => p.id)}
+            disabledLabel="Allaqachon tanlangan"
+          />
           {error && <p className="error">{error}</p>}
           <button type="submit" className="chat-cta">
             Kanal yaratish
@@ -229,7 +291,13 @@ function NewConversationModal({ onClose, onStart }) {
             ))}
           </div>
         )}
-        <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+        <UserSearchInput
+          selected={null}
+          onSelect={add}
+          onClear={() => {}}
+          disabledIds={picked.map((p) => p.id)}
+          disabledLabel="Allaqachon tanlangan"
+        />
         {error && <p className="error">{error}</p>}
         <button type="button" className="chat-cta" disabled={picked.length === 0 || starting} onClick={handleStart}>
           {starting ? "Boshlanmoqda..." : "Yangi chat yaratish"}
@@ -894,9 +962,22 @@ export default function Chat() {
                 </div>
                 <div className="chat-room-bar-actions">
                   {activeKind === "channel" && activeChannel && (
-                    <button type="button" className="secondary chat-soft-btn" onClick={toggleMembersPanel}>
-                      Aʼzolar
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="chat-cta chat-soft-btn"
+                        onClick={() => {
+                          loadChannelMembers();
+                          setShowMembersPanel(false);
+                          setShowAddMembers(true);
+                        }}
+                      >
+                        + Aʼzo
+                      </button>
+                      <button type="button" className="secondary chat-soft-btn" onClick={toggleMembersPanel}>
+                        Aʼzolar
+                      </button>
+                    </>
                   )}
                   {activeKind === "direct" && activeConversation && (
                     <button type="button" className="secondary chat-soft-btn" onClick={toggleDmMembersPanel}>
@@ -915,6 +996,7 @@ export default function Chat() {
                           {m.full_name}
                           {m.user_id === activeChannel.created_by && <span className="chat-owner-tag">egasi</span>}
                         </span>
+                        {m.approved === false && <span className="chat-status-pill pending">Kutilmoqda</span>}
                         {m.user_id !== user?.id && m.user_id !== activeChannel.created_by && (
                           <button type="button" className="remove-btn" onClick={() => handleRemoveMember(m.user_id)}>
                             Chiqarish
@@ -926,6 +1008,7 @@ export default function Chat() {
                       type="button"
                       className="chat-members-add-btn"
                       onClick={() => {
+                        loadChannelMembers();
                         setShowMembersPanel(false);
                         setShowAddMembers(true);
                       }}
@@ -1211,12 +1294,14 @@ export default function Chat() {
         <MemberPickerModal
           title={`#${activeChannel.name}ga a'zo qo'shish`}
           confirmLabel="Qo'shish"
+          companyId={companyId}
+          excludeIds={[user?.id, ...channelMembers.map((m) => m.user_id)]}
           onClose={() => setShowAddMembers(false)}
           onConfirm={async (ids) => {
-            await api.addChannelMembers(companyId, activeChannel.id, ids);
-            setShowAddMembers(false);
+            const res = await api.addChannelMembers(companyId, activeChannel.id, ids);
             refreshChannels();
             loadChannelMembers();
+            return res;
           }}
         />
       )}

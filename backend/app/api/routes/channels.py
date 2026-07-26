@@ -45,28 +45,71 @@ async def _require_channel_member(db: AsyncSession, channel_id: str, user_id) ->
     return channel
 
 
-async def _invite_to_channel(db: AsyncSession, channel: ChatChannel, user_ids: set[str], inviter: User) -> list[str]:
-    existing_result = await db.execute(
-        select(ChatChannelMember.user_id).where(ChatChannelMember.channel_id == channel.id)
-    )
-    existing = {str(uid) for uid in existing_result.scalars().all()}
+async def _invite_to_channel(db: AsyncSession, channel: ChatChannel, user_ids: set[str], inviter: User) -> dict:
+    """Add users to a channel.
 
-    invited = []
-    for uid in user_ids:
-        if uid in existing:
-            continue
-        db.add(ChatChannelMember(channel_id=channel.id, user_id=uid, approved=False))
-        db.add(
-            Notification(
-                user_id=uid,
-                type="channel_invite",
-                message=f"{inviter.full_name} sizni #{channel.name} kanaliga qo'shdi.",
-                company_id=channel.company_id,
-                invite_token=str(channel.id),
-            )
+    Company teammates (approved TeamMembership) are added immediately.
+    Everyone else gets a pending invite notification.
+    """
+    existing_result = await db.execute(
+        select(ChatChannelMember).where(ChatChannelMember.channel_id == channel.id)
+    )
+    existing_rows = {str(m.user_id): m for m in existing_result.scalars().all()}
+
+    teammate_result = await db.execute(
+        select(TeamMembership.user_id).where(
+            TeamMembership.company_id == channel.company_id,
+            TeamMembership.approved == True,  # noqa: E712
         )
-        invited.append(uid)
-    return invited
+    )
+    teammates = {str(uid) for uid in teammate_result.scalars().all()}
+
+    added: list[str] = []
+    invited: list[str] = []
+
+    for uid in user_ids:
+        if str(uid) == str(inviter.id):
+            continue
+        is_teammate = uid in teammates
+        row = existing_rows.get(uid)
+
+        if row is not None:
+            if row.approved:
+                continue
+            if is_teammate:
+                row.approved = True
+                added.append(uid)
+            else:
+                # Still pending — re-ping so the invite isn't lost.
+                db.add(
+                    Notification(
+                        user_id=uid,
+                        type="channel_invite",
+                        message=f"{inviter.full_name} sizni #{channel.name} kanaliga qo'shdi.",
+                        company_id=channel.company_id,
+                        invite_token=str(channel.id),
+                    )
+                )
+                invited.append(uid)
+            continue
+
+        if is_teammate:
+            db.add(ChatChannelMember(channel_id=channel.id, user_id=uid, approved=True))
+            added.append(uid)
+        else:
+            db.add(ChatChannelMember(channel_id=channel.id, user_id=uid, approved=False))
+            db.add(
+                Notification(
+                    user_id=uid,
+                    type="channel_invite",
+                    message=f"{inviter.full_name} sizni #{channel.name} kanaliga qo'shdi.",
+                    company_id=channel.company_id,
+                    invite_token=str(channel.id),
+                )
+            )
+            invited.append(uid)
+
+    return {"added": added, "invited": invited}
 
 
 @router.get("", response_model=list[ChannelOut])
@@ -132,17 +175,18 @@ async def create_channel(
     db.add(channel)
     await db.flush()
 
-    # Creator is the owner — auto-approved. Everyone else is invited and
-    # only shows up once they accept the notification.
+    # Creator is the owner — auto-approved. Company teammates are added
+    # immediately; outsiders get a pending invite notification.
     db.add(ChatChannelMember(channel_id=channel.id, user_id=current_user.id, approved=True))
     invite_ids = {str(uid) for uid in payload.member_ids if str(uid) != str(current_user.id)}
-    invited = await _invite_to_channel(db, channel, invite_ids, current_user)
+    result = await _invite_to_channel(db, channel, invite_ids, current_user)
 
     await db.commit()
     await db.refresh(channel)
-    for uid in invited:
+    for uid in result["invited"]:
         await ping_notifications(uid)
-    return ChannelOut.model_validate(channel, from_attributes=True).model_copy(update={"member_count": 1})
+    member_count = 1 + len(result["added"])
+    return ChannelOut.model_validate(channel, from_attributes=True).model_copy(update={"member_count": member_count})
 
 
 @router.patch("/{channel_id}", response_model=ChannelOut)
@@ -202,12 +246,15 @@ async def list_channel_members(
 ):
     await _require_channel_member(db, channel_id, current_user.id)
     result = await db.execute(
-        select(User)
+        select(User, ChatChannelMember)
         .join(ChatChannelMember, ChatChannelMember.user_id == User.id)
-        .where(ChatChannelMember.channel_id == channel_id, ChatChannelMember.approved == True)  # noqa: E712
-        .order_by(User.full_name)
+        .where(ChatChannelMember.channel_id == channel_id)
+        .order_by(ChatChannelMember.approved.desc(), User.full_name)
     )
-    return [ChannelMemberOut(user_id=u.id, full_name=u.full_name) for u in result.scalars().all()]
+    return [
+        ChannelMemberOut(user_id=u.id, full_name=u.full_name, approved=m.approved)
+        for u, m in result.all()
+    ]
 
 
 @router.delete("/{channel_id}/members/{user_id}", status_code=204)
@@ -237,7 +284,7 @@ async def remove_channel_member(
     await db.commit()
 
 
-@router.post("/{channel_id}/members", status_code=204)
+@router.post("/{channel_id}/members")
 async def add_channel_members(
     company_id: str,
     channel_id: str,
@@ -246,10 +293,29 @@ async def add_channel_members(
     current_user: User = Depends(get_current_user),
 ):
     channel = await _require_channel_member(db, channel_id, current_user.id)
-    invited = await _invite_to_channel(db, channel, {str(uid) for uid in payload.user_ids}, current_user)
+    if not payload.user_ids:
+        raise HTTPException(status_code=400, detail="Kamida bitta a'zo tanlang")
+    result = await _invite_to_channel(db, channel, {str(uid) for uid in payload.user_ids}, current_user)
     await db.commit()
-    for uid in invited:
+    for uid in result["invited"]:
         await ping_notifications(uid)
+    return {
+        "added": len(result["added"]),
+        "invited": len(result["invited"]),
+        "message": _add_members_message(result),
+    }
+
+
+def _add_members_message(result: dict) -> str:
+    added = len(result["added"])
+    invited = len(result["invited"])
+    if added and invited:
+        return f"{added} ta a'zo qo'shildi, {invited} ta taklif yuborildi"
+    if added:
+        return f"{added} ta a'zo kanalga qo'shildi"
+    if invited:
+        return f"{invited} ta taklif yuborildi — ular qabul qilishi kerak"
+    return "Tanlanganlar allaqachon kanalda"
 
 
 @router.get("/{channel_id}/mention-candidates", response_model=list[MentionCandidate])

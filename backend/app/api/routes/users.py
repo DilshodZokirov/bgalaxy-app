@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -16,10 +16,17 @@ async def search_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Finds registered users by email prefix, for the invite autocomplete.
-    Only returns matches among users who already have an account — invites
-    can't be sent to unregistered emails."""
+    """Finds registered users by name or email for invite/add-member pickers.
+    Only returns people who already have a BG account."""
+    term = q.strip()
+    pattern = f"%{term}%"
     result = await db.execute(
-        select(User).where(User.email.ilike(f"{q}%")).limit(8)
+        select(User)
+        .where(
+            User.id != current_user.id,
+            or_(User.email.ilike(pattern), User.full_name.ilike(pattern)),
+        )
+        .order_by(User.full_name)
+        .limit(12)
     )
     return result.scalars().all()

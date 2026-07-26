@@ -35,6 +35,15 @@ async def create_invite(
     if target_user is None:
         raise HTTPException(status_code=404, detail="Bu email bilan ro'yxatdan o'tgan foydalanuvchi topilmadi")
 
+    existing_member = await db.execute(
+        select(TeamMembership).where(
+            TeamMembership.company_id == company_id,
+            TeamMembership.user_id == target_user.id,
+        )
+    )
+    if existing_member.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="Bu foydalanuvchi allaqachon ishxonada")
+
     invite = Invite(
         company_id=company_id,
         email=payload.email,

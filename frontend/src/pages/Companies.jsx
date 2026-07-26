@@ -640,6 +640,9 @@ export default function Companies() {
                 selected={inviteUser}
                 onSelect={setInviteUser}
                 onClear={() => setInviteUser(null)}
+                disabledIds={members.map((m) => m.user_id)}
+                disabledLabel="Allaqachon ishxonada"
+                placeholder="Ism yoki email yozing..."
               />
               {inviteError && <p className="error">{inviteError}</p>}
               <button type="submit" className="os-btn-primary" disabled={inviteLoading || !inviteUser}>
