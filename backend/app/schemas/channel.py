@@ -34,6 +34,7 @@ class ChannelMemberAdd(BaseModel):
 class ChannelMemberOut(BaseModel):
     user_id: uuid.UUID
     full_name: str
+    approved: bool = True
 
 
 class MentionCandidate(BaseModel):

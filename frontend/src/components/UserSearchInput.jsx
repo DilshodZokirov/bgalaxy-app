@@ -62,7 +62,7 @@ export default function UserSearchInput({ onSelect, selected, onClear }) {
     <div style={{ position: "relative" }}>
       <input
         type="text"
-        placeholder="Ism yoki email bo'yicha qidiring..."
+        placeholder="Ism yoki email yozing..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />

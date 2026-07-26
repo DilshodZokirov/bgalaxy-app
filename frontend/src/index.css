@@ -4721,6 +4721,48 @@ video {
   background: rgba(34, 211, 238, 0.1);
 }
 
+.chat-teammate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.chat-teammate-item {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.28);
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-teammate-item:hover {
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.1);
+}
+
+.chat-teammate-item strong {
+  color: #67e8f9;
+  font-size: 16px;
+}
+
+.chat-success-msg {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #34d399;
+}
+
 .chat-side-empty {
   margin: 4px 2px 0;
   font-size: 12px;
