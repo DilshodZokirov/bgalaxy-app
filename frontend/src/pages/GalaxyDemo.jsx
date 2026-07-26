@@ -29,7 +29,7 @@ export default function GalaxyDemo() {
           <Link to="/" className="galaxy-demo-brand">
             <span className="galaxy-demo-mark">BG</span>
             <span className="galaxy-demo-brand-text">
-              <strong>Business Galaxy</strong>
+              <strong>BG</strong>
               <em>3D Hub Demo</em>
             </span>
           </Link>

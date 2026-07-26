@@ -23,8 +23,8 @@ export default function GalaxyAppBar({ left = null }) {
       <div className="galaxy-top-left">
         {left || (
           <div className="galaxy-app-bar-fallback">
-            <strong>Business Galaxy</strong>
-            <span>Bitta galaktika. Cheksiz biznes.</span>
+            <strong>BG</strong>
+            <span>One Galaxy. Endless Business.</span>
           </div>
         )}
       </div>

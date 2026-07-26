@@ -2283,23 +2283,54 @@ video {
 
 .logo-galaxy-mark {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
 }
 
-.logo-galaxy-orb {
+.logo-orbit {
   position: absolute;
-  inset: 0;
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.55), transparent 35%),
-    linear-gradient(145deg, #2563eb, #7c3aed 55%, #22d3ee);
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  pointer-events: none;
+}
+
+.logo-orbit-a {
+  inset: 2px;
+  border-top-color: #38bdf8;
+  border-right-color: #60a5fa;
+  border-bottom-color: #a855f7;
+  border-left-color: #e879f9;
   box-shadow:
-    0 0 22px rgba(124, 58, 237, 0.55),
-    inset 0 0 12px rgba(255, 255, 255, 0.2);
+    0 0 10px rgba(56, 189, 248, 0.45),
+    inset 0 0 8px rgba(168, 85, 247, 0.2);
+  animation: logo-orbit-spin-a 14s linear infinite;
+}
+
+.logo-orbit-b {
+  inset: 8px;
+  border-top-color: #c084fc;
+  border-right-color: #e879f9;
+  border-bottom-color: #38bdf8;
+  border-left-color: #818cf8;
+  opacity: 0.9;
+  box-shadow: 0 0 8px rgba(232, 121, 249, 0.35);
+  animation: logo-orbit-spin-b 20s linear infinite;
+}
+
+.logo-galaxy-star {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: #e879f9;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  filter: drop-shadow(0 0 4px rgba(232, 121, 249, 0.9));
+  z-index: 2;
+  animation: logo-star-twinkle 2.4s ease-in-out infinite;
 }
 
 .logo-galaxy-text {
@@ -2307,10 +2338,17 @@ video {
   z-index: 1;
   font-family: "Syne", "Poppins", sans-serif;
   font-weight: 800;
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  color: #fff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+  font-size: 1.35rem;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  color: #e8eef8;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 12px rgba(148, 163, 184, 0.45);
+  background: linear-gradient(180deg, #f8fafc 10%, #94a3b8 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .logo-galaxy-copy {
@@ -2318,26 +2356,74 @@ video {
   flex-direction: column;
   min-width: 0;
   line-height: 1.15;
+  gap: 2px;
 }
 
+.logo-galaxy-copy .logo-wordmark,
 .logo-galaxy-copy strong {
   font-family: "Syne", "Poppins", sans-serif;
-  font-size: 1rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #f1f5f9;
+  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.45);
 }
 
+.logo-galaxy-copy .logo-tagline,
 .logo-galaxy-copy em {
   font-style: normal;
   font-size: 0.68rem;
-  color: #a5b4fc;
   letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+.logo-tagline span:first-child {
+  color: #7dd3fc;
+}
+
+.logo-tagline span:last-child {
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.logo-galaxy-extra {
+  font-style: normal;
+  font-size: 0.62rem;
+  color: #94a3b8;
+  margin-top: 2px;
 }
 
 .logo-galaxy.compact .logo-galaxy-mark {
   width: 40px;
   height: 40px;
+}
+
+.logo-galaxy.compact .logo-galaxy-text {
+  font-size: 1.1rem;
+}
+
+.logo-wordmark-plain {
+  display: block;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+@keyframes logo-orbit-spin-a {
+  from { transform: rotate(-28deg); }
+  to { transform: rotate(332deg); }
+}
+
+@keyframes logo-orbit-spin-b {
+  from { transform: rotate(38deg); }
+  to { transform: rotate(-322deg); }
+}
+
+@keyframes logo-star-twinkle {
+  0%, 100% { opacity: 0.75; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); }
 }
 
 .sidebar-brand-row {
@@ -2484,12 +2570,27 @@ video {
   box-shadow: 0 0 40px rgba(14, 165, 233, 0.12);
 }
 
+.galaxy-shell-day .logo-galaxy-copy .logo-wordmark,
 .galaxy-shell-day .logo-galaxy-copy strong {
   color: #0f172a;
+  text-shadow: none;
 }
 
-.galaxy-shell-day .logo-galaxy-copy em {
+.galaxy-shell-day .logo-tagline span:first-child {
+  color: #0284c7;
+}
+
+.galaxy-shell-day .logo-galaxy-extra,
+.galaxy-shell-day .logo-galaxy-copy em:not(.logo-tagline) {
   color: #0369a1;
+}
+
+.galaxy-shell-day .logo-galaxy-text {
+  background: linear-gradient(180deg, #1e293b 10%, #64748b 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
 }
 
 .galaxy-shell-day .sidebar-galaxy .sidebar-link {
