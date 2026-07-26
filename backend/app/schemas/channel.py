@@ -20,6 +20,8 @@ class ChannelOut(BaseModel):
     created_by: uuid.UUID
     created_at: datetime
     member_count: int = 0
+    last_message: str | None = None
+    last_message_at: datetime | None = None
 
     class Config:
         from_attributes = True
