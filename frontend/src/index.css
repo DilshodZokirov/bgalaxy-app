@@ -1758,6 +1758,31 @@ video {
   }
 }
 
+.notif-inline {
+  position: relative;
+}
+
+.notif-bell-inline {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.notif-bell-inline .notif-bell-btn,
+.notif-inline .galaxy-icon-btn.notif-bell-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.notif-panel-inline {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  left: auto;
+  z-index: 50;
+}
+
 /* ---------- Accounting: detail modal, filters, pagination, stats modal ---------- */
 .acc-modal-backdrop {
   position: fixed;
@@ -2166,6 +2191,242 @@ video {
 /* ---------- Virtual Office comms panel ---------- */
 .office-comms-row:hover {
   background: var(--panel-2);
+}
+
+/* ---------- Galaxy brand + nav (mockup-inspired) ---------- */
+.logo-galaxy {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.logo-galaxy-mark {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.logo-galaxy-orb {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.55), transparent 35%),
+    linear-gradient(145deg, #2563eb, #7c3aed 55%, #22d3ee);
+  box-shadow:
+    0 0 22px rgba(124, 58, 237, 0.55),
+    inset 0 0 12px rgba(255, 255, 255, 0.2);
+}
+
+.logo-galaxy-text {
+  position: relative;
+  z-index: 1;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+}
+
+.logo-galaxy-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.logo-galaxy-copy strong {
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.logo-galaxy-copy em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: #a5b4fc;
+  letter-spacing: 0.02em;
+}
+
+.logo-galaxy.compact .logo-galaxy-mark {
+  width: 40px;
+  height: 40px;
+}
+
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-company-select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.sidebar-link-icon {
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-link-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.sidebar-link-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.sidebar-link-hint {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.sidebar-avatar-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.sidebar-logout {
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.sidebar-galaxy {
+  width: 260px;
+  padding: 18px 14px;
+  border-right: 1px solid rgba(167, 139, 250, 0.3);
+  background:
+    linear-gradient(180deg, rgba(30, 27, 75, 0.55), rgba(15, 23, 42, 0.45));
+  backdrop-filter: blur(22px) saturate(1.25);
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.05),
+    0 0 50px rgba(124, 58, 237, 0.18);
+}
+
+.sidebar-galaxy.collapsed {
+  width: 84px;
+}
+
+.sidebar-galaxy .sidebar-company-select {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(167, 139, 250, 0.28);
+  color: #e2e8f0;
+  border-radius: 12px;
+}
+
+.sidebar-galaxy .sidebar-nav {
+  gap: 6px;
+}
+
+.sidebar-galaxy .sidebar-link {
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  color: #cbd5e1;
+}
+
+.sidebar-galaxy .sidebar-link:hover {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.18);
+  color: #f8fafc;
+}
+
+.sidebar-galaxy .sidebar-link.active {
+  background: linear-gradient(135deg, rgba(91, 33, 182, 0.95), rgba(37, 99, 235, 0.92));
+  border-color: rgba(196, 181, 253, 0.35);
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.4);
+  color: #fff;
+}
+
+.sidebar-galaxy .sidebar-link.active .sidebar-link-hint {
+  color: rgba(237, 233, 254, 0.85);
+}
+
+.sidebar-galaxy .sidebar-footer {
+  border-top-color: rgba(167, 139, 250, 0.22);
+  padding: 14px 8px 4px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sidebar-galaxy .sidebar-footer .name {
+  color: #f8fafc;
+}
+
+.sidebar-galaxy .sidebar-footer .role {
+  color: #a5b4fc;
+}
+
+.sidebar-galaxy .sidebar-collapse-btn {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(167, 139, 250, 0.28);
+  color: #c4b5fd;
+}
+
+.galaxy-shell-day .sidebar-galaxy {
+  background: rgba(255, 255, 255, 0.5);
+  border-right-color: rgba(14, 116, 144, 0.2);
+  box-shadow: 0 0 40px rgba(14, 165, 233, 0.12);
+}
+
+.galaxy-shell-day .logo-galaxy-copy strong {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .logo-galaxy-copy em {
+  color: #0369a1;
+}
+
+.galaxy-shell-day .sidebar-galaxy .sidebar-link {
+  color: #334155;
+}
+
+.galaxy-shell-day .sidebar-galaxy .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.7);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .sidebar-galaxy .sidebar-footer .name {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .sidebar-galaxy .sidebar-footer .role {
+  color: #0369a1;
 }
 
 /* ---------- Cosmic Dashboard (viqorli hub) ---------- */

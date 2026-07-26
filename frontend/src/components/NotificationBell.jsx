@@ -13,11 +13,12 @@ function timeAgo(iso) {
   return `${Math.floor(hours / 24)} kun oldin`;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ variant = "fixed" }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const navigate = useNavigate();
+  const inline = variant === "inline";
 
   function refresh() {
     api
@@ -133,9 +134,14 @@ export default function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div ref={wrapRef}>
-      <div className="notif-bell-wrap">
-        <button className="notif-bell-btn" onClick={() => setOpen((v) => !v)}>
+    <div ref={wrapRef} className={inline ? "notif-inline" : undefined}>
+      <div className={inline ? "notif-bell-wrap notif-bell-inline" : "notif-bell-wrap"}>
+        <button
+          className={inline ? "galaxy-icon-btn notif-bell-btn" : "notif-bell-btn"}
+          onClick={() => setOpen((v) => !v)}
+          title="Bildirishnomalar"
+          type="button"
+        >
           🔔
           {unreadCount > 0 && (
             <span className="notif-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
@@ -144,7 +150,7 @@ export default function NotificationBell() {
       </div>
 
       {open && (
-        <div className="notif-panel">
+        <div className={inline ? "notif-panel notif-panel-inline" : "notif-panel"}>
           <div className="notif-panel-header">
             <strong style={{ fontSize: 13.5 }}>Bildirishnomalar</strong>
             {unreadCount > 0 && (

@@ -6,18 +6,19 @@ import { getActiveCompanyId, setActiveCompanyId } from "../hooks/useCompany";
 import Logo from "./Logo";
 
 const NAV_ITEMS = [
-  { icon: "🏠", label: "Bosh sahifa", to: "/dashboard" },
-  { icon: "🏢", label: "Kompaniyalar", to: "/companies" },
-  { icon: "🏙️", label: "Virtual Ofis", to: "/office" },
-  { icon: "💬", label: "Chat", to: "/chat" },
-  { icon: "🎥", label: "Uchrashuvlar", to: "/meetings" },
-  { icon: "🗂️", label: "Vazifalar", to: "/tasks" },
-  { icon: "🤖", label: "AI Ziyo", to: "/rafiq" },
+  { icon: "🌌", label: "Galaxy Home", hint: "Bosh sahifa", to: "/dashboard" },
+  { icon: "🏢", label: "Korxona", hint: "Kompaniyalar", to: "/companies" },
+  { icon: "🏙️", label: "Virtual Office", hint: "3D Metaverse", to: "/office" },
+  { icon: "🎥", label: "Online Meeting", hint: "Meet & Connect", to: "/meetings" },
+  { icon: "💬", label: "Chat", hint: "Messages", to: "/chat" },
+  { icon: "🗂️", label: "Vazifalar", hint: "Jira-style board", to: "/tasks" },
+  { icon: "🤖", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
 
-export default function Sidebar({ onOpenSettings }) {
+export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isGalaxy = variant === "galaxy";
   const [companies, setCompanies] = useState([]);
   const [activeId, setActiveIdState] = useState(getActiveCompanyId());
   const [canManageAccounting, setCanManageAccounting] = useState(false);
@@ -77,23 +78,28 @@ export default function Sidebar({ onOpenSettings }) {
     .join("")
     .toUpperCase();
 
-  const navItems = canManageAccounting
-    ? [...NAV_ITEMS, { icon: "🧾", label: "Buxgalteriya", to: "/accounting" }]
-    : NAV_ITEMS;
-  const withWarehouse = hasWarehouse && canViewWarehouse
-    ? [...navItems, { icon: "📦", label: "Ombor", to: "/warehouse" }]
-    : navItems;
-  const withAnalytics = canViewAnalytics
-    ? [...withWarehouse, { icon: "📈", label: "Analitika", to: "/analytics" }]
-    : withWarehouse;
-  const finalNavItems = user?.is_developer
-    ? [...withAnalytics, { icon: "🛠️", label: "Developer paneli", to: "/developer" }]
-    : withAnalytics;
+  let finalNavItems = [...NAV_ITEMS];
+  if (canManageAccounting) {
+    finalNavItems = [
+      ...finalNavItems.slice(0, 4),
+      { icon: "🧾", label: "Buxgalteriya", hint: "Accounting", to: "/accounting" },
+      ...finalNavItems.slice(4),
+    ];
+  }
+  if (hasWarehouse && canViewWarehouse) {
+    finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Warehouse", to: "/warehouse" }];
+  }
+  if (canViewAnalytics) {
+    finalNavItems = [...finalNavItems, { icon: "📈", label: "Analitika", hint: "Analytics", to: "/analytics" }];
+  }
+  if (user?.is_developer) {
+    finalNavItems = [...finalNavItems, { icon: "🛠️", label: "Developer", hint: "Panel", to: "/developer" }];
+  }
 
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Logo compact={collapsed} />
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""} ${isGalaxy ? "sidebar-galaxy" : ""}`}>
+      <div className="sidebar-brand-row">
+        <Logo compact={collapsed} variant={isGalaxy ? "galaxy" : "default"} />
         <button className="sidebar-collapse-btn" onClick={toggleCollapsed} title={collapsed ? "Kengaytirish" : "Siqish"}>
           {collapsed ? "»" : "«"}
         </button>
@@ -101,17 +107,9 @@ export default function Sidebar({ onOpenSettings }) {
 
       {!collapsed && companies.length > 0 && (
         <select
+          className="sidebar-company-select"
           value={activeId || ""}
           onChange={handleSwitch}
-          style={{
-            background: "var(--panel-2)",
-            border: "1px solid var(--border)",
-            color: "var(--text)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 10px",
-            fontSize: 13,
-            fontFamily: "inherit",
-          }}
         >
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
@@ -122,41 +120,43 @@ export default function Sidebar({ onOpenSettings }) {
       )}
 
       <nav className="sidebar-nav">
-        {finalNavItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={`sidebar-link ${location.pathname.startsWith(item.to) ? "active" : ""}`}
-            title={collapsed ? item.label : undefined}
-          >
-            <span>{item.icon}</span>
-            {!collapsed && item.label}
-          </Link>
-        ))}
+        {finalNavItems.map((item) => {
+          const active = location.pathname.startsWith(item.to);
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`sidebar-link ${active ? "active" : ""}`}
+              title={collapsed ? item.label : undefined}
+            >
+              <span className="sidebar-link-icon">{item.icon}</span>
+              {!collapsed && (
+                <span className="sidebar-link-copy">
+                  <span className="sidebar-link-label">{item.label}</span>
+                  {isGalaxy && item.hint && <span className="sidebar-link-hint">{item.hint}</span>}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
+
       <div className="sidebar-footer">
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: "pointer" }}
-          onClick={() => onOpenSettings?.()}
-        >
+        <div className="sidebar-user" onClick={() => onOpenSettings?.()}>
           {user?.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt="Avatar"
-              style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-            />
+            <img src={user.avatar_url} alt="Avatar" className="sidebar-avatar-img" />
           ) : (
             <div className="avatar-circle">{initials}</div>
           )}
           {!collapsed && (
             <div>
               <div className="name">{user?.full_name || "Foydalanuvchi"}</div>
-              <div className="role">A'zo</div>
+              <div className="role">{user?.is_developer ? "Admin" : "A'zo"} · Sozlamalar</div>
             </div>
           )}
         </div>
         {!collapsed && (
-          <button className="secondary" onClick={logout}>
+          <button className="secondary sidebar-logout" onClick={logout}>
             Chiqish
           </button>
         )}
