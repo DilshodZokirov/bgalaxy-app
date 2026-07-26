@@ -56,6 +56,13 @@ export const api = {
   getWarehouseProducts: (companyId) => request(`/companies/${companyId}/warehouse/products`),
   getWarehouseDashboard: (companyId, period) =>
     request(`/companies/${companyId}/warehouse/dashboard?period=${period}`),
+  getWarehouseMarketplace: (companyId) => request(`/companies/${companyId}/warehouse/marketplace`),
+  placeWarehouseOrder: (companyId, sellerCompanyId, productId, quantity) =>
+    request(`/companies/${companyId}/warehouse/marketplace/order`, {
+      method: "POST",
+      body: { seller_company_id: sellerCompanyId, product_id: productId, quantity },
+    }),
+  getWarehouseOrders: (companyId) => request(`/companies/${companyId}/warehouse/orders`),
   createWarehouseProduct: (companyId, data) =>
     request(`/companies/${companyId}/warehouse/products`, { method: "POST", body: data }),
   updateWarehouseProduct: (companyId, productId, data) =>

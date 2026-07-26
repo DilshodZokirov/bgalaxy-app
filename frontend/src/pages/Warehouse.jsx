@@ -590,6 +590,126 @@ function WarehouseDashboard({ company }) {
   );
 }
 
+function OrderModal({ product, onClose, onOrdered }) {
+  const [quantity, setQuantity] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const q = Number(quantity);
+    if (!q || q <= 0) {
+      setError("Musbat son kiriting");
+      return;
+    }
+    if (q > product.quantity) {
+      setError("Sotuvchida yetarli zaxira yo'q");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await product.onOrder(q);
+      onOrdered();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 20 }} onClick={onClose}>
+      <form className="card" style={{ maxWidth: 380, width: "100%" }} onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h3 style={{ fontSize: 16, margin: 0 }}>{product.name}</h3>
+          <button type="button" className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+        </div>
+        <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
+          {product.company_name} — mavjud: {product.quantity} {UNIT_LABELS[product.unit] || product.unit}, narxi: {money(product.price)}/{UNIT_LABELS[product.unit] || product.unit}
+        </p>
+        <input type="number" placeholder={`Buyurtma miqdori (${UNIT_LABELS[product.unit] || product.unit})`} value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0.001" step="0.001" max={product.quantity} required />
+        {quantity && !isNaN(Number(quantity)) && (
+          <p style={{ fontSize: 12.5, color: "var(--cyan, #22d3ee)", margin: "0 0 12px" }}>Jami: {money(Number(quantity) * product.price)}</p>
+        )}
+        {error && <p className="error">{error}</p>}
+        <button type="submit" disabled={saving}>{saving ? "Buyurtma berilmoqda..." : "🛒 Buyurtma berish"}</button>
+      </form>
+    </div>
+  );
+}
+
+function MarketplaceTab({ company, onOrdered }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [orderProduct, setOrderProduct] = useState(null);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    refresh();
+  }, [company.id]);
+
+  function refresh() {
+    setLoading(true);
+    api
+      .getWarehouseMarketplace(company.id)
+      .then(setProducts)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return (
+    <div>
+      <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 14 }}>
+        Bu yerda ishlab chiqaruvchi kompaniyalarning ombordagi mahsulotlari ko'rinadi — buyurtma bersangiz, avtomatik ravishda o'z omboringizga qo'shiladi.
+      </p>
+      <input type="text" placeholder="🔍 Nomi bo'yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 280, marginBottom: 16 }} />
+
+      {error && <p className="error">{error}</p>}
+      {loading && <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
+      {!loading && visible.length === 0 && <div className="empty-card"><p>Hozircha bozorda mahsulot yo'q.</p></div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+        {visible.map((p) => (
+          <div key={p.id} className="card">
+            {p.image_url && <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />}
+            <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginBottom: 4 }}>🏭 {p.company_name}</div>
+            <strong style={{ fontSize: 14 }}>{p.name}</strong>
+            <div style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0" }}>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</div>
+            <div style={{ fontSize: 12, color: "var(--green)", marginBottom: 10 }}>Mavjud: {p.quantity} {UNIT_LABELS[p.unit] || p.unit}</div>
+            <button
+              style={{ width: "100%", padding: "8px", fontSize: 12.5 }}
+              onClick={() =>
+                setOrderProduct({
+                  ...p,
+                  onOrder: (q) => api.placeWarehouseOrder(company.id, p.company_id, p.id, q),
+                })
+              }
+            >
+              🛒 Buyurtma berish
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {orderProduct && (
+        <OrderModal
+          product={orderProduct}
+          onClose={() => setOrderProduct(null)}
+          onOrdered={() => {
+            refresh();
+            onOrdered?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Warehouse() {
   const navigate = useNavigate();
   const [company, setCompany] = useState(null);
@@ -710,16 +830,25 @@ export default function Warehouse() {
     <AppShell>
       <div className="page-header">
         <h1>Ombor — {company.name}</h1>
-        <p>Ishlab chiqarish turi: {TYPE_LABELS[company.warehouse_type] || company.warehouse_type}</p>
+        <p>
+          {company.company_type === "distributor"
+            ? "Distributiv firma — boshqa kompaniyalar omboridan buyurtma qiladi"
+            : `Ishlab chiqarish turi: ${TYPE_LABELS[company.warehouse_type] || company.warehouse_type}`}
+        </p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <button className={tab === "dashboard" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("dashboard")}>
           📊 Dashboard
         </button>
         <button className={tab === "products" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("products")}>
           📦 Ombor mahsulotlari
         </button>
+        {company.company_type === "distributor" && (
+          <button className={tab === "marketplace" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("marketplace")}>
+            🛒 Bozor
+          </button>
+        )}
         <button className="secondary" style={{ width: "auto", padding: "9px 16px", marginLeft: "auto" }} onClick={() => navigate("/dashboard")}>
           ← Korxonaga qaytish
         </button>
@@ -727,12 +856,16 @@ export default function Warehouse() {
 
       {tab === "dashboard" && <WarehouseDashboard company={company} />}
 
+      {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
+
       {tab === "products" && (
         <>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
-            <button style={{ width: "auto", padding: "10px 18px" }} onClick={() => setShowAdd(true)}>
-              + Yangi mahsulot
-            </button>
+            {company.company_type !== "distributor" && (
+              <button style={{ width: "auto", padding: "10px 18px" }} onClick={() => setShowAdd(true)}>
+                + Yangi mahsulot
+              </button>
+            )}
             <input
               type="text"
               placeholder="🔍 Nomi bo'yicha qidirish..."
@@ -777,6 +910,9 @@ export default function Warehouse() {
               <div key={p.id} className="card" style={isLowStock(p) ? { borderColor: "rgba(245,158,11,0.5)" } : p.quantity <= 0 ? { borderColor: "rgba(248,113,113,0.5)" } : undefined}>
                 {p.image_url && (
                   <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                )}
+                {p.source_company_name && (
+                  <div style={{ fontSize: 10.5, color: "var(--blue, #3b82f6)", marginBottom: 6 }}>🚚 {p.source_company_name} dan</div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <strong style={{ fontSize: 14.5 }}>{p.name}</strong>
