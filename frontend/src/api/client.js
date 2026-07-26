@@ -165,9 +165,12 @@ export const api = {
   getAccountingReportData: (companyId, dateFrom, dateTo) =>
     request(`/companies/${companyId}/accounting/report-data?date_from=${dateFrom}&date_to=${dateTo}`),
   getNotifications: () => request("/notifications"),
+  dismissNotification: (id) => request(`/notifications/${id}/dismiss`, { method: "POST" }),
   getGroupCallToken: (companyId) =>
     request(`/companies/${companyId}/group-call/token`, { method: "POST" }),
   getActiveGroupCall: (companyId) => request(`/companies/${companyId}/group-call/active`),
+  leaveGroupCall: (companyId) =>
+    request(`/companies/${companyId}/group-call/leave`, { method: "POST" }),
   muteGroupCallParticipant: (companyId, userId, kind, muted) =>
     request(`/companies/${companyId}/group-call/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
   getOfficeVoiceToken: (companyId) =>

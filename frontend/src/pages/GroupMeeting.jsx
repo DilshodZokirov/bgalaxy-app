@@ -101,6 +101,8 @@ export default function GroupMeeting() {
           video={true}
           audio={true}
           onDisconnected={() => {
+            const companyId = company.id;
+            api.leaveGroupCall(companyId).catch(() => {});
             setConnection(null);
             navigate("/meetings");
           }}

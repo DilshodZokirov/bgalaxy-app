@@ -10,8 +10,28 @@ from app.models.direct_chat import DirectConversationMember
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.notification import NotificationOut
+from app.services import livekit_admin
+from app.services.group_call_notifications import (
+    GROUP_CALL_STARTED,
+    finalize_group_call_notifications,
+    mark_group_call_invites_seen,
+)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+_DISMISSIBLE_TYPES = {
+    "group_call_started",
+    "group_call_ended",
+    "partner_call",
+    "scheduled_meeting",
+    "scheduled_meeting_booked",
+    "task_assigned",
+    "task_update",
+    "direct_message",
+    "mention",
+    "info",
+    "invite",
+}
 
 
 async def _to_out(db: AsyncSession, n: Notification) -> NotificationOut:
@@ -47,6 +67,29 @@ async def list_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Sweep stale group-call invites for this user before returning the list.
+    pending_result = await db.execute(
+        select(Notification).where(
+            Notification.user_id == current_user.id,
+            Notification.type == GROUP_CALL_STARTED,
+            Notification.resolved.is_(False),
+            Notification.company_id.is_not(None),
+        )
+    )
+    pending_started = list(pending_result.scalars().all())
+    company_ids = {str(n.company_id) for n in pending_started}
+    still_live: list[Notification] = []
+    for company_id in company_ids:
+        participants = await livekit_admin.list_room_participants(f"company-{company_id}")
+        if participants:
+            still_live.extend(n for n in pending_started if str(n.company_id) == company_id)
+        else:
+            # Late cleanup — do not treat "online now" as "was online during call".
+            await finalize_group_call_notifications(db, company_id, trust_live_presence=False)
+
+    if still_live:
+        await mark_group_call_invites_seen(db, still_live)
+
     result = await db.execute(
         select(Notification)
         .where(Notification.user_id == current_user.id)
@@ -70,6 +113,29 @@ async def mark_read(
     if n is None:
         raise HTTPException(status_code=404, detail="Topilmadi")
     n.read = True
+    await db.commit()
+
+
+@router.post("/{notification_id}/dismiss", status_code=204)
+async def dismiss_notification(
+    notification_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Hide action buttons (Join / Close) without accepting — used for call
+    invites the user chooses to ignore, and for missed-call notices."""
+    result = await db.execute(
+        select(Notification).where(Notification.id == notification_id, Notification.user_id == current_user.id)
+    )
+    n = result.scalar_one_or_none()
+    if n is None:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    # Live join invites: remove entirely so "Qo'shilish" cannot linger.
+    if n.type == GROUP_CALL_STARTED:
+        await db.delete(n)
+    else:
+        n.read = True
+        n.resolved = True
     await db.commit()
 
 
