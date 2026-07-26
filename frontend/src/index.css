@@ -5011,14 +5011,23 @@ video {
 
 .galaxy-shell-day .chat-side-section,
 .galaxy-shell-day .chat-live-dock,
-.galaxy-shell-day .chat-empty-hero {
+.galaxy-shell-day .chat-empty-hero,
+.galaxy-shell-day .chat-room-bar,
+.galaxy-shell-day .chat-composer,
+.galaxy-shell-day .chat-messages {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(15, 23, 42, 0.08);
 }
 
 .galaxy-shell-day .chat-side-item,
-.galaxy-shell-day .chat-live-chip {
+.galaxy-shell-day .chat-live-chip,
+.galaxy-shell-day .chat-room-bar-copy strong {
   color: #334155;
+}
+
+.galaxy-shell-day .chat-side-item.active,
+.galaxy-shell-day .chat-side-item.has-unread .chat-side-item-title {
+  color: #0f172a;
 }
 
 @media (max-width: 860px) {
