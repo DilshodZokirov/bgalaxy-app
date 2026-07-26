@@ -104,4 +104,4 @@ app.include_router(warehouse.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "tasks_comments": True, "tasks_ws": True}

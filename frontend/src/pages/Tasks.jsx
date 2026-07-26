@@ -300,7 +300,14 @@ function TaskDetailDrawer({
     setError(null);
     api.getTaskComments(companyId, task.id)
       .then(setComments)
-      .catch((err) => setError(err.message));
+      .catch((err) => {
+        const msg = err.message || "";
+        setError(
+          /not found/i.test(msg)
+            ? "Izohlar serveri hali tayyor emas. Birozdan keyin qayta urinib ko'ring."
+            : msg
+        );
+      });
   }, [companyId, task?.id, liveTick]);
 
   useEffect(() => {
@@ -638,12 +645,21 @@ export default function Tasks() {
     let closed = false;
     let retry;
 
+    let attempt = 0;
+
     function connect() {
       socket = new WebSocket(wsUrl(`/ws/tasks/${company.id}`));
-      socket.onopen = () => setLive(true);
+      socket.onopen = () => {
+        attempt = 0;
+        setLive(true);
+      };
       socket.onclose = () => {
         setLive(false);
-        if (!closed) retry = setTimeout(connect, 2500);
+        if (closed) return;
+        // Back off when the board socket is not ready yet (deploy lag / 403).
+        attempt += 1;
+        const delay = Math.min(15000, 2000 * attempt);
+        retry = setTimeout(connect, delay);
       };
       socket.onmessage = (ev) => {
         try {

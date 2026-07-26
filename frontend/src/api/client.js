@@ -205,25 +205,30 @@ export const api = {
   deleteTask: (companyId, taskId) =>
     request(`/companies/${companyId}/tasks/${taskId}`, { method: "DELETE" }),
   getTaskComments: (companyId, taskId) =>
-    request(`/companies/${companyId}/tasks/${taskId}/comments`),
+    request(`/companies/${companyId}/tasks/comments/${taskId}`),
   addTaskComment: async (companyId, taskId, content, file) => {
     const token = getToken();
     const formData = new FormData();
     formData.append("content", content || "");
     if (file) formData.append("file", file);
-    const res = await fetch(`${API_BASE}/companies/${companyId}/tasks/${taskId}/comments`, {
+    const res = await fetch(`${API_BASE}/companies/${companyId}/tasks/comments/${taskId}`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      throw new Error(error.detail || `Request failed: ${res.status}`);
+      const detail = error.detail || `Request failed: ${res.status}`;
+      throw new Error(
+        res.status === 404
+          ? "Izohlar serveri hali tayyor emas. Birozdan keyin qayta urinib ko'ring."
+          : detail
+      );
     }
     return res.json();
   },
   deleteTaskComment: (companyId, taskId, commentId) =>
-    request(`/companies/${companyId}/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+    request(`/companies/${companyId}/tasks/comments/${taskId}/${commentId}`, { method: "DELETE" }),
   getTaskHistory: (companyId, params = {}) =>
     request(`/companies/${companyId}/tasks/history?${new URLSearchParams(params)}`),
   getTaskLeaderboard: (companyId) => request(`/companies/${companyId}/tasks/leaderboard`),

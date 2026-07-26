@@ -124,6 +124,14 @@ async def _broadcast_board(company_id: str, event_type: str, **extra) -> None:
 
 
 async def _require_member(db: AsyncSession, company_id: str, user_id) -> None:
+    """Owner or team member may subscribe to the company task board."""
+    from app.models.company import Company
+
+    company_result = await db.execute(select(Company).where(Company.id == company_id))
+    company = company_result.scalar_one_or_none()
+    if company and str(company.owner_id) == str(user_id):
+        return
+
     result = await db.execute(
         select(TeamMembership).where(
             TeamMembership.company_id == company_id,
@@ -424,107 +432,6 @@ async def delete_task(
     await _broadcast_board(company_id, "tasks_changed", reason="deleted", task_id=str(task_id))
 
 
-@router.get("/{task_id}/comments", response_model=list[TaskCommentOut])
-async def list_task_comments(
-    company_id: str,
-    task_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    await _get_visible_task(db, company_id, task_id, current_user)
-    result = await db.execute(
-        select(TaskComment, User)
-        .join(User, User.id == TaskComment.author_id)
-        .where(TaskComment.task_id == task_id, TaskComment.company_id == company_id)
-        .order_by(TaskComment.created_at)
-    )
-    return [_comment_to_out(c, u.full_name) for c, u in result.all()]
-
-
-@router.post("/{task_id}/comments", response_model=TaskCommentOut, status_code=201)
-async def create_task_comment(
-    company_id: str,
-    task_id: str,
-    content: str = Form(""),
-    file: UploadFile | None = File(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    await _get_visible_task(db, company_id, task_id, current_user)
-
-    file_url = None
-    file_name = None
-    if file is not None and file.filename:
-        data = await file.read()
-        if len(data) > MAX_COMMENT_FILE_BYTES:
-            raise HTTPException(status_code=400, detail="Fayl hajmi juda katta (20 MB dan kichik bo'lsin)")
-        ext = os.path.splitext(file.filename)[1]
-        stored_name = f"{uuid_lib.uuid4().hex}{ext}"
-        with open(os.path.join(UPLOAD_DIR, stored_name), "wb") as f:
-            f.write(data)
-        file_url = f"/uploads/{stored_name}"
-        file_name = file.filename
-
-    text = (content or "").strip()
-    if not text and not file_url:
-        raise HTTPException(status_code=400, detail="Izoh yoki fayl kerak")
-
-    comment = TaskComment(
-        task_id=task_id,
-        company_id=company_id,
-        author_id=current_user.id,
-        content=text or None,
-        file_url=file_url,
-        file_name=file_name,
-    )
-    db.add(comment)
-    await db.commit()
-    await db.refresh(comment)
-
-    out = _comment_to_out(comment, current_user.full_name)
-    await _broadcast_board(
-        company_id,
-        "task_comment",
-        reason="created",
-        task_id=str(task_id),
-        comment=out.model_dump(mode="json"),
-    )
-    return out
-
-
-@router.delete("/{task_id}/comments/{comment_id}", status_code=204)
-async def delete_task_comment(
-    company_id: str,
-    task_id: str,
-    comment_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _, is_pm = await _get_visible_task(db, company_id, task_id, current_user)
-    result = await db.execute(
-        select(TaskComment).where(
-            TaskComment.id == comment_id,
-            TaskComment.task_id == task_id,
-            TaskComment.company_id == company_id,
-        )
-    )
-    comment = result.scalar_one_or_none()
-    if comment is None:
-        raise HTTPException(status_code=404, detail="Izoh topilmadi")
-    if not is_pm and str(comment.author_id) != str(current_user.id):
-        raise HTTPException(status_code=403, detail="Faqat o'z izohingizni o'chira olasiz")
-
-    await db.delete(comment)
-    await db.commit()
-    await _broadcast_board(
-        company_id,
-        "task_comment",
-        reason="deleted",
-        task_id=str(task_id),
-        comment_id=str(comment_id),
-    )
-
-
 @router.get("/monthly-champion")
 async def monthly_champion(
     company_id: str,
@@ -747,6 +654,163 @@ async def download_history_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="vazifalar-{date_from}_{date_to}.xlsx"'},
     )
+
+
+async def _list_comments_impl(db: AsyncSession, company_id: str, task_id: str, current_user: User):
+    await _get_visible_task(db, company_id, task_id, current_user)
+    result = await db.execute(
+        select(TaskComment, User)
+        .join(User, User.id == TaskComment.author_id)
+        .where(TaskComment.task_id == task_id, TaskComment.company_id == company_id)
+        .order_by(TaskComment.created_at)
+    )
+    return [_comment_to_out(c, u.full_name) for c, u in result.all()]
+
+
+async def _create_comment_impl(
+    db: AsyncSession,
+    company_id: str,
+    task_id: str,
+    current_user: User,
+    content: str,
+    file: UploadFile | None,
+):
+    await _get_visible_task(db, company_id, task_id, current_user)
+
+    file_url = None
+    file_name = None
+    if file is not None and file.filename:
+        data = await file.read()
+        if len(data) > MAX_COMMENT_FILE_BYTES:
+            raise HTTPException(status_code=400, detail="Fayl hajmi juda katta (20 MB dan kichik bo'lsin)")
+        ext = os.path.splitext(file.filename)[1]
+        stored_name = f"{uuid_lib.uuid4().hex}{ext}"
+        with open(os.path.join(UPLOAD_DIR, stored_name), "wb") as f:
+            f.write(data)
+        file_url = f"/uploads/{stored_name}"
+        file_name = file.filename
+
+    text = (content or "").strip()
+    if not text and not file_url:
+        raise HTTPException(status_code=400, detail="Izoh yoki fayl kerak")
+
+    comment = TaskComment(
+        task_id=task_id,
+        company_id=company_id,
+        author_id=current_user.id,
+        content=text or None,
+        file_url=file_url,
+        file_name=file_name,
+    )
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+
+    out = _comment_to_out(comment, current_user.full_name)
+    await _broadcast_board(
+        company_id,
+        "task_comment",
+        reason="created",
+        task_id=str(task_id),
+        comment=out.model_dump(mode="json"),
+    )
+    return out
+
+
+async def _delete_comment_impl(
+    db: AsyncSession, company_id: str, task_id: str, comment_id: str, current_user: User
+):
+    _, is_pm = await _get_visible_task(db, company_id, task_id, current_user)
+    result = await db.execute(
+        select(TaskComment).where(
+            TaskComment.id == comment_id,
+            TaskComment.task_id == task_id,
+            TaskComment.company_id == company_id,
+        )
+    )
+    comment = result.scalar_one_or_none()
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Izoh topilmadi")
+    if not is_pm and str(comment.author_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Faqat o'z izohingizni o'chira olasiz")
+
+    await db.delete(comment)
+    await db.commit()
+    await _broadcast_board(
+        company_id,
+        "task_comment",
+        reason="deleted",
+        task_id=str(task_id),
+        comment_id=str(comment_id),
+    )
+
+
+# Preferred static "/comments/..." paths (like /history).
+@router.get("/comments/{task_id}", response_model=list[TaskCommentOut])
+async def list_task_comments(
+    company_id: str,
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await _list_comments_impl(db, company_id, task_id, current_user)
+
+
+@router.post("/comments/{task_id}", response_model=TaskCommentOut, status_code=201)
+async def create_task_comment(
+    company_id: str,
+    task_id: str,
+    content: str = Form(""),
+    file: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await _create_comment_impl(db, company_id, task_id, current_user, content, file)
+
+
+@router.delete("/comments/{task_id}/{comment_id}", status_code=204)
+async def delete_task_comment(
+    company_id: str,
+    task_id: str,
+    comment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _delete_comment_impl(db, company_id, task_id, comment_id, current_user)
+
+
+# Legacy aliases kept for clients still calling /{task_id}/comments.
+@router.get("/{task_id}/comments", response_model=list[TaskCommentOut], include_in_schema=False)
+async def list_task_comments_legacy(
+    company_id: str,
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await _list_comments_impl(db, company_id, task_id, current_user)
+
+
+@router.post("/{task_id}/comments", response_model=TaskCommentOut, status_code=201, include_in_schema=False)
+async def create_task_comment_legacy(
+    company_id: str,
+    task_id: str,
+    content: str = Form(""),
+    file: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await _create_comment_impl(db, company_id, task_id, current_user, content, file)
+
+
+@router.delete("/{task_id}/comments/{comment_id}", status_code=204, include_in_schema=False)
+async def delete_task_comment_legacy(
+    company_id: str,
+    task_id: str,
+    comment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _delete_comment_impl(db, company_id, task_id, comment_id, current_user)
 
 
 # WebSocket lives outside the company-prefixed router so the path stays stable.
