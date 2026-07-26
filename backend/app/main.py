@@ -1,18 +1,35 @@
+import asyncio
 import logging
 import os
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, tasks, users, warehouse
+from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, scheduled_meetings, tasks, users, warehouse
 from app.core.config import settings
+from app.services.scheduled_meeting_notifier import scheduled_meeting_loop
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = asyncio.create_task(scheduled_meeting_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -80,6 +97,7 @@ app.include_router(complaints.router)
 app.include_router(office.router)
 app.include_router(group_meeting.router)
 app.include_router(partner_meeting.router)
+app.include_router(scheduled_meetings.router)
 app.include_router(warehouse.router)
 
 

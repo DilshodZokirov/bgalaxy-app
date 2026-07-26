@@ -83,6 +83,30 @@ export default function NotificationBell({ variant = "fixed" }) {
     navigate(`/partner-call/${n.invite_token}`);
   }
 
+  async function handleJoinScheduledMeeting(n) {
+    try {
+      await api.markNotificationRead(n.id);
+      markLocally(n.id, { read: true });
+    } catch {
+      // ignore
+    }
+    setOpen(false);
+    if (n.company_id) setActiveCompanyId(n.company_id);
+    navigate("/group-meeting");
+  }
+
+  async function handleOpenMeetingsHub(n) {
+    try {
+      await api.markNotificationRead(n.id);
+      markLocally(n.id, { read: true });
+    } catch {
+      // ignore
+    }
+    setOpen(false);
+    if (n.company_id) setActiveCompanyId(n.company_id);
+    navigate("/meetings");
+  }
+
   async function handleJoinGroupCall(n) {
     try {
       await api.markNotificationRead(n.id);
@@ -173,6 +197,8 @@ export default function NotificationBell({ variant = "fixed" }) {
                 n.type === "invite" ||
                 n.type === "partner_call" ||
                 n.type === "group_call_started" ||
+                n.type === "scheduled_meeting" ||
+                n.type === "scheduled_meeting_booked" ||
                 n.type === "task_assigned" ||
                 n.type === "task_update" ||
                 n.type === "direct_message");
@@ -219,6 +245,20 @@ export default function NotificationBell({ variant = "fixed" }) {
                 ) : n.type === "group_call_started" ? (
                   <div className="notif-item-actions">
                     <button onClick={() => handleJoinGroupCall(n)}>🎥 Qo'shilish</button>
+                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
+                      Yopish
+                    </button>
+                  </div>
+                ) : n.type === "scheduled_meeting" ? (
+                  <div className="notif-item-actions">
+                    <button onClick={() => handleJoinScheduledMeeting(n)}>Uchrashuvga kirish</button>
+                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
+                      Yopish
+                    </button>
+                  </div>
+                ) : n.type === "scheduled_meeting_booked" ? (
+                  <div className="notif-item-actions">
+                    <button onClick={() => handleOpenMeetingsHub(n)}>Countdown ko‘rish</button>
                     <button className="secondary" onClick={() => handleDismiss(n.id)}>
                       Yopish
                     </button>

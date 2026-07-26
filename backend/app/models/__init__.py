@@ -9,6 +9,7 @@ from app.models.error_log import ErrorLog  # noqa: F401
 from app.models.invite import Invite  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.rafiq import RafiqMessage  # noqa: F401
+from app.models.scheduled_meeting import ScheduledMeeting  # noqa: F401
 from app.models.role import Role  # noqa: F401
 from app.models.task import Task  # noqa: F401
 from app.models.user import User  # noqa: F401
