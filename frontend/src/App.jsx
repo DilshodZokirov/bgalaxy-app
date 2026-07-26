@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./hooks/useAuth";
 import ThemeApplier from "./components/ThemeApplier";
@@ -173,13 +173,14 @@ export default function App() {
           }
         />
         <Route
-          path="/analytics"
+          path="/statistika"
           element={
             <ProtectedRoute>
               <Analytics />
             </ProtectedRoute>
           }
         />
+        <Route path="/analytics" element={<Navigate to="/statistika" replace />} />
         <Route
           path="/warehouse"
           element={

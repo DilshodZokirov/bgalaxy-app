@@ -9,7 +9,7 @@ const PERMISSION_LABELS = {
   edit_company_settings: "Sozlamalarni tahrirlash",
   manage_accounting: "Buxgalteriyani boshqarish",
   manage_tasks: "Vazifalarni boshqarish (Loyiha menejeri)",
-  view_analytics: "Kompaniya analitikasini ko'rish",
+  view_analytics: "Kompaniya statistikasini ko'rish",
   manage_warehouse: "Ombor bo'limini boshqarish",
   ombor_ishchi: "Ombor ishchisi (faqat ko'rish)",
 };

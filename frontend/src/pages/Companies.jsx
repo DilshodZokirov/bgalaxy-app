@@ -490,14 +490,14 @@ export default function Companies() {
                       </span>
                       Ofis yaratish
                     </button>
-                    <button type="button" className="os-quick-btn" onClick={() => navigate("/analytics")}>
+                    <button type="button" className="os-quick-btn" onClick={() => navigate("/statistika")}>
                       <span className="os-quick-ico" aria-hidden>
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
                           <path d="M4 19h16" />
                           <path d="M7 16V9M12 16V5M17 16v-4" />
                         </svg>
                       </span>
-                      Hisobotlar
+                      Statistika
                     </button>
                     <button type="button" className="os-quick-btn" onClick={() => setTab("settings")}>
                       <span className="os-quick-ico" aria-hidden>
