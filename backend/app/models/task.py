@@ -42,3 +42,18 @@ class Task(Base):
 
 def task_points(status: str, priority: str) -> int:
     return PRIORITY_POINTS.get(priority, {}).get(status, 0)
+
+
+class TaskComment(Base):
+    """Text note and/or file attachment on a task."""
+
+    __tablename__ = "task_comments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"))
+    company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
+    author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
