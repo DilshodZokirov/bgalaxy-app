@@ -2625,25 +2625,126 @@ video {
   text-overflow: ellipsis;
 }
 
-.dm-file-bubble img {
-  max-width: 220px;
-  border-radius: 8px;
-  display: block;
-  margin-top: 4px;
+.dm-file-bubble,
+.chat-bubble-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
 }
 
+.chat-bubble-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.chat-image-attach {
+  display: block;
+  width: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 12px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.chat-image-attach img,
+.dm-file-bubble img {
+  max-width: min(240px, 100%);
+  max-height: 220px;
+  border-radius: 12px;
+  display: block;
+  object-fit: cover;
+}
+
+.chat-file-attach,
 .dm-file-link {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 10px;
   align-items: center;
-  gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-top: 4px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: rgba(2, 6, 23, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
   font-size: 12.5px;
-  color: var(--text);
+  color: inherit;
   text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chat-file-attach:hover,
+.dm-file-link:hover {
+  border-color: rgba(34, 211, 238, 0.45);
+  background: rgba(34, 211, 238, 0.1);
+}
+
+.chat-file-attach-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #04111f;
+  background: linear-gradient(135deg, #f87171, #fb7185);
+  flex-shrink: 0;
+}
+
+.chat-file-attach-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-file-attach-copy strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f8fafc;
+}
+
+.chat-file-attach-copy small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.message-row.mine .chat-file-attach,
+.message-row.mine .dm-file-link {
+  background: rgba(4, 17, 31, 0.18);
+  border-color: rgba(4, 17, 31, 0.2);
+}
+
+.message-row.mine .chat-file-attach-copy strong {
+  color: #04111f;
+}
+
+.message-row.mine .chat-file-attach-copy small {
+  color: rgba(4, 17, 31, 0.65);
+}
+
+.galaxy-shell-day .chat-file-attach,
+.galaxy-shell-day .dm-file-link {
+  background: rgba(241, 245, 249, 0.95);
+}
+
+.galaxy-shell-day .chat-file-attach-copy strong {
+  color: #0f172a;
 }
 
 .dm-attach-btn {

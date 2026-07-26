@@ -14,6 +14,12 @@ function isImage(fileName) {
   return IMAGE_EXT.some((ext) => lower.endsWith(ext));
 }
 
+function fileKindLabel(fileName) {
+  if (!fileName) return "FILE";
+  const ext = fileName.split(".").pop()?.toUpperCase() || "FILE";
+  return ext.slice(0, 4);
+}
+
 function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId, excludeIds = [] }) {
   const [picked, setPicked] = useState([]);
   const [teammates, setTeammates] = useState([]);
@@ -1116,18 +1122,26 @@ export default function Chat() {
                             </button>
                           </div>
                         ) : (
-                          <div className="dm-file-bubble">
-                            {m.content}
+                          <div className="chat-bubble-body">
+                            {m.content ? <p className="chat-bubble-text">{m.content}</p> : null}
                             {m.file_url && isImage(m.file_name) && (
-                              <img
-                                src={`${API_BASE}${m.file_url}`}
-                                alt={m.file_name}
+                              <button
+                                type="button"
+                                className="chat-image-attach"
                                 onClick={() => setLightboxUrl(`${API_BASE}${m.file_url}`)}
-                              />
+                              >
+                                <img src={`${API_BASE}${m.file_url}`} alt={m.file_name || "Rasm"} />
+                              </button>
                             )}
                             {m.file_url && !isImage(m.file_name) && (
-                              <a className="dm-file-link" href={`${API_BASE}${m.file_url}`} target="_blank" rel="noreferrer">
-                                {m.file_name}
+                              <a className="chat-file-attach" href={`${API_BASE}${m.file_url}`} target="_blank" rel="noreferrer">
+                                <span className="chat-file-attach-icon" aria-hidden>
+                                  {fileKindLabel(m.file_name)}
+                                </span>
+                                <span className="chat-file-attach-copy">
+                                  <strong title={m.file_name}>{m.file_name}</strong>
+                                  <small>Yuklab olish</small>
+                                </span>
                               </a>
                             )}
                             <div className="chat-bubble-meta">
