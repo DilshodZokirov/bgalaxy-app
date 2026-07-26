@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class ConversationStart(BaseModel):
     partner_ids: list[uuid.UUID]
     channel: str = "chat"  # "chat" | "office"
+    force_new: bool = False  # True = always create a new thread (even if 1-1 already exists)
 
 
 class ParticipantOut(BaseModel):

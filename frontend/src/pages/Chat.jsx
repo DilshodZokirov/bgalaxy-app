@@ -87,30 +87,35 @@ function NewChannelModal({ onClose, onConfirm }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Yangi kanal</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="chat-modal-backdrop" onClick={onClose}>
+      <div className="card chat-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-modal-head">
+          <h3>Yangi kanal</h3>
+          <button type="button" className="secondary chat-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
         </div>
         <form onSubmit={handleSubmit}>
           <label>Kanal nomi</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="masalan: moliya" required />
-
-          <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "10px 0" }}>A'zolarni tanlang:</p>
+          <p className="chat-modal-hint">Aʼzolar ixtiyoriy — keyinroq ham qo‘shishingiz mumkin.</p>
           {picked.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            <div className="chat-chip-row">
               {picked.map((p) => (
-                <span key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel-2)", borderRadius: 999, padding: "5px 6px 5px 12px", fontSize: 12.5 }}>
+                <span key={p.id} className="chat-chip">
                   {p.full_name}
-                  <button type="button" onClick={() => remove(p.id)} style={{ width: 18, height: 18, padding: 0, borderRadius: "50%", background: "var(--border)", fontSize: 11, lineHeight: 1 }}>✕</button>
+                  <button type="button" onClick={() => remove(p.id)} aria-label="Olib tashlash">
+                    ×
+                  </button>
                 </span>
               ))}
             </div>
           )}
           <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
           {error && <p className="error">{error}</p>}
-          <button type="submit">Kanal yaratish</button>
+          <button type="submit" className="chat-cta">
+            Kanal yaratish
+          </button>
         </form>
       </div>
     </div>
@@ -144,30 +149,165 @@ function NewConversationModal({ onClose, onStart }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ maxWidth: 380, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Yangi maxfiy suhbat</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="chat-modal-backdrop" onClick={onClose}>
+      <div className="card chat-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-modal-head">
+          <h3>Yangi suhbat</h3>
+          <button type="button" className="secondary chat-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 10px" }}>
-          Email orqali qidiring — BG (Business Galaxy)'da ro'yxatdan o'tgan istalgan kishi bilan, kompaniyangizdan tashqarida ham.
+        <p className="chat-modal-hint">
+          Bir yoki bir nechta odamni tanlang. Har safar <strong>yangi parallel chat</strong> ochiladi — eski
+          suhbatlar pastki qatorda qoladi.
         </p>
         {picked.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          <div className="chat-chip-row">
             {picked.map((p) => (
-              <span key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel-2)", borderRadius: 999, padding: "5px 6px 5px 12px", fontSize: 12.5 }}>
+              <span key={p.id} className="chat-chip">
                 {p.full_name}
-                <button type="button" onClick={() => remove(p.id)} style={{ width: 18, height: 18, padding: 0, borderRadius: "50%", background: "var(--border)", fontSize: 11, lineHeight: 1 }}>✕</button>
+                <button type="button" onClick={() => remove(p.id)} aria-label="Olib tashlash">
+                  ×
+                </button>
               </span>
             ))}
           </div>
         )}
         <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
         {error && <p className="error">{error}</p>}
-        <button disabled={picked.length === 0 || starting} onClick={handleStart}>
-          {starting ? "Boshlanmoqda..." : "Suhbatni boshlash"}
+        <button type="button" className="chat-cta" disabled={picked.length === 0 || starting} onClick={handleStart}>
+          {starting ? "Boshlanmoqda..." : "Yangi chat yaratish"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ChatLauncherModal({
+  onClose,
+  channels,
+  conversations,
+  canCreateChannel,
+  onJoinChannel,
+  onJoinConversation,
+  onCreateChannel,
+  onCreateConversation,
+}) {
+  const [tab, setTab] = useState("join"); // join | channel | conversation
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const filteredChannels = channels.filter((c) => !q || `#${c.name}`.toLowerCase().includes(q));
+  const filteredConversations = conversations.filter((c) => {
+    const label = c.participants.map((p) => p.full_name).join(", ").toLowerCase();
+    return !q || label.includes(q);
+  });
+
+  return (
+    <div className="chat-modal-backdrop" onClick={onClose}>
+      <div className="card chat-modal chat-launcher" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-modal-head">
+          <h3>Chatlar</h3>
+          <button type="button" className="secondary chat-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
+        </div>
+
+        <div className="chat-launcher-tabs">
+          <button type="button" className={tab === "join" ? "active" : ""} onClick={() => setTab("join")}>
+            Mavjud chatlar
+          </button>
+          {canCreateChannel && (
+            <button type="button" className={tab === "channel" ? "active" : ""} onClick={() => setTab("channel")}>
+              Yangi kanal
+            </button>
+          )}
+          <button
+            type="button"
+            className={tab === "conversation" ? "active" : ""}
+            onClick={() => setTab("conversation")}
+          >
+            Yangi suhbat
+          </button>
+        </div>
+
+        {tab === "join" && (
+          <>
+            <input
+              className="chat-launcher-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Chat qidirish..."
+            />
+            <div className="chat-launcher-list">
+              {filteredChannels.map((c) => (
+                <button
+                  key={`ch-${c.id}`}
+                  type="button"
+                  className="chat-launcher-item"
+                  onClick={() => {
+                    onJoinChannel(c.id);
+                    onClose();
+                  }}
+                >
+                  <strong>#{c.name}</strong>
+                  <span>Kanal · {c.member_count || 0} aʼzo</span>
+                </button>
+              ))}
+              {filteredConversations.map((c) => (
+                <button
+                  key={`dm-${c.id}`}
+                  type="button"
+                  className="chat-launcher-item"
+                  onClick={() => {
+                    onJoinConversation(c.id);
+                    onClose();
+                  }}
+                >
+                  <strong>{c.participants.map((p) => p.full_name).join(", ") || "Suhbat"}</strong>
+                  <span>{c.last_message || "Maxfiy suhbat"}</span>
+                </button>
+              ))}
+              {!filteredChannels.length && !filteredConversations.length && (
+                <p className="chat-modal-hint">Hali chat yo‘q — yangi kanal yoki suhbat yarating.</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === "channel" && canCreateChannel && (
+          <div className="chat-launcher-embed">
+            <p className="chat-modal-hint">Kompaniya ichida yangi guruh kanali ochiladi.</p>
+            <button
+              type="button"
+              className="chat-cta"
+              onClick={() => {
+                onClose();
+                onCreateChannel();
+              }}
+            >
+              Kanal yaratish formasini ochish
+            </button>
+          </div>
+        )}
+
+        {tab === "conversation" && (
+          <div className="chat-launcher-embed">
+            <p className="chat-modal-hint">
+              Yangi parallel maxfiy suhbat — bir xil odam bilan ham alohida chat ochishingiz mumkin.
+            </p>
+            <button
+              type="button"
+              className="chat-cta"
+              onClick={() => {
+                onClose();
+                onCreateConversation();
+              }}
+            >
+              Suhbat yaratish formasini ochish
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -195,6 +335,7 @@ export default function Chat() {
   const [editDraft, setEditDraft] = useState("");
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [showLauncher, setShowLauncher] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [channelMembers, setChannelMembers] = useState([]);
@@ -229,7 +370,10 @@ export default function Chat() {
   }
 
   function refreshConversations() {
-    api.getConversations().then(setConversations).catch(() => {});
+    api
+      .getConversations()
+      .then((list) => setConversations(list.filter((c) => c.channel !== "office")))
+      .catch(() => {});
   }
 
   useEffect(refreshChannels, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -476,6 +620,7 @@ export default function Chat() {
   }
 
   async function handleCreateChannel(name, memberIds) {
+    if (!companyId) throw new Error("Kanal uchun avval kompaniya tanlang");
     const channel = await api.createChannel(companyId, { name, member_ids: memberIds });
     setShowNewChannel(false);
     refreshChannels();
@@ -483,7 +628,8 @@ export default function Chat() {
   }
 
   async function handleStartConversation(partnerIds) {
-    const conv = await api.startConversation(partnerIds);
+    // Always open a new parallel thread — existing ones stay in the bottom dock.
+    const conv = await api.startConversation(partnerIds, "chat", true);
     refreshConversations();
     selectConversation(conv.id);
   }
@@ -491,10 +637,23 @@ export default function Chat() {
   if (!companyId && channels.length === 0 && conversations.length === 0) {
     return (
       <AppShell>
-        <div className="empty-card">
-          <p>Chatdan foydalanish uchun avval kompaniya yarating yoki maxfiy suhbat boshlang.</p>
-          <button onClick={() => navigate("/companies")}>+ Kompaniya yaratish</button>
+        <div className="chat-workspace">
+          <div className="chat-empty-hero">
+            <h2>Chat markazi</h2>
+            <p>Kompaniya kanallari yoki maxfiy suhbatlar — bir nechta live chat birga ishlaydi.</p>
+            <div className="chat-empty-actions">
+              <button type="button" className="chat-cta" onClick={() => setShowNewConversation(true)}>
+                Yangi suhbat
+              </button>
+              <button type="button" className="secondary" onClick={() => navigate("/companies")}>
+                Kompaniya yaratish
+              </button>
+            </div>
+          </div>
         </div>
+        {showNewConversation && (
+          <NewConversationModal onClose={() => setShowNewConversation(false)} onStart={handleStartConversation} />
+        )}
       </AppShell>
     );
   }
@@ -510,61 +669,81 @@ export default function Chat() {
       ? activeConversation.participants.map((p) => p.full_name).join(", ")
       : "Maxfiy chat";
 
+  const liveChats = [
+    ...channels.map((c) => ({
+      key: `ch-${c.id}`,
+      kind: "channel",
+      id: c.id,
+      label: `#${c.name}`,
+      active: activeKind === "channel" && c.id === activeChannelId,
+    })),
+    ...conversations.map((c) => ({
+      key: `dm-${c.id}`,
+      kind: "direct",
+      id: c.id,
+      label: c.participants.map((p) => p.full_name).join(", ") || "Suhbat",
+      active: activeKind === "direct" && c.id === activeConversationId,
+    })),
+  ];
+
   return (
     <AppShell>
-      <div className="page-header">
-        <h1>{headerTitle}</h1>
-        <p>Jamoangiz va hamkorlaringiz bilan real vaqtda muloqot qiling.</p>
-      </div>
-
-      <div style={{ display: "flex", gap: 16 }}>
-        <div style={{ width: 210, flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <strong style={{ fontSize: 12.5, color: "var(--text-dim)" }}>KANALLAR</strong>
-            <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => setShowNewChannel(true)}>+</button>
+      <div className="chat-workspace">
+        <div className="chat-workspace-head">
+          <div>
+            <p className="chat-kicker">Live Chat</p>
+            <h1>{headerTitle}</h1>
+            <p>Bir nechta chat parallel ochiq — pastki qatordan tanlang yoki yangisini yarating.</p>
           </div>
-          {channels.map((c) => (
-            <div
-              key={c.id}
-              onClick={() => selectChannel(c.id)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-                fontSize: 13.5,
-                marginBottom: 4,
-                background: activeKind === "channel" && c.id === activeChannelId ? "var(--panel-2)" : "transparent",
-                color: activeKind === "channel" && c.id === activeChannelId ? "var(--text)" : "var(--text-dim)",
-              }}
-            >
-              #{c.name}
-            </div>
-          ))}
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "18px 0 8px" }}>
-            <strong style={{ fontSize: 12.5, color: "var(--text-dim)" }}>MAXFIY SUHBATLAR</strong>
-            <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => setShowNewConversation(true)}>+</button>
-          </div>
-          {conversations.map((c) => (
-            <div
-              key={c.id}
-              onClick={() => selectConversation(c.id)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-                fontSize: 13,
-                marginBottom: 4,
-                background: activeKind === "direct" && c.id === activeConversationId ? "var(--panel-2)" : "transparent",
-                color: activeKind === "direct" && c.id === activeConversationId ? "var(--text)" : "var(--text-dim)",
-              }}
-            >
-              🔒 {c.participants.map((p) => p.full_name).join(", ") || "Suhbat"}
-            </div>
-          ))}
+          <button type="button" className="chat-cta" onClick={() => setShowLauncher(true)}>
+            Chatlar / Yangi
+          </button>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="chat-workspace-body">
+          <aside className="chat-side-list">
+            <div className="chat-side-section">
+              <div className="chat-side-head">
+                <strong>Kanallar</strong>
+                <button type="button" className="secondary chat-soft-btn" onClick={() => setShowNewChannel(true)} disabled={!companyId}>
+                  +
+                </button>
+              </div>
+              {channels.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`chat-side-item ${activeKind === "channel" && c.id === activeChannelId ? "active" : ""}`}
+                  onClick={() => selectChannel(c.id)}
+                >
+                  #{c.name}
+                </button>
+              ))}
+              {!channels.length && <p className="chat-side-empty">Kanal yo‘q</p>}
+            </div>
+
+            <div className="chat-side-section">
+              <div className="chat-side-head">
+                <strong>Suhbatlar</strong>
+                <button type="button" className="secondary chat-soft-btn" onClick={() => setShowNewConversation(true)}>
+                  +
+                </button>
+              </div>
+              {conversations.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`chat-side-item ${activeKind === "direct" && c.id === activeConversationId ? "active" : ""}`}
+                  onClick={() => selectConversation(c.id)}
+                >
+                  {c.participants.map((p) => p.full_name).join(", ") || "Suhbat"}
+                </button>
+              ))}
+              {!conversations.length && <p className="chat-side-empty">Suhbat yo‘q</p>}
+            </div>
+          </aside>
+
+          <div className="chat-main-pane">
           {activeKind === "channel" && activeChannel && (
             <div ref={membersPanelRef} style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10, position: "relative" }}>
               <button className="secondary chat-members-btn" onClick={toggleMembersPanel}>
@@ -740,6 +919,28 @@ export default function Chat() {
               </form>
             </div>
           </div>
+          </div>
+        </div>
+
+        <div className="chat-live-dock" aria-label="Live chatlar">
+          <div className="chat-live-scroll">
+            {liveChats.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`chat-live-chip ${item.active ? "active" : ""} ${item.kind}`}
+                onClick={() => (item.kind === "channel" ? selectChannel(item.id) : selectConversation(item.id))}
+                title={item.label}
+              >
+                <span className="chat-live-dot" aria-hidden />
+                <span>{item.label}</span>
+              </button>
+            ))}
+            {!liveChats.length && <span className="chat-live-empty">Hali ochiq chat yo‘q</span>}
+          </div>
+          <button type="button" className="chat-live-add" onClick={() => setShowLauncher(true)} title="Chatga kirish yoki yangi yaratish">
+            +
+          </button>
         </div>
       </div>
 
@@ -755,6 +956,18 @@ export default function Chat() {
         </div>
       )}
 
+      {showLauncher && (
+        <ChatLauncherModal
+          onClose={() => setShowLauncher(false)}
+          channels={channels}
+          conversations={conversations}
+          canCreateChannel={!!companyId}
+          onJoinChannel={selectChannel}
+          onJoinConversation={selectConversation}
+          onCreateChannel={() => setShowNewChannel(true)}
+          onCreateConversation={() => setShowNewConversation(true)}
+        />
+      )}
       {showNewChannel && <NewChannelModal onClose={() => setShowNewChannel(false)} onConfirm={handleCreateChannel} />}
       {showNewConversation && <NewConversationModal onClose={() => setShowNewConversation(false)} onStart={handleStartConversation} />}
 

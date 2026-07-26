@@ -151,8 +151,9 @@ async def start_conversation(
     if len(partners) != len(partner_ids):
         raise HTTPException(status_code=404, detail="Tanlangan foydalanuvchilardan biri topilmadi")
 
-    # For a plain 1-1 chat, reuse an existing conversation with exactly these two people.
-    if len(partner_ids) == 1:
+    # For a plain 1-1 chat, reuse an existing conversation with exactly these two people —
+    # unless the client explicitly asks for a new parallel thread (force_new).
+    if len(partner_ids) == 1 and not payload.force_new:
         (other_id,) = partner_ids
         candidate_result = await db.execute(
             select(DirectConversationMember.conversation_id)

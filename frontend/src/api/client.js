@@ -206,8 +206,11 @@ export const api = {
   getMemberAnalytics: (companyId, userId, params = {}) =>
     request(`/companies/${companyId}/analytics/member/${userId}?${new URLSearchParams(params)}`),
   getConversations: () => request("/direct-conversations"),
-  startConversation: (partnerIds, channel = "chat") =>
-    request("/direct-conversations", { method: "POST", body: { partner_ids: partnerIds, channel } }),
+  startConversation: (partnerIds, channel = "chat", forceNew = false) =>
+    request("/direct-conversations", {
+      method: "POST",
+      body: { partner_ids: partnerIds, channel, force_new: forceNew },
+    }),
   deleteConversation: (conversationId) =>
     request(`/direct-conversations/${conversationId}`, { method: "DELETE" }),
   getConversationMembers: (conversationId) => request(`/direct-conversations/${conversationId}/members`),
