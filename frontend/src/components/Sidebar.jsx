@@ -88,7 +88,7 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
     ];
   }
   if (hasWarehouse && canViewWarehouse) {
-    finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Warehouse", to: "/warehouse" }];
+    finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Mahsulot oqimi", to: "/warehouse" }];
   }
   if (canViewAnalytics) {
     finalNavItems = [...finalNavItems, { icon: "📈", label: "Analitika", hint: "Analytics", to: "/analytics" }];

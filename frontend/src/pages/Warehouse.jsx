@@ -6,6 +6,22 @@ import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 
 const TYPE_LABELS = { technology: "Texnologiya", clothing: "Kiyim-kechak", food: "Oziq-ovqat" };
+const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
+
+const PERIODS = [
+  { key: "today", label: "Bugun" },
+  { key: "week", label: "1 hafta" },
+  { key: "month", label: "1 oy" },
+  { key: "3m", label: "3 oy" },
+  { key: "6m", label: "6 oy" },
+  { key: "year", label: "1 yil" },
+];
+
+const DASHBOARD_VIEWS = [
+  { key: "current", label: "Mahsulotlar" },
+  { key: "budget", label: "Byudjet" },
+  { key: "sold", label: "Aylanma" },
+];
 
 function emptyForm(type) {
   return {
@@ -22,8 +38,6 @@ function emptyForm(type) {
     notes: "",
   };
 }
-
-const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
 
 function resizeToDataUrl(file, maxWidth = 800) {
   return new Promise((resolve, reject) => {
@@ -45,6 +59,48 @@ function resizeToDataUrl(file, maxWidth = 800) {
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
+}
+
+function stockTone(p, isLow) {
+  if (p.quantity <= 0) return "out";
+  if (isLow) return "low";
+  return "ok";
+}
+
+function WarehouseHeading({ companyName, subtitle }) {
+  return (
+    <div className="galaxy-page-heading">
+      <p className="galaxy-page-kicker">Warehouse Hub</p>
+      <h1>Ombor{companyName ? ` — ${companyName}` : ""}</h1>
+      <p>{subtitle || "Mahsulotlar, zaxira va bozor — bitta stansiyada."}</p>
+    </div>
+  );
+}
+
+function ChartBlock({ title, period, setPeriod, chartType, setChartType, children, hint }) {
+  return (
+    <section className="wh-panel">
+      <div className="wh-panel-head">
+        <h3>{title}</h3>
+        <div className="wh-seg">
+          {["line", "bar"].map((t) => (
+            <button key={t} type="button" className={chartType === t ? "active" : ""} onClick={() => setChartType(t)}>
+              {t === "line" ? "Chiziq" : "Ustun"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="wh-period-row">
+        {PERIODS.map((p) => (
+          <button key={p.key} type="button" className={period === p.key ? "active" : ""} onClick={() => setPeriod(p.key)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {hint && <p className="wh-hint">{hint}</p>}
+      {children}
+    </section>
+  );
 }
 
 function ProductModal({ company, product, products, onClose, onSaved }) {
@@ -92,8 +148,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
     if (!file) return;
     setImageUploading(true);
     try {
-      const dataUrl = await resizeToDataUrl(file);
-      setField("image_url", dataUrl);
+      setField("image_url", await resizeToDataUrl(file));
     } catch {
       setError("Rasmni yuklashda xatolik");
     } finally {
@@ -106,7 +161,6 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
     setError(null);
     setSaving(true);
     try {
-      // "Tonna" is just a convenience input — always stored converted to kg.
       let quantity = Number(form.quantity) || 0;
       let unit = form.unit;
       if (unit === "tonna") {
@@ -148,106 +202,104 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
   }
 
   return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 20 }}
-      onClick={onClose}
-    >
-      <form className="card" style={{ maxWidth: 420, width: "100%" }} onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>{isEdit ? "Mahsulotni tahrirlash" : "Yangi mahsulot"}</h3>
-          <button type="button" className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="wh-modal-backdrop" onClick={onClose}>
+      <form className="card wh-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="wh-modal-head">
+          <h3>{isEdit ? "Mahsulotni tahrirlash" : "Yangi mahsulot"}</h3>
+          <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
         </div>
 
         {!isEdit && products?.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 11.5, color: "var(--text-dim)", margin: "0 0 6px" }}>
-              Mavjud mahsulotdan tanlang (soni avtomatik qo'shiladi) — yoki pastga yangisini yozing:
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 90, overflowY: "auto" }}>
+          <div className="wh-proto">
+            <p>Mavjud mahsulotdan tanlang — yoki pastga yangisini yozing:</p>
+            <div className="wh-proto-list">
               {products.map((p) => (
-                <span
+                <button
                   key={p.id}
+                  type="button"
+                  className={`wh-proto-chip ${form.name === p.name ? "active" : ""}`}
                   onClick={() => pickPrototype(p)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: form.name === p.name ? "var(--blue)" : "var(--panel-2)",
-                    color: form.name === p.name ? "#fff" : "var(--text)",
-                    borderRadius: 999,
-                    padding: "4px 10px 4px 4px",
-                    fontSize: 11.5,
-                    cursor: "pointer",
-                  }}
                 >
-                  {p.image_url ? (
-                    <img src={p.image_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover" }} />
-                  ) : (
-                    <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--border)", display: "inline-block" }} />
-                  )}
+                  {p.image_url ? <img src={p.image_url} alt="" /> : <span className="wh-proto-dot" />}
                   {p.name}
-                </span>
+                </button>
               ))}
             </div>
           </div>
         )}
+
+        <label>Nomi</label>
         <input type="text" placeholder="Mahsulot nomi" value={form.name} onChange={(e) => setField("name", e.target.value)} required />
         {!isEdit && (
-          <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "-6px 0 10px" }}>
-            Agar shu nomdagi mahsulot allaqachon bo'lsa, yangi qator ochilmaydi — kiritgan soningiz mavjudiga qo'shiladi.
-          </p>
+          <p className="wh-hint">Agar shu nomdagi mahsulot bo‘lsa, soni mavjudiga qo‘shiladi.</p>
         )}
+        <label>Narxi</label>
         <input type="number" placeholder="Narxi (so'm)" value={form.price} onChange={(e) => setField("price", e.target.value)} min="0" step="0.01" required />
         {!isEdit && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <input type="number" placeholder="Boshlang'ich soni" value={form.quantity} onChange={(e) => setField("quantity", e.target.value)} min="0" step="0.001" required style={{ flex: 2 }} />
-            <select value={form.unit} onChange={(e) => setField("unit", e.target.value)} style={{ flex: 1, background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px" }}>
-              <option value="dona">dona</option>
-              <option value="kg">kg</option>
-              <option value="tonna">tonna</option>
-              <option value="litr">litr</option>
-            </select>
+          <div className="wh-form-row">
+            <div>
+              <label>Boshlang‘ich soni</label>
+              <input type="number" value={form.quantity} onChange={(e) => setField("quantity", e.target.value)} min="0" step="0.001" required />
+            </div>
+            <div>
+              <label>Birlik</label>
+              <select value={form.unit} onChange={(e) => setField("unit", e.target.value)}>
+                <option value="dona">dona</option>
+                <option value="kg">kg</option>
+                <option value="tonna">tonna</option>
+                <option value="litr">litr</option>
+              </select>
+            </div>
           </div>
         )}
 
         {company.warehouse_type === "clothing" && (
-          <>
-            <input type="text" placeholder="O'lcham (masalan M, L, 42)" value={form.size} onChange={(e) => setField("size", e.target.value)} />
-            <input type="text" placeholder="Rang" value={form.color} onChange={(e) => setField("color", e.target.value)} />
-          </>
+          <div className="wh-form-row">
+            <div>
+              <label>O‘lcham</label>
+              <input type="text" placeholder="M, L, 42" value={form.size} onChange={(e) => setField("size", e.target.value)} />
+            </div>
+            <div>
+              <label>Rang</label>
+              <input type="text" placeholder="Rang" value={form.color} onChange={(e) => setField("color", e.target.value)} />
+            </div>
+          </div>
         )}
         {company.warehouse_type === "food" && (
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: "var(--text-dim)", display: "block", marginBottom: 4 }}>Yaroqlilik muddati</label>
+          <>
+            <label>Yaroqlilik muddati</label>
             <input type="date" value={form.expiry_date} onChange={(e) => setField("expiry_date", e.target.value)} />
-          </div>
+          </>
         )}
         {company.warehouse_type === "technology" && (
-          <input type="text" placeholder="SKU / model raqami" value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
+          <>
+            <label>SKU / model</label>
+            <input type="text" placeholder="SKU / model raqami" value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
+          </>
         )}
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: "var(--text-dim)", display: "block", marginBottom: 4 }}>Rasm (ixtiyoriy)</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {form.image_url && (
-              <img src={form.image_url} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />
-            )}
-            <input type="file" accept="image/*" onChange={handleImageFile} disabled={imageUploading} />
-          </div>
+        <label>Rasm (ixtiyoriy)</label>
+        <div className="wh-image-row">
+          {form.image_url && <img src={form.image_url} alt="" />}
+          <input type="file" accept="image/*" onChange={handleImageFile} disabled={imageUploading} />
         </div>
 
+        <label>Kam qolgan chegarasi</label>
         <input
           type="number"
-          placeholder={`Kam qolgan chegarasi (ixtiyoriy, ${UNIT_LABELS[form.unit === "tonna" ? "kg" : form.unit] || form.unit})`}
+          placeholder={`Ixtiyoriy (${UNIT_LABELS[form.unit === "tonna" ? "kg" : form.unit] || form.unit})`}
           value={form.low_stock_threshold}
           onChange={(e) => setField("low_stock_threshold", e.target.value)}
           min="0"
           step="0.001"
         />
-        <textarea placeholder="Izoh (ixtiyoriy)" value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} style={{ width: "100%", resize: "vertical" }} />
+        <label>Izoh</label>
+        <textarea placeholder="Izoh (ixtiyoriy)" value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} />
 
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={saving}>{saving ? "Saqlanmoqda..." : isEdit ? "Saqlash" : "Qo'shish"}</button>
+        <button type="submit" className="wh-cta" disabled={saving}>
+          {saving ? "Saqlanmoqda..." : isEdit ? "Saqlash" : "Qo'shish"}
+        </button>
       </form>
     </div>
   );
@@ -285,32 +337,30 @@ function StockModal({ company, product, onClose, onSaved }) {
   }
 
   return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 20 }}
-      onClick={onClose}
-    >
-      <div className="card" style={{ maxWidth: 440, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>{product.name} — zaxira qo'shish</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="wh-modal-backdrop" onClick={onClose}>
+      <div className="card wh-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="wh-modal-head">
+          <h3>{product.name} — zaxira</h3>
+          <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
         </div>
-
-        <form onSubmit={handleSubmit} style={{ marginBottom: 18 }}>
-          <input type="number" placeholder={`Qo'shiladigan miqdor (${UNIT_LABELS[product.unit] || product.unit})`} value={change} onChange={(e) => setChange(e.target.value)} min="0.001" step="0.001" required />
-          <input type="text" placeholder="Izoh (ixtiyoriy)" value={note} onChange={(e) => setNote(e.target.value)} />
+        <form onSubmit={handleSubmit} className="wh-stock-form">
+          <label>Qo‘shiladigan miqdor ({UNIT_LABELS[product.unit] || product.unit})</label>
+          <input type="number" value={change} onChange={(e) => setChange(e.target.value)} min="0.001" step="0.001" required />
+          <label>Izoh</label>
+          <input type="text" placeholder="Ixtiyoriy" value={note} onChange={(e) => setNote(e.target.value)} />
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={saving}>{saving ? "Saqlanmoqda..." : "➕ Qo'shish"}</button>
+          <button type="submit" className="wh-cta" disabled={saving}>{saving ? "Saqlanmoqda..." : "Qo'shish"}</button>
         </form>
-
-        <p style={{ fontSize: 12.5, fontWeight: 700, margin: "0 0 8px" }}>Tarix</p>
-        <div style={{ maxHeight: 220, overflowY: "auto" }}>
-          {history.length === 0 && <p style={{ fontSize: 12, color: "var(--text-dim)" }}>Hali harakat yo'q</p>}
+        <h4 className="wh-history-title">Tarix</h4>
+        <div className="wh-history">
+          {history.length === 0 && <p className="wh-empty-inline">Hali harakat yo‘q</p>}
           {history.map((h) => (
-            <div key={h.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 12 }}>
-              <span style={{ color: h.change > 0 ? "var(--green)" : "#f87171" }}>
-                {h.change > 0 ? "+" : ""}{h.change} {UNIT_LABELS[product.unit] || product.unit} {h.note ? `— ${h.note}` : ""}
+            <div key={h.id} className="wh-history-row">
+              <span className={h.change > 0 ? "up" : "down"}>
+                {h.change > 0 ? "+" : ""}{h.change} {UNIT_LABELS[product.unit] || product.unit}
+                {h.note ? ` — ${h.note}` : ""}
               </span>
-              <span style={{ color: "var(--text-dim)" }}>{h.user_name}</span>
+              <span>{h.user_name}</span>
             </div>
           ))}
         </div>
@@ -318,21 +368,6 @@ function StockModal({ company, product, onClose, onSaved }) {
     </div>
   );
 }
-
-const PERIODS = [
-  { key: "today", label: "Bugun" },
-  { key: "week", label: "1 hafta" },
-  { key: "month", label: "1 oy" },
-  { key: "3m", label: "3 oy" },
-  { key: "6m", label: "6 oy" },
-  { key: "year", label: "1 yil" },
-];
-
-const DASHBOARD_VIEWS = [
-  { key: "current", label: "📦 Mahsulotlar bo'yicha" },
-  { key: "budget", label: "💰 Umumiy byudjet" },
-  { key: "sold", label: "📈 Sotilgan tovarlar aylanmasi" },
-];
 
 function WarehouseDashboard({ company }) {
   const [period, setPeriod] = useState("month");
@@ -349,241 +384,184 @@ function WarehouseDashboard({ company }) {
   }, [company.id, period]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!data) return <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>;
+  if (!data) return <p className="wh-empty-inline">Yuklanmoqda...</p>;
 
   const unitEntries = Object.entries(data.total_by_unit || {});
   const totalEvents = (data.trend || []).reduce((sum, t) => sum + t.events, 0);
   const maxReceived = Math.max(1, ...data.by_product.map((p) => p.received));
   const maxBudget = Math.max(1, ...(data.by_product_budget || []).map((p) => p.value));
+  const tooltipStyle = { background: "#0f172a", border: "1px solid rgba(148,163,184,0.25)", borderRadius: 10, color: "#f8fafc" };
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+    <div className="wh-dashboard">
+      <div className="wh-view-tabs">
         {DASHBOARD_VIEWS.map((v) => (
-          <button key={v.key} className={view === v.key ? "" : "secondary"} style={{ width: "auto", padding: "8px 14px", fontSize: 12.5 }} onClick={() => setView(v.key)}>
+          <button key={v.key} type="button" className={view === v.key ? "active" : ""} onClick={() => setView(v.key)}>
             {v.label}
           </button>
         ))}
       </div>
 
       {view === "current" && (
-      <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
-        <div className="card" style={{ flex: "1 1 160px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Jami mahsulot turi</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{data.product_count}</div>
-        </div>
-        <div className="card" style={{ flex: "1 1 220px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 4 }}>Umumiy zaxira (birlik bo'yicha)</div>
-          {unitEntries.length === 0 ? (
-            <div style={{ fontSize: 22, fontWeight: 700 }}>0</div>
-          ) : (
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {unitEntries.map(([unit, qty]) => (
-                <div key={unit}><span style={{ fontSize: 18, fontWeight: 700 }}>{qty}</span> <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{UNIT_LABELS[unit] || unit}</span></div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="card" style={{ flex: "1 1 160px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Kirim harakatlari (davr)</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{totalEvents}</div>
-        </div>
-        <div className="card" style={{ flex: "1 1 160px" }}>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan (davr)</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#f87171" }}>{data.total_sold}</div>
-          <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 2 }}>Distributiv savdo ulanganda avtomatik hisoblanadi</div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <strong style={{ fontSize: 14 }}>📈 Kirim harakatlari (davr bo'yicha)</strong>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["line", "bar"].map((t) => (
-              <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
-                {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-          {PERIODS.map((p) => (
-            <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <p style={{ fontSize: 11, color: "var(--text-dim)", margin: "0 0 12px" }}>
-          Turli mahsulotlar turli birlikda (dona/kg/litr) o'lchangani uchun, bu grafik ularni bitta noto'g'ri songa qo'shmaydi — shunchaki qancha marta zaxira qo'shilganini ko'rsatadi. Har bir mahsulotning aniq miqdori pastdagi ro'yxatda.
-        </p>
-
-        <ResponsiveContainer width="100%" height={220}>
-          {chartType === "line" ? (
-            <LineChart data={data.trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-              <YAxis stroke="var(--text-dim)" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
-              <Line type="monotone" dataKey="events" name="Kirim soni" stroke="var(--cyan, #22d3ee)" strokeWidth={2} />
-            </LineChart>
-          ) : (
-            <BarChart data={data.trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-              <YAxis stroke="var(--text-dim)" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} />
-              <Bar dataKey="events" name="Kirim soni" fill="var(--cyan, #22d3ee)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          )}
-        </ResponsiveContainer>
-      </div>
-
-      <div className="card">
-        <strong style={{ fontSize: 14, display: "block", marginBottom: 14 }}>📦 Mahsulotlar bo'yicha qabul qilingan (davr)</strong>
-        {data.by_product.length === 0 ? (
-          <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Bu davrda hech qanday kirim bo'lmagan.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {data.by_product.map((p) => (
-              <div key={p.name + p.unit}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                  <span>{p.name}</span>
-                  <span style={{ color: "var(--green)" }}>+{p.received} {UNIT_LABELS[p.unit] || p.unit}</span>
-                </div>
-                <div style={{ height: 6, background: "var(--panel-2)", borderRadius: 999 }}>
-                  <div style={{ height: "100%", width: `${(p.received / maxReceived) * 100}%`, background: "var(--green)", borderRadius: 999 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      </>
-      )}
-
-      {view === "budget" && (
         <>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Umumiy byudjet qiymati (hozirgi zaxira)</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--cyan, #22d3ee)" }}>{money(data.total_budget_value)}</div>
-            <p style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 6 }}>
-              Har bir mahsulot narxi × soni bo'yicha hisoblangan — shu sababli turli birlikdagi (dona/kg/litr) mahsulotlarni bemalol bitta qiymatda solishtirish mumkin.
-            </p>
+          <div className="wh-stats">
+            <article className="wh-stat">
+              <span>Jami mahsulot turi</span>
+              <strong>{data.product_count}</strong>
+            </article>
+            <article className="wh-stat">
+              <span>Umumiy zaxira</span>
+              {unitEntries.length === 0 ? (
+                <strong>0</strong>
+              ) : (
+                <div className="wh-stat-units">
+                  {unitEntries.map(([unit, qty]) => (
+                    <strong key={unit}>{qty} <small>{UNIT_LABELS[unit] || unit}</small></strong>
+                  ))}
+                </div>
+              )}
+            </article>
+            <article className="wh-stat good">
+              <span>Kirim harakatlari</span>
+              <strong>{totalEvents}</strong>
+            </article>
+            <article className="wh-stat warn">
+              <span>Sotilgan (davr)</span>
+              <strong>{data.total_sold}</strong>
+            </article>
           </div>
 
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <strong style={{ fontSize: 14 }}>📈 Qabul qilingan zaxira qiymati (davr bo'yicha)</strong>
-              <div style={{ display: "flex", gap: 6 }}>
-                {["line", "bar"].map((t) => (
-                  <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
-                    {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-              {PERIODS.map((p) => (
-                <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+          <ChartBlock
+            title="Kirim harakatlari"
+            period={period}
+            setPeriod={setPeriod}
+            chartType={chartType}
+            setChartType={setChartType}
+            hint="Turli birlikdagi mahsulotlar bitta songa qo‘shilmaydi — faqat kirim soni ko‘rsatiladi."
+          >
             <ResponsiveContainer width="100%" height={220}>
               {chartType === "line" ? (
                 <LineChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
-                  <Line type="monotone" dataKey="received_value" name="Qabul qilingan qiymat" stroke="var(--cyan, #22d3ee)" strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="events" name="Kirim soni" stroke="#38bdf8" strokeWidth={2} />
                 </LineChart>
               ) : (
                 <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
-                  <Bar dataKey="received_value" name="Qabul qilingan qiymat" fill="var(--cyan, #22d3ee)" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="events" name="Kirim soni" fill="#38bdf8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               )}
             </ResponsiveContainer>
-          </div>
+          </ChartBlock>
 
-          <div className="card">
-            <strong style={{ fontSize: 14, display: "block", marginBottom: 14 }}>💰 Mahsulotlar bo'yicha byudjet</strong>
-            {(!data.by_product_budget || data.by_product_budget.length === 0) ? (
-              <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Hali mahsulot qo'shilmagan.</p>
+          <section className="wh-panel">
+            <div className="wh-panel-head"><h3>Mahsulotlar bo‘yicha qabul</h3></div>
+            {data.by_product.length === 0 ? (
+              <p className="wh-empty-inline">Bu davrda kirim bo‘lmagan.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {data.by_product_budget.map((p) => (
-                  <div key={p.name + p.unit}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                      <span>{p.name} <span style={{ color: "var(--text-dim)" }}>({p.quantity} {UNIT_LABELS[p.unit] || p.unit})</span></span>
-                      <span style={{ color: "var(--cyan, #22d3ee)" }}>{money(p.value)}</span>
+              <div className="wh-bars">
+                {data.by_product.map((p) => (
+                  <div key={p.name + p.unit} className="wh-bar-row">
+                    <div className="wh-bar-meta">
+                      <span>{p.name}</span>
+                      <span className="up">+{p.received} {UNIT_LABELS[p.unit] || p.unit}</span>
                     </div>
-                    <div style={{ height: 6, background: "var(--panel-2)", borderRadius: 999 }}>
-                      <div style={{ height: "100%", width: `${(p.value / maxBudget) * 100}%`, background: "var(--cyan, #22d3ee)", borderRadius: 999 }} />
+                    <div className="wh-bar-track">
+                      <div style={{ width: `${(p.received / maxReceived) * 100}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
+        </>
+      )}
+
+      {view === "budget" && (
+        <>
+          <article className="wh-hero-metric">
+            <span>Umumiy byudjet qiymati</span>
+            <strong>{money(data.total_budget_value)}</strong>
+            <p>Narx × soni — turli birliklarni bitta qiymatda solishtirish mumkin.</p>
+          </article>
+          <ChartBlock title="Qabul qilingan zaxira qiymati" period={period} setPeriod={setPeriod} chartType={chartType} setChartType={setChartType}>
+            <ResponsiveContainer width="100%" height={220}>
+              {chartType === "line" ? (
+                <LineChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                  <Line type="monotone" dataKey="received_value" name="Qiymat" stroke="#2dd4bf" strokeWidth={2} />
+                </LineChart>
+              ) : (
+                <BarChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                  <Bar dataKey="received_value" name="Qiymat" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </ChartBlock>
+          <section className="wh-panel">
+            <div className="wh-panel-head"><h3>Mahsulotlar bo‘yicha byudjet</h3></div>
+            {(!data.by_product_budget || data.by_product_budget.length === 0) ? (
+              <p className="wh-empty-inline">Hali mahsulot yo‘q.</p>
+            ) : (
+              <div className="wh-bars">
+                {data.by_product_budget.map((p) => (
+                  <div key={p.name + p.unit} className="wh-bar-row">
+                    <div className="wh-bar-meta">
+                      <span>{p.name} <em>({p.quantity} {UNIT_LABELS[p.unit] || p.unit})</em></span>
+                      <span className="cyan">{money(p.value)}</span>
+                    </div>
+                    <div className="wh-bar-track cyan">
+                      <div style={{ width: `${(p.value / maxBudget) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       )}
 
       {view === "sold" && (
         <>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sotilgan tovarlar aylanmasi (umumiy narxi)</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#f87171" }}>{money(data.total_sold_value || 0)}</div>
-            <p style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>
-              Hozircha savdo ma'lumotlari yo'q. Distributiv firma moduli ulanganda, sotilgan har bir mahsulot bu yerda avtomatik hisoblanadi va aylanma real vaqtda ko'rinadi.
-            </p>
-          </div>
-
-          <div className="card">
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <strong style={{ fontSize: 14 }}>📈 Sotuv aylanmasi (davr bo'yicha)</strong>
-              <div style={{ display: "flex", gap: 6 }}>
-                {["line", "bar"].map((t) => (
-                  <button key={t} className="secondary" style={{ width: "auto", padding: "5px 10px", fontSize: 11, opacity: chartType === t ? 1 : 0.5 }} onClick={() => setChartType(t)}>
-                    {t === "line" ? "📉 Chiziq" : "📊 Ustun"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-              {PERIODS.map((p) => (
-                <button key={p.key} className={period === p.key ? "" : "secondary"} style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => setPeriod(p.key)}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+          <article className="wh-hero-metric warn">
+            <span>Sotilgan tovarlar aylanmasi</span>
+            <strong>{money(data.total_sold_value || 0)}</strong>
+            <p>Distributiv savdo ulanganda aylanma real vaqtda yangilanadi.</p>
+          </article>
+          <ChartBlock title="Sotuv aylanmasi" period={period} setPeriod={setPeriod} chartType={chartType} setChartType={setChartType}>
             <ResponsiveContainer width="100%" height={220}>
               {chartType === "line" ? (
                 <LineChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
-                  <Line type="monotone" dataKey="sold_value" name="Sotuv qiymati" stroke="#f87171" strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                  <Line type="monotone" dataKey="sold_value" name="Sotuv" stroke="#fb7185" strokeWidth={2} />
                 </LineChart>
               ) : (
                 <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="label" stroke="var(--text-dim)" fontSize={11} />
-                  <YAxis stroke="var(--text-dim)" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)" }} formatter={(v) => money(v)} />
-                  <Bar dataKey="sold_value" name="Sotuv qiymati" fill="#f87171" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                  <Bar dataKey="sold_value" name="Sotuv" fill="#fb7185" radius={[4, 4, 0, 0]} />
                 </BarChart>
               )}
             </ResponsiveContainer>
-          </div>
+          </ChartBlock>
         </>
       )}
     </div>
@@ -620,21 +598,24 @@ function OrderModal({ product, onClose, onOrdered }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 20 }} onClick={onClose}>
-      <form className="card" style={{ maxWidth: 380, width: "100%" }} onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>{product.name}</h3>
-          <button type="button" className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="wh-modal-backdrop" onClick={onClose}>
+      <form className="card wh-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="wh-modal-head">
+          <h3>{product.name}</h3>
+          <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
-          {product.company_name} — mavjud: {product.quantity} {UNIT_LABELS[product.unit] || product.unit}, narxi: {money(product.price)}/{UNIT_LABELS[product.unit] || product.unit}
+        <p className="wh-hint">
+          {product.company_name} — mavjud: {product.quantity} {UNIT_LABELS[product.unit] || product.unit}, narxi: {money(product.price)}
         </p>
-        <input type="number" placeholder={`Buyurtma miqdori (${UNIT_LABELS[product.unit] || product.unit})`} value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0.001" step="0.001" max={product.quantity} required />
-        {quantity && !isNaN(Number(quantity)) && (
-          <p style={{ fontSize: 12.5, color: "var(--cyan, #22d3ee)", margin: "0 0 12px" }}>Jami: {money(Number(quantity) * product.price)}</p>
+        <label>Buyurtma miqdori</label>
+        <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0.001" step="0.001" max={product.quantity} required />
+        {quantity && !Number.isNaN(Number(quantity)) && (
+          <p className="wh-total">Jami: {money(Number(quantity) * product.price)}</p>
         )}
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={saving}>{saving ? "Buyurtma berilmoqda..." : "🛒 Buyurtma berish"}</button>
+        <button type="submit" className="wh-cta" disabled={saving}>
+          {saving ? "Buyurtma berilmoqda..." : "Buyurtma berish"}
+        </button>
       </form>
     </div>
   );
@@ -663,39 +644,43 @@ function MarketplaceTab({ company, onOrdered }) {
   const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
-    <div>
-      <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 14 }}>
-        Bu yerda ishlab chiqaruvchi kompaniyalarning ombordagi mahsulotlari ko'rinadi — buyurtma bersangiz, avtomatik ravishda o'z omboringizga qo'shiladi.
+    <div className="wh-market">
+      <p className="wh-section-lead">
+        Ishlab chiqaruvchi kompaniyalar omboridan buyurtma bering — mahsulot o‘z omboringizga qo‘shiladi.
       </p>
-      <input type="text" placeholder="🔍 Nomi bo'yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 280, marginBottom: 16 }} />
-
+      <input className="wh-search" type="text" placeholder="Nomi bo‘yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} />
       {error && <p className="error">{error}</p>}
-      {loading && <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
-      {!loading && visible.length === 0 && <div className="empty-card"><p>Hozircha bozorda mahsulot yo'q.</p></div>}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+      {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
+      {!loading && visible.length === 0 && <div className="wh-empty"><p>Hozircha bozorda mahsulot yo‘q.</p></div>}
+      <div className="wh-grid">
         {visible.map((p) => (
-          <div key={p.id} className="card">
-            {p.image_url && <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />}
-            <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginBottom: 4 }}>🏭 {p.company_name}</div>
-            <strong style={{ fontSize: 14 }}>{p.name}</strong>
-            <div style={{ fontSize: 13, color: "var(--text-dim)", margin: "4px 0" }}>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</div>
-            <div style={{ fontSize: 12, color: "var(--green)", marginBottom: 10 }}>Mavjud: {p.quantity} {UNIT_LABELS[p.unit] || p.unit}</div>
-            <button
-              style={{ width: "100%", padding: "8px", fontSize: 12.5 }}
-              onClick={() =>
-                setOrderProduct({
-                  ...p,
-                  onOrder: (q) => api.placeWarehouseOrder(company.id, p.company_id, p.id, q),
-                })
-              }
-            >
-              🛒 Buyurtma berish
-            </button>
-          </div>
+          <article key={p.id} className="wh-card">
+            {p.image_url ? (
+              <img className="wh-card-img" src={p.image_url} alt={p.name} />
+            ) : (
+              <div className="wh-card-img placeholder" />
+            )}
+            <div className="wh-card-body">
+              <span className="wh-source">{p.company_name}</span>
+              <h4>{p.name}</h4>
+              <p>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</p>
+              <p className="ok">Mavjud: {p.quantity} {UNIT_LABELS[p.unit] || p.unit}</p>
+              <button
+                type="button"
+                className="wh-cta"
+                onClick={() =>
+                  setOrderProduct({
+                    ...p,
+                    onOrder: (q) => api.placeWarehouseOrder(company.id, p.company_id, p.id, q),
+                  })
+                }
+              >
+                Buyurtma berish
+              </button>
+            </div>
+          </article>
         ))}
       </div>
-
       {orderProduct && (
         <OrderModal
           product={orderProduct}
@@ -719,16 +704,13 @@ export default function Warehouse() {
   const [showAdd, setShowAdd] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [stockProduct, setStockProduct] = useState(null);
-  const [tab, setTab] = useState("dashboard"); // "dashboard" | "products"
+  const [tab, setTab] = useState("dashboard");
   const [search, setSearch] = useState("");
-  const [stockFilter, setStockFilter] = useState("all"); // "all" | "low" | "out"
-  const [sortBy, setSortBy] = useState("recent"); // "recent" | "name" | "quantity"
+  const [stockFilter, setStockFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("recent");
 
   useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setCompany(pickActiveCompany(list)))
-      .catch(() => {});
+    api.getMyCompanies().then((list) => setCompany(pickActiveCompany(list))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -747,7 +729,7 @@ export default function Warehouse() {
   }
 
   async function handleDelete(product) {
-    if (!confirm(`"${product.name}" mahsulotini o'chirmoqchimisiz?`)) return;
+    if (!window.confirm(`"${product.name}" mahsulotini o'chirmoqchimisiz?`)) return;
     try {
       await api.deleteWarehouseProduct(company.id, product.id);
       refreshProducts();
@@ -769,6 +751,19 @@ export default function Warehouse() {
     return p.low_stock_threshold != null && p.quantity > 0 && p.quantity <= p.low_stock_threshold;
   }
 
+  const visibleProducts = products
+    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((p) => {
+      if (stockFilter === "low") return isLowStock(p);
+      if (stockFilter === "out") return p.quantity <= 0;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "quantity") return b.quantity - a.quantity;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
   function handleExportCsv() {
     const header = ["Nomi", "Narxi", "Soni", "Birlik", "O'lcham", "Rang", "Muddat", "SKU", "Izoh"];
     const rows = visibleProducts.map((p) => [
@@ -786,29 +781,26 @@ export default function Warehouse() {
     URL.revokeObjectURL(url);
   }
 
-  const visibleProducts = products
-    .filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
-    .filter((p) => {
-      if (stockFilter === "low") return isLowStock(p);
-      if (stockFilter === "out") return p.quantity <= 0;
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "quantity") return b.quantity - a.quantity;
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
-
   const lowStockCount = products.filter(isLowStock).length;
   const outOfStockCount = products.filter((p) => p.quantity <= 0).length;
+
+  const tabs = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "products", label: "Mahsulotlar" },
+  ];
+  if (company?.company_type === "distributor") {
+    tabs.push({ key: "marketplace", label: "Bozor" });
+  }
 
   if (!company) {
     return (
       <AppShell>
-        <div className="page-header"><h1>Ombor</h1></div>
-        <div className="empty-card">
-          <p>Avval kompaniya yarating.</p>
-          <button onClick={() => navigate("/companies")}>+ Kompaniya yaratish</button>
+        <div className="wh-page">
+          <WarehouseHeading />
+          <div className="wh-empty">
+            <p>Avval kompaniya yarating.</p>
+            <button type="button" className="wh-cta" onClick={() => navigate("/companies")}>Kompaniya yaratish</button>
+          </div>
         </div>
       </AppShell>
     );
@@ -817,136 +809,131 @@ export default function Warehouse() {
   if (!company.has_warehouse) {
     return (
       <AppShell>
-        <div className="page-header"><h1>Ombor</h1></div>
-        <div className="empty-card">
-          <p>Bu kompaniyada ombor bo'limi hali yoqilmagan.</p>
-          <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Profil → Sozlamalar → Kompaniya → Ombor bo'limidan yoqishingiz mumkin.</p>
+        <div className="wh-page">
+          <WarehouseHeading companyName={company.name} />
+          <div className="wh-empty">
+            <p>Bu kompaniyada ombor hali yoqilmagan.</p>
+            <p className="wh-hint">Profil → Sozlamalar → Kompaniya → Ombor bo‘limidan yoqing.</p>
+          </div>
         </div>
       </AppShell>
     );
   }
 
+  const subtitle =
+    company.company_type === "distributor"
+      ? "Distributiv firma — boshqa kompaniyalar omboridan buyurtma qiladi"
+      : `Ishlab chiqarish turi: ${TYPE_LABELS[company.warehouse_type] || company.warehouse_type}`;
+
   return (
     <AppShell>
-      <div className="page-header">
-        <h1>Ombor — {company.name}</h1>
-        <p>
-          {company.company_type === "distributor"
-            ? "Distributiv firma — boshqa kompaniyalar omboridan buyurtma qiladi"
-            : `Ishlab chiqarish turi: ${TYPE_LABELS[company.warehouse_type] || company.warehouse_type}`}
-        </p>
-      </div>
+      <div className="wh-page">
+        <WarehouseHeading companyName={company.name} subtitle={subtitle} />
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        <button className={tab === "dashboard" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("dashboard")}>
-          📊 Dashboard
-        </button>
-        <button className={tab === "products" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("products")}>
-          📦 Ombor mahsulotlari
-        </button>
-        {company.company_type === "distributor" && (
-          <button className={tab === "marketplace" ? "" : "secondary"} style={{ width: "auto", padding: "9px 16px" }} onClick={() => setTab("marketplace")}>
-            🛒 Bozor
-          </button>
-        )}
-        <button className="secondary" style={{ width: "auto", padding: "9px 16px", marginLeft: "auto" }} onClick={() => navigate("/dashboard")}>
-          ← Korxonaga qaytish
-        </button>
-      </div>
-
-      {tab === "dashboard" && <WarehouseDashboard company={company} />}
-
-      {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
-
-      {tab === "products" && (
-        <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
-            {company.company_type !== "distributor" && (
-              <button style={{ width: "auto", padding: "10px 18px" }} onClick={() => setShowAdd(true)}>
-                + Yangi mahsulot
+        <div className="wh-toolbar">
+          <div className="wh-tabs" role="tablist">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                className={tab === t.key ? "active" : ""}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
               </button>
-            )}
-            <input
-              type="text"
-              placeholder="🔍 Nomi bo'yicha qidirish..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 220, margin: 0 }}
-            />
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px 12px", fontSize: 13 }}>
-              <option value="recent">Yangi qo'shilgan</option>
-              <option value="name">Nomi (A-Z)</option>
-              <option value="quantity">Soni (ko'pdan kamga)</option>
-            </select>
-            <button className="secondary" style={{ width: "auto", padding: "9px 16px", marginLeft: "auto" }} onClick={handleExportCsv}>
-              ⬇️ Excel/CSV eksport
-            </button>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-            <button className={stockFilter === "all" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5 }} onClick={() => setStockFilter("all")}>
-              Barchasi ({products.length})
-            </button>
-            <button className={stockFilter === "low" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5, color: stockFilter === "low" ? undefined : "var(--orange, #f59e0b)" }} onClick={() => setStockFilter("low")}>
-              ⚠️ Kam qolgan ({lowStockCount})
-            </button>
-            <button className={stockFilter === "out" ? "" : "secondary"} style={{ width: "auto", padding: "6px 14px", fontSize: 12.5, color: stockFilter === "out" ? undefined : "#f87171" }} onClick={() => setStockFilter("out")}>
-              ❌ Tugagan ({outOfStockCount})
-            </button>
-          </div>
-
-          {error && <p className="error">{error}</p>}
-          {loading && <p style={{ color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
-
-          {!loading && products.length === 0 && (
-            <div className="empty-card"><p>Hali mahsulot qo'shilmagan.</p></div>
-          )}
-          {!loading && products.length > 0 && visibleProducts.length === 0 && (
-            <div className="empty-card"><p>Qidiruv/filtr shartlariga mos mahsulot topilmadi.</p></div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-            {visibleProducts.map((p) => (
-              <div key={p.id} className="card" style={isLowStock(p) ? { borderColor: "rgba(245,158,11,0.5)" } : p.quantity <= 0 ? { borderColor: "rgba(248,113,113,0.5)" } : undefined}>
-                {p.image_url && (
-                  <img src={p.image_url} alt={p.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-                )}
-                {p.source_company_name && (
-                  <div style={{ fontSize: 10.5, color: "var(--blue, #3b82f6)", marginBottom: 6 }}>🚚 {p.source_company_name} dan</div>
-                )}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <strong style={{ fontSize: 14.5 }}>{p.name}</strong>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      background: p.quantity <= 0 ? "rgba(248,113,113,0.15)" : isLowStock(p) ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)",
-                      color: p.quantity <= 0 ? "#f87171" : isLowStock(p) ? "#f59e0b" : "var(--green)",
-                    }}
-                  >
-                    {p.quantity <= 0 ? "❌" : isLowStock(p) ? "⚠️" : ""} {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>{money(p.price)}</div>
-                {p.size && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>O'lcham: {p.size}{p.color ? `, Rang: ${p.color}` : ""}</div>}
-                {p.expiry_date && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Muddat: {p.expiry_date}</div>}
-                {p.sku && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>SKU: {p.sku}</div>}
-                {p.notes && <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>{p.notes}</div>}
-
-                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                  <button style={{ flex: 1, padding: "7px", fontSize: 12 }} onClick={() => setStockProduct(p)}>➕ Zaxira qo'shish</button>
-                  {p.unit === "dona" && (
-                    <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} onClick={() => handleQuickAdd(p)} title="Tez +1 qo'shish">+1</button>
-                  )}
-                  <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} onClick={() => setEditProduct(p)}>✏️</button>
-                  <button className="secondary" style={{ width: "auto", padding: "7px 10px", fontSize: 12, color: "#f87171" }} onClick={() => handleDelete(p)}>🗑️</button>
-                </div>
-              </div>
             ))}
           </div>
-        </>
-      )}
+          <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/dashboard")}>
+            Korxonaga qaytish
+          </button>
+        </div>
+
+        {tab === "dashboard" && <WarehouseDashboard company={company} />}
+        {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
+
+        {tab === "products" && (
+          <section className="wh-products">
+            <div className="wh-tools">
+              {company.company_type !== "distributor" && (
+                <button type="button" className="wh-cta" onClick={() => setShowAdd(true)}>Yangi mahsulot</button>
+              )}
+              <input
+                className="wh-search"
+                type="text"
+                placeholder="Nomi bo‘yicha qidirish..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="recent">Yangi qo‘shilgan</option>
+                <option value="name">Nomi (A-Z)</option>
+                <option value="quantity">Soni (ko‘pdan kamga)</option>
+              </select>
+              <button type="button" className="secondary wh-soft-btn" onClick={handleExportCsv}>
+                CSV eksport
+              </button>
+            </div>
+
+            <div className="wh-filters">
+              <button type="button" className={stockFilter === "all" ? "active" : ""} onClick={() => setStockFilter("all")}>
+                Barchasi ({products.length})
+              </button>
+              <button type="button" className={stockFilter === "low" ? "active low" : "low"} onClick={() => setStockFilter("low")}>
+                Kam qolgan ({lowStockCount})
+              </button>
+              <button type="button" className={stockFilter === "out" ? "active out" : "out"} onClick={() => setStockFilter("out")}>
+                Tugagan ({outOfStockCount})
+              </button>
+            </div>
+
+            {error && <p className="error">{error}</p>}
+            {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
+            {!loading && products.length === 0 && <div className="wh-empty"><p>Hali mahsulot qo‘shilmagan.</p></div>}
+            {!loading && products.length > 0 && visibleProducts.length === 0 && (
+              <div className="wh-empty"><p>Qidiruv/filtrga mos mahsulot topilmadi.</p></div>
+            )}
+
+            <div className="wh-grid">
+              {visibleProducts.map((p) => {
+                const tone = stockTone(p, isLowStock(p));
+                return (
+                  <article key={p.id} className={`wh-card tone-${tone}`}>
+                    {p.image_url ? (
+                      <img className="wh-card-img" src={p.image_url} alt={p.name} />
+                    ) : (
+                      <div className="wh-card-img placeholder" />
+                    )}
+                    <div className="wh-card-body">
+                      {p.source_company_name && <span className="wh-source">{p.source_company_name} dan</span>}
+                      <div className="wh-card-top">
+                        <h4>{p.name}</h4>
+                        <span className={`wh-qty ${tone}`}>
+                          {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
+                        </span>
+                      </div>
+                      <p className="wh-price">{money(p.price)}</p>
+                      {p.size && <p className="wh-meta">O‘lcham: {p.size}{p.color ? `, Rang: ${p.color}` : ""}</p>}
+                      {p.expiry_date && <p className="wh-meta">Muddat: {p.expiry_date}</p>}
+                      {p.sku && <p className="wh-meta">SKU: {p.sku}</p>}
+                      {p.notes && <p className="wh-meta">{p.notes}</p>}
+                      <div className="wh-card-actions">
+                        <button type="button" className="wh-cta slim" onClick={() => setStockProduct(p)}>Zaxira</button>
+                        {p.unit === "dona" && (
+                          <button type="button" className="secondary wh-soft-btn" onClick={() => handleQuickAdd(p)}>+1</button>
+                        )}
+                        <button type="button" className="secondary wh-soft-btn" onClick={() => setEditProduct(p)}>Tahrir</button>
+                        <button type="button" className="secondary wh-soft-btn danger" onClick={() => handleDelete(p)}>O‘chirish</button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
 
       {showAdd && <ProductModal company={company} products={products} onClose={() => setShowAdd(false)} onSaved={refreshProducts} />}
       {editProduct && <ProductModal company={company} product={editProduct} products={products} onClose={() => setEditProduct(null)} onSaved={refreshProducts} />}
