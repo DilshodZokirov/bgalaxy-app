@@ -1261,8 +1261,11 @@ video {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding-right: 108px;
   animation: ziyo-rise 0.45s ease both;
+}
+
+.ziyo-page.is-chat {
+  padding-right: 108px;
 }
 
 @keyframes ziyo-rise {
@@ -1307,14 +1310,61 @@ video {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  text-align: left;
-  padding: 28px 8px 8px;
+  text-align: center;
+  padding: 8px 8px 12px;
+}
+
+.ziyo-hero-visual {
+  position: relative;
+  width: min(280px, 70vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+.ziyo-wave {
+  position: absolute;
+  inset: 18% 2%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.22), transparent 58%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      rgba(56, 189, 248, 0.18) 10px 14px,
+      transparent 14px 22px
+    );
+  opacity: 0.85;
+  animation: ziyo-wave 3.6s ease-in-out infinite;
+}
+
+.ziyo-wave.delay {
+  inset: 28% 8%;
+  opacity: 0.45;
+  animation-delay: 0.6s;
+}
+
+@keyframes ziyo-wave {
+  0%, 100% { transform: scaleX(0.96); opacity: 0.55; }
+  50% { transform: scaleX(1.04); opacity: 0.95; }
+}
+
+.ziyo-hero-img {
+  position: relative;
+  z-index: 1;
+  width: 82%;
+  height: auto;
+  border-radius: 50%;
+  object-fit: cover;
+  animation: ziyo-float 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 18px 40px rgba(56, 189, 248, 0.28));
 }
 
 .ziyo-hero h1 {
-  margin: 0;
+  margin: 8px 0 0;
   font-family: "Syne", "Poppins", sans-serif;
   font-size: clamp(1.7rem, 4vw, 2.35rem);
   font-weight: 700;
@@ -1332,8 +1382,8 @@ video {
   position: absolute;
   right: 0;
   bottom: 72px;
-  width: 96px;
-  height: 96px;
+  width: 84px;
+  height: 84px;
   z-index: 2;
   pointer-events: none;
   animation: ziyo-corner-in 0.5s ease both;
@@ -1385,10 +1435,10 @@ video {
 .ziyo-chips {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 10px;
   margin-top: 22px;
-  max-width: 560px;
+  max-width: 520px;
 }
 
 .ziyo-chips-inline {
@@ -1689,15 +1739,22 @@ video {
 @media (max-width: 640px) {
   .ziyo-page {
     min-height: calc(100vh - 120px);
+  }
+
+  .ziyo-page.is-chat {
     padding-right: 0;
     padding-bottom: 88px;
+  }
+
+  .ziyo-hero-visual {
+    width: min(220px, 68vw);
   }
 
   .ziyo-corner-bot {
     right: 8px;
     bottom: 64px;
-    width: 72px;
-    height: 72px;
+    width: 68px;
+    height: 68px;
   }
 
   .ziyo-chip {
