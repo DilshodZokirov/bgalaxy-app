@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LiveKitRoom, VideoConference } from "@livekit/components-react";
+import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
+import MeetingRoom from "../components/MeetingRoom";
 
 function GroupHeading({ companyName }) {
   return (
@@ -92,7 +93,7 @@ export default function GroupMeeting() {
 
   if (connection) {
     return (
-      <div className="meetings-call-shell" data-lk-theme="default">
+      <div className="meetings-call-shell">
         <LiveKitRoom
           serverUrl={connection.url}
           token={connection.token}
@@ -105,27 +106,31 @@ export default function GroupMeeting() {
           }}
           style={{ height: "100%" }}
         >
-          <VideoConference />
-        </LiveKitRoom>
-
-        {canHost && participants.length > 0 && (
-          <aside className="meetings-host-panel">
-            <strong>Ishtirokchilar</strong>
-            {participants.map((p) => (
-              <div key={p.identity} className="meetings-host-row">
-                <span>{p.name}</span>
-                <div className="meetings-host-actions">
-                  <button type="button" className="secondary" onClick={() => handleMute(p.identity, "audio", true)} title="Ovozni o‘chirish">
-                    Mic
-                  </button>
-                  <button type="button" className="secondary" onClick={() => handleMute(p.identity, "video", true)} title="Kamerani o‘chirish">
-                    Cam
-                  </button>
+          <MeetingRoom
+            kicker="G4 MEETING ROOM"
+            title={`${company.name} — guruh`}
+            hostControls={
+              canHost && participants.length > 0 ? (
+                <div className="g4-host-controls">
+                  <strong>Host boshqaruvi</strong>
+                  {participants.map((p) => (
+                    <div key={p.identity} className="g4-host-row">
+                      <span>{p.name}</span>
+                      <div>
+                        <button type="button" onClick={() => handleMute(p.identity, "audio", true)}>
+                          Mic off
+                        </button>
+                        <button type="button" onClick={() => handleMute(p.identity, "video", true)}>
+                          Cam off
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </aside>
-        )}
+              ) : null
+            }
+          />
+        </LiveKitRoom>
       </div>
     );
   }
