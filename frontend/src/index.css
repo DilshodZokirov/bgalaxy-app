@@ -1342,6 +1342,68 @@ video {
   box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
 }
 
+.rafiq-header-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rafiq-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px 9px 12px;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #2563eb, #7c3aed 70%, #a855f7);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.rafiq-header-chip:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.rafiq-header-chip.is-listening {
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.35), 0 8px 24px rgba(124, 58, 237, 0.45);
+}
+
+.rafiq-header-chip.is-off {
+  filter: grayscale(0.35) brightness(0.9);
+}
+
+.rafiq-header-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.rafiq-header-mic {
+  height: 34px;
+  min-width: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.galaxy-shell-day .rafiq-header-mic {
+  background: rgba(255, 255, 255, 0.65);
+  color: #0f172a;
+  border-color: rgba(14, 116, 144, 0.22);
+}
+
+
 .rafiq-popup {
   position: fixed;
   top: 70px;
@@ -3330,6 +3392,192 @@ video {
   .orbit-core {
     transform: translate(-50%, -50%);
   }
+}
+
+
+/* ---------- Galaxy welcome 3D fantasy ---------- */
+.galaxy-welcome {
+  position: relative;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  padding: 4px 2px 2px;
+}
+
+.galaxy-welcome-stage {
+  position: absolute;
+  inset: -18px -10px -8px -6px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.galaxy-welcome-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(10px);
+  opacity: 0.7;
+}
+
+.galaxy-welcome-orb.o1 {
+  width: 70px;
+  height: 70px;
+  left: -8px;
+  top: -6px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.7), transparent 70%);
+  animation: welcome-float 5.5s ease-in-out infinite;
+}
+
+.galaxy-welcome-orb.o2 {
+  width: 46px;
+  height: 46px;
+  left: 42%;
+  top: -10px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.55), transparent 70%);
+  animation: welcome-float 4.8s ease-in-out infinite reverse;
+}
+
+.galaxy-welcome-orb.o3 {
+  width: 38px;
+  height: 38px;
+  right: 8%;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.45), transparent 70%);
+  animation: welcome-float 6s ease-in-out infinite;
+}
+
+.galaxy-welcome-spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f8fafc;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+  animation: welcome-spark 2.8s ease-in-out infinite;
+}
+
+.galaxy-welcome-spark.s1 { left: 12%; top: 18%; }
+.galaxy-welcome-spark.s2 { left: 55%; top: 8%; animation-delay: 0.4s; }
+.galaxy-welcome-spark.s3 { left: 78%; top: 40%; animation-delay: 0.9s; }
+.galaxy-welcome-spark.s4 { left: 30%; bottom: 10%; animation-delay: 1.3s; }
+
+.galaxy-welcome-title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: clamp(1.45rem, 2.5vw, 1.95rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  transform-style: preserve-3d;
+  transform: rotateX(12deg) rotateY(-6deg);
+}
+
+.galaxy-welcome-depth {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.55), rgba(37, 99, 235, 0.2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  transform: translateZ(-18px) translateY(3px);
+  filter: blur(0.4px);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.galaxy-welcome-face {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  color: #f8fafc;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25),
+    0 10px 28px rgba(37, 99, 235, 0.45),
+    0 0 24px rgba(167, 139, 250, 0.45);
+  background: linear-gradient(120deg, #fff 10%, #c4b5fd 40%, #67e8f9 70%, #fff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: welcome-shine 5s linear infinite;
+}
+
+.galaxy-welcome-letter {
+  display: inline-block;
+  transform: translateZ(16px);
+  animation: welcome-letter-in 0.55s ease both;
+}
+
+.galaxy-welcome-wave {
+  display: inline-block;
+  margin-left: 6px;
+  -webkit-text-fill-color: initial;
+  color: initial;
+  transform-origin: 70% 70%;
+  animation: welcome-wave 1.8s ease-in-out infinite;
+}
+
+.galaxy-welcome-sub {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  transform: translateZ(8px) rotateX(8deg);
+}
+
+.galaxy-welcome-sub span {
+  color: #a5b4fc;
+  font-weight: 700;
+}
+
+.galaxy-shell-day .galaxy-welcome-face {
+  background: linear-gradient(120deg, #0f172a 5%, #0369a1 40%, #b45309 75%, #0f172a 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: none;
+}
+
+.galaxy-shell-day .galaxy-welcome-sub {
+  color: #334155;
+}
+
+.galaxy-shell-day .galaxy-welcome-sub span {
+  color: #0369a1;
+}
+
+@keyframes welcome-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.06); }
+}
+
+@keyframes welcome-spark {
+  0%, 100% { opacity: 0.25; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes welcome-shine {
+  to { background-position: 200% center; }
+}
+
+@keyframes welcome-letter-in {
+  from {
+    opacity: 0;
+    transform: translateZ(16px) translateY(12px) rotateX(-40deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(16px) translateY(0) rotateX(0);
+  }
+}
+
+@keyframes welcome-wave {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-8deg); }
+  60% { transform: rotate(12deg); }
+  80% { transform: rotate(-4deg); }
 }
 
 /* ---------- Galaxy Hub 3D demo ---------- */

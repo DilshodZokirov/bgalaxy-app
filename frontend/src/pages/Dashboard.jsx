@@ -8,6 +8,8 @@ import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
 import GalaxySkyBackdrop from "../components/GalaxySkyBackdrop";
 import NotificationBell from "../components/NotificationBell";
+import RafiqFloatingButton from "../components/RafiqFloatingButton";
+import GalaxyWelcome from "../components/GalaxyWelcome";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
@@ -132,8 +134,7 @@ export default function Dashboard() {
         <GalaxySkyBackdrop mode={skyMode} />
         <header className="galaxy-top">
           <div className="galaxy-top-left">
-            <h1>Xush kelibsiz, {firstName}! 👋</h1>
-            <p>BG - Sizning biznesingiz uchun yagona galaktika</p>
+            <GalaxyWelcome name={firstName} />
           </div>
 
           <label className="galaxy-search">
@@ -157,6 +158,7 @@ export default function Dashboard() {
               {skyMode === "night" ? "🌙" : "☀️"}
             </button>
             <NotificationBell variant="inline" />
+            <RafiqFloatingButton variant="header" />
           </div>
         </header>
 
