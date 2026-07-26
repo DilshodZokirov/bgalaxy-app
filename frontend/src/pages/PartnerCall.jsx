@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { LiveKitRoom, VideoConference } from "@livekit/components-react";
+import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { api } from "../api/client";
 import AppShell from "../components/AppShell";
+import MeetingRoom from "../components/MeetingRoom";
 import UserSearchInput from "../components/UserSearchInput";
 
 function PartnerHeading({ title = "Hamkorlar uchrashuvi" }) {
@@ -121,11 +122,7 @@ export default function PartnerCall() {
   }
 
   return (
-    <div className="meetings-call-shell" data-lk-theme="default">
-      <button type="button" className="meetings-call-add" onClick={() => setShowAdd(true)}>
-        Odam qo‘shish
-      </button>
-
+    <div className="meetings-call-shell">
       {addedMsg && <div className="meetings-toast">{addedMsg}</div>}
 
       <LiveKitRoom
@@ -137,27 +134,36 @@ export default function PartnerCall() {
         onDisconnected={() => navigate("/meetings")}
         style={{ height: "100%" }}
       >
-        <VideoConference />
-      </LiveKitRoom>
-
-      {isHost && participants.length > 0 && (
-        <aside className="meetings-host-panel">
-          <strong>Ishtirokchilar</strong>
-          {participants.map((p) => (
-            <div key={p.identity} className="meetings-host-row">
-              <span>{p.name}</span>
-              <div className="meetings-host-actions">
-                <button type="button" className="secondary" onClick={() => handleMute(p.identity, "audio", true)} title="Ovozni o‘chirish">
-                  Mic
-                </button>
-                <button type="button" className="secondary" onClick={() => handleMute(p.identity, "video", true)} title="Kamerani o‘chirish">
-                  Cam
-                </button>
+        <MeetingRoom
+          kicker="G4 MEETING ROOM"
+          title="Hamkorlar uchrashuvi"
+          headerActions={
+            <button type="button" className="g4-header-btn" onClick={() => setShowAdd(true)}>
+              Odam qo‘shish
+            </button>
+          }
+          hostControls={
+            isHost && participants.length > 0 ? (
+              <div className="g4-host-controls">
+                <strong>Host boshqaruvi</strong>
+                {participants.map((p) => (
+                  <div key={p.identity} className="g4-host-row">
+                    <span>{p.name}</span>
+                    <div>
+                      <button type="button" onClick={() => handleMute(p.identity, "audio", true)}>
+                        Mic off
+                      </button>
+                      <button type="button" onClick={() => handleMute(p.identity, "video", true)}>
+                        Cam off
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
-        </aside>
-      )}
+            ) : null
+          }
+        />
+      </LiveKitRoom>
 
       {showAdd && (
         <div className="meetings-modal-backdrop" onClick={() => setShowAdd(false)}>
