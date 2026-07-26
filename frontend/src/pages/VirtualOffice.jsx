@@ -441,7 +441,7 @@ export default function VirtualOffice() {
         <div className="office-shrunk-wrap">
           {officeScene}
           <button type="button" className="office-enter-gate" onClick={enterFullscreen}>
-            <span className="office-enter-card">⛶ To‘liq ekranga qaytish (Enter / Esc emas)</span>
+            <span className="office-enter-card">⛶ To‘liq ekranga qaytish (Enter)</span>
           </button>
         </div>
       </div>
