@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { getActiveCompanyId, setActiveCompanyId } from "../hooks/useCompany";
+import RafiqAvatar from "./RafiqAvatar";
 
 const WAKE_WORD = "ziyo";
 
@@ -19,7 +20,7 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
   const isHeader = variant === "header";
 
   useEffect(() => {
-    if (location.pathname.startsWith("/rafiq")) return undefined; // the dedicated page is text-only, avoid mic contention
+    if (location.pathname.startsWith("/rafiq")) return undefined;
     if (!enabled || !SpeechRecognitionAPI) return undefined;
 
     stoppedRef.current = false;
@@ -44,7 +45,6 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
     recognition.onerror = () => {};
     recognition.onend = () => {
       if (!stoppedRef.current) {
-        // Keep the wake-word listener alive in the background.
         setTimeout(() => startListening(), 300);
       }
     };
@@ -73,7 +73,7 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
     try {
       recognition.start();
     } catch {
-      // already running — ignore
+      // already running
     }
   }
 
@@ -109,23 +109,34 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
 
   if (location.pathname.startsWith("/rafiq")) return null;
 
-  const icons = { idle: "🎙️", listening: "🎙️", thinking: "💭", speaking: "🔊" };
+  const statusLabel = {
+    idle: "Tayyor",
+    listening: "Tinglamoqda",
+    thinking: "O'ylamoqda",
+    speaking: "Gapirmoqda",
+  }[status];
 
   if (isHeader) {
     return (
       <div className="rafiq-header-wrap">
         <button
           type="button"
-          className={`rafiq-header-chip ${enabled ? `is-${status}` : "is-off"}`}
+          className={`ziyo-header-chip ${enabled ? `is-${status}` : "is-off"}`}
           onClick={() => navigate("/rafiq")}
           title="AI Ziyo chatini ochish"
         >
-          <span className="rafiq-header-icon">{enabled ? icons[status] : "🤖"}</span>
-          <span>Ziyo</span>
+          <span className="ziyo-header-avatar">
+            <RafiqAvatar size={26} variant="photo" />
+            {enabled && status === "listening" && <span className="ziyo-header-pulse" aria-hidden />}
+          </span>
+          <span className="ziyo-header-copy">
+            <strong>Ziyo</strong>
+            <small>{enabled ? statusLabel : "O'chirilgan"}</small>
+          </span>
         </button>
         <button
           type="button"
-          className="rafiq-header-mic"
+          className={`ziyo-header-mic ${enabled ? "is-on" : ""}`}
           onClick={() => setEnabled((v) => !v)}
           title={
             enabled
@@ -141,15 +152,17 @@ export default function RafiqFloatingButton({ variant = "fab" }) {
 
   return (
     <button
-      className="rafiq-fab"
+      type="button"
+      className={`ziyo-fab ${enabled ? `is-${status}` : "is-off"}`}
       onClick={() => setEnabled((v) => !v)}
       title={
         enabled
-          ? `Faol — "${WAKE_WORD}" deb ayting, keyin buyrug'ingizni gapiring (bosib o'chirish mumkin)`
+          ? `Faol — "${WAKE_WORD}" deb ayting, keyin buyrug'ingizni gapiring`
           : "O'chirilgan — yoqish uchun bosing"
       }
     >
-      {enabled ? icons[status] : "🤖"} Ziyo
+      <RafiqAvatar size={34} variant="photo" />
+      <span>Ziyo</span>
     </button>
   );
 }

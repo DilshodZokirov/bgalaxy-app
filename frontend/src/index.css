@@ -1244,46 +1244,218 @@ video {
   border: 1px solid var(--blue);
 }
 
-/* ---------- Rafiq chat page ---------- */
-.rafiq-page-header {
+/* ---------- AI Ziyo chat page ---------- */
+.ziyo-page {
+  --ziyo-ink: #e8eef7;
+  --ziyo-muted: #93a4b8;
+  --ziyo-cyan: #38bdf8;
+  --ziyo-panel: rgba(12, 18, 32, 0.72);
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: calc(100vh - 140px);
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 18px;
+  animation: ziyo-rise 0.45s ease both;
 }
 
-.rafiq-page-header .status {
-  font-size: 12.5px;
-  color: var(--green);
-  display: flex;
-  align-items: center;
-  gap: 5px;
+@keyframes ziyo-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 
-.rafiq-page-header .status .dot {
-  width: 6px;
-  height: 6px;
+.ziyo-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ziyo-brand {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f8fafc;
+}
+
+.ziyo-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #34d399;
+}
+
+.ziyo-online .dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--green);
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
 }
 
+.ziyo-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px 8px 8px;
+}
+
+.ziyo-hero-visual {
+  position: relative;
+  width: min(320px, 78vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+}
+
+.ziyo-wave {
+  position: absolute;
+  inset: 18% 4%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.22), transparent 58%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      rgba(56, 189, 248, 0.18) 10px 14px,
+      transparent 14px 22px
+    );
+  filter: blur(0.2px);
+  opacity: 0.85;
+  animation: ziyo-wave 3.6s ease-in-out infinite;
+}
+
+.ziyo-wave.delay {
+  inset: 28% 10%;
+  opacity: 0.45;
+  animation-delay: 0.6s;
+}
+
+@keyframes ziyo-wave {
+  0%, 100% { transform: scaleX(0.96); opacity: 0.55; }
+  50% { transform: scaleX(1.04); opacity: 0.95; }
+}
+
+.ziyo-hero-img {
+  position: relative;
+  z-index: 1;
+  width: 78%;
+  height: auto;
+  border-radius: 50%;
+  object-fit: cover;
+  animation: ziyo-float 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 18px 40px rgba(56, 189, 248, 0.28));
+}
+
+@keyframes ziyo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.ziyo-hero h1 {
+  margin: 4px 0 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.ziyo-hero p {
+  margin: 8px 0 0;
+  color: var(--ziyo-muted);
+  font-size: 1rem;
+}
+
+.ziyo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+  max-width: 560px;
+}
+
+.ziyo-chips-inline {
+  justify-content: flex-start;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.ziyo-chip {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.ziyo-chip:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(14, 116, 144, 0.18);
+  transform: translateY(-1px);
+}
+
+.ziyo-chip-icon {
+  width: 18px;
+  height: 18px;
+  color: #7dd3fc;
+  display: grid;
+  place-items: center;
+}
+
+.ziyo-chip-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ziyo-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ziyo-log,
 .rafiq-log {
-  height: 480px;
+  flex: 1;
+  min-height: 280px;
+  max-height: none;
+  height: auto;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
+  background: var(--ziyo-panel);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+}
+
+.rafiq-page-compact .rafiq-log {
+  height: 320px;
+  margin-bottom: 0;
 }
 
 .rafiq-msg {
-  max-width: 75%;
-  padding: 10px 14px;
-  border-radius: 14px;
+  max-width: 78%;
+  padding: 11px 14px;
+  border-radius: 16px;
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -1291,52 +1463,80 @@ video {
 
 .rafiq-msg.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
   color: white;
-  border-radius: 14px 14px 4px 14px;
+  border-radius: 16px 16px 5px 16px;
 }
 
 .rafiq-msg.assistant {
   align-self: flex-start;
-  background: var(--panel-2);
-  border-radius: 14px 14px 14px 4px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px 16px 16px 5px;
+  color: #e2e8f0;
 }
 
-.rafiq-suggestions {
+.ziyo-composer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(8, 13, 24, 0.88);
+  box-shadow: 0 12px 40px rgba(2, 6, 23, 0.35);
 }
 
-.rafiq-suggestion {
-  width: auto;
-  padding: 8px 14px;
-  font-size: 12.5px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-}
-
-.rafiq-suggestion:hover {
-  border-color: var(--blue);
-  color: var(--text);
-}
-
-.rafiq-page form {
-  flex-direction: row;
-}
-
-.rafiq-page form input {
+.ziyo-composer input {
   flex: 1;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+  padding: 12px 0 !important;
+  margin: 0 !important;
 }
 
-.rafiq-page form button {
-  width: auto;
-  padding: 12px 20px;
+.ziyo-composer input::placeholder {
+  color: #64748b;
+}
+
+.ziyo-composer button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #38bdf8, #2563eb);
+  color: #041018;
+  flex-shrink: 0;
+}
+
+.ziyo-composer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ziyo-composer button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ziyo-error {
+  margin: 0;
+}
+
+.ziyo-avatar-photo {
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #020617;
 }
 
 /* ---------- Global floating AI button + popup ---------- */
+.ziyo-fab,
 .rafiq-fab {
   position: fixed;
   top: 20px;
@@ -1344,16 +1544,24 @@ video {
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  gap: 10px;
+  background: rgba(8, 15, 30, 0.88);
   color: white;
-  border: none;
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 999px;
-  padding: 10px 18px 10px 12px;
+  padding: 7px 16px 7px 7px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 10px 28px rgba(14, 165, 233, 0.28);
+}
+
+.ziyo-fab.is-listening {
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.28), 0 10px 28px rgba(14, 165, 233, 0.35);
+}
+
+.ziyo-fab.is-off {
+  filter: grayscale(0.4) brightness(0.9);
 }
 
 .rafiq-header-wrap {
@@ -1362,44 +1570,80 @@ video {
   gap: 6px;
 }
 
+.ziyo-header-chip,
 .rafiq-header-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: none;
+  border: 1px solid rgba(56, 189, 248, 0.28);
   border-radius: 999px;
-  padding: 9px 16px 9px 12px;
+  padding: 5px 12px 5px 5px;
   font-family: "Syne", "Poppins", sans-serif;
-  font-size: 13.5px;
-  font-weight: 700;
   color: #fff;
   cursor: pointer;
-  background: linear-gradient(135deg, #2563eb, #7c3aed 70%, #a855f7);
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
-  transition: transform 0.15s ease, filter 0.15s ease;
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(37, 99, 235, 0.18)),
+    rgba(8, 15, 30, 0.85);
+  box-shadow: 0 8px 22px rgba(14, 165, 233, 0.22);
+  transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
+.ziyo-header-chip:hover,
 .rafiq-header-chip:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06);
+  border-color: rgba(125, 211, 252, 0.55);
 }
 
-.rafiq-header-chip.is-listening {
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.35), 0 8px 24px rgba(124, 58, 237, 0.45);
+.ziyo-header-chip.is-listening {
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.28), 0 8px 22px rgba(14, 165, 233, 0.3);
 }
 
-.rafiq-header-chip.is-off {
-  filter: grayscale(0.35) brightness(0.9);
+.ziyo-header-chip.is-off {
+  filter: grayscale(0.35) brightness(0.92);
 }
 
-.rafiq-header-icon {
-  font-size: 15px;
-  line-height: 1;
+.ziyo-header-avatar {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
 
+.ziyo-header-pulse {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.7);
+  animation: ziyo-pulse 1.4s ease-out infinite;
+}
+
+@keyframes ziyo-pulse {
+  0% { transform: scale(0.92); opacity: 0.9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.ziyo-header-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.ziyo-header-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ziyo-header-copy small {
+  font-size: 10px;
+  color: #93c5fd;
+  font-weight: 500;
+}
+
+.ziyo-header-mic,
 .rafiq-header-mic {
-  height: 34px;
-  min-width: 40px;
+  height: 36px;
+  min-width: 42px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   background: rgba(15, 23, 42, 0.55);
@@ -1411,10 +1655,58 @@ video {
   padding: 0 10px;
 }
 
+.ziyo-header-mic.is-on {
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.galaxy-shell-day .ziyo-header-mic,
 .galaxy-shell-day .rafiq-header-mic {
   background: rgba(255, 255, 255, 0.65);
   color: #0f172a;
   border-color: rgba(14, 116, 144, 0.22);
+}
+
+.galaxy-shell-day .ziyo-brand,
+.galaxy-shell-day .ziyo-hero h1 {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .ziyo-hero p {
+  color: #475569;
+}
+
+.galaxy-shell-day .ziyo-chip,
+.galaxy-shell-day .ziyo-composer,
+.galaxy-shell-day .ziyo-log,
+.galaxy-shell-day .rafiq-log {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .ziyo-composer input {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .rafiq-msg.assistant {
+  background: rgba(241, 245, 249, 0.95);
+  color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .ziyo-page {
+    min-height: calc(100vh - 120px);
+  }
+
+  .ziyo-hero-visual {
+    width: min(260px, 72vw);
+  }
+
+  .ziyo-chip {
+    font-size: 0.84rem;
+    padding: 9px 12px;
+  }
 }
 
 
