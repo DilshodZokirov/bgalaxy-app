@@ -935,9 +935,22 @@ export default function Chat() {
                 </div>
                 <div className="chat-room-bar-actions">
                   {activeKind === "channel" && activeChannel && (
-                    <button type="button" className="secondary chat-soft-btn" onClick={toggleMembersPanel}>
-                      Aʼzolar
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="chat-cta chat-soft-btn"
+                        onClick={() => {
+                          loadChannelMembers();
+                          setShowMembersPanel(false);
+                          setShowAddMembers(true);
+                        }}
+                      >
+                        + Aʼzo
+                      </button>
+                      <button type="button" className="secondary chat-soft-btn" onClick={toggleMembersPanel}>
+                        Aʼzolar
+                      </button>
+                    </>
                   )}
                   {activeKind === "direct" && activeConversation && (
                     <button type="button" className="secondary chat-soft-btn" onClick={toggleDmMembersPanel}>
