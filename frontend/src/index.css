@@ -2169,13 +2169,25 @@ video {
 }
 
 /* ---------- Cosmic Dashboard (viqorli hub) ---------- */
-.galaxy-shell {
+/* Night (oy): biroz oqroq, yumshoq oy nuri */
+.galaxy-shell,
+.galaxy-shell-night {
   background:
-    radial-gradient(ellipse 70% 50% at 15% 15%, rgba(109, 40, 217, 0.38), transparent 55%),
-    radial-gradient(ellipse 60% 45% at 85% 10%, rgba(29, 78, 216, 0.32), transparent 50%),
-    radial-gradient(ellipse 55% 40% at 70% 85%, rgba(8, 47, 73, 0.55), transparent 55%),
-    radial-gradient(ellipse 40% 30% at 30% 75%, rgba(76, 29, 149, 0.25), transparent 50%),
-    #020617;
+    radial-gradient(ellipse 65% 45% at 18% 12%, rgba(186, 170, 255, 0.34), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 82% 18%, rgba(147, 197, 253, 0.28), transparent 52%),
+    radial-gradient(ellipse 50% 35% at 70% 80%, rgba(226, 232, 240, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 30% 70%, rgba(165, 180, 252, 0.18), transparent 50%),
+    linear-gradient(180deg, #1e293b 0%, #334155 42%, #475569 100%);
+}
+
+/* Day (quyosh): quyoshli osmon */
+.galaxy-shell-day {
+  background:
+    radial-gradient(ellipse 50% 40% at 85% 12%, rgba(254, 243, 199, 0.95), transparent 50%),
+    radial-gradient(ellipse 60% 45% at 20% 20%, rgba(125, 211, 252, 0.55), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(254, 215, 170, 0.45), transparent 50%),
+    linear-gradient(180deg, #38bdf8 0%, #7dd3fc 38%, #bae6fd 68%, #fed7aa 100%);
+  color: #0f172a;
 }
 
 .galaxy-shell .sidebar {
@@ -2200,6 +2212,207 @@ video {
   background: linear-gradient(135deg, rgba(91, 33, 182, 0.95), rgba(37, 99, 235, 0.9));
   box-shadow: 0 0 22px rgba(139, 92, 246, 0.45);
   border-color: rgba(196, 181, 253, 0.25);
+}
+
+
+.galaxy-sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.dashboard-galaxy > *:not(.galaxy-sky) {
+  position: relative;
+  z-index: 1;
+}
+
+.galaxy-sky-sun {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  right: 8%;
+  top: 6%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbeb, #fde047 35%, #f59e0b 70%, transparent 72%);
+  box-shadow: 0 0 80px rgba(250, 204, 21, 0.75), 0 0 160px rgba(251, 146, 60, 0.45);
+  animation: orbit-pulse 6s ease-in-out infinite;
+}
+
+.galaxy-sky-ray {
+  position: absolute;
+  right: 10%;
+  top: 8%;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.28), transparent 20%, transparent 50%, rgba(254, 243, 199, 0.2), transparent 70%);
+  animation: orbit-spin 28s linear infinite;
+  mix-blend-mode: screen;
+}
+
+.galaxy-sky-ray.r2 {
+  width: 300px;
+  height: 300px;
+  right: 4%;
+  top: 2%;
+  animation-duration: 40s;
+  animation-direction: reverse;
+  opacity: 0.55;
+}
+
+.galaxy-sky-cloud {
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  filter: blur(2px);
+  box-shadow:
+    28px 8px 0 -4px rgba(255, 255, 255, 0.45),
+    -24px 10px 0 -6px rgba(255, 255, 255, 0.4);
+  animation: dust-drift 10s ease-in-out infinite;
+}
+
+.galaxy-sky-cloud.c1 { width: 120px; height: 36px; left: 12%; top: 18%; }
+.galaxy-sky-cloud.c2 { width: 160px; height: 42px; left: 40%; top: 28%; animation-delay: 1.2s; opacity: 0.8; }
+.galaxy-sky-cloud.c3 { width: 100px; height: 30px; right: 28%; top: 40%; animation-delay: 0.6s; }
+
+.galaxy-sky-flare {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0.55;
+}
+.galaxy-sky-flare.f1 {
+  width: 220px; height: 220px; left: -40px; bottom: 10%;
+  background: rgba(251, 146, 60, 0.45);
+}
+.galaxy-sky-flare.f2 {
+  width: 180px; height: 180px; right: 20%; bottom: 0;
+  background: rgba(56, 189, 248, 0.35);
+}
+
+.galaxy-sky-moon {
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  right: 10%;
+  top: 8%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, #f8fafc, #e2e8f0 40%, #cbd5e1 70%),
+    #e2e8f0;
+  box-shadow:
+    0 0 40px rgba(248, 250, 252, 0.55),
+    0 0 90px rgba(186, 230, 253, 0.35),
+    inset -14px -8px 0 rgba(148, 163, 184, 0.25);
+}
+
+.galaxy-sky-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(36px);
+  pointer-events: none;
+}
+.galaxy-sky-glow.g1 {
+  width: 280px; height: 280px; left: 8%; top: 10%;
+  background: rgba(199, 210, 254, 0.35);
+}
+.galaxy-sky-glow.g2 {
+  width: 240px; height: 240px; right: 12%; top: 30%;
+  background: rgba(224, 231, 255, 0.28);
+}
+.galaxy-sky-glow.g3 {
+  width: 300px; height: 220px; left: 30%; bottom: 8%;
+  background: rgba(241, 245, 249, 0.18);
+}
+
+.galaxy-sky-mist {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 35%;
+  background: linear-gradient(180deg, transparent, rgba(248, 250, 252, 0.18));
+}
+
+.galaxy-shell-day .sidebar {
+  background: rgba(255, 255, 255, 0.45);
+  border-right: 1px solid rgba(14, 116, 144, 0.18);
+  box-shadow: 0 0 40px rgba(14, 165, 233, 0.12);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .sidebar-link {
+  color: #334155;
+}
+
+.galaxy-shell-day .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.55);
+  color: #0f172a;
+  border-color: rgba(14, 165, 233, 0.2);
+}
+
+.galaxy-shell-day .sidebar-link.active {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  box-shadow: 0 0 18px rgba(14, 165, 233, 0.35);
+}
+
+.galaxy-shell-day .sidebar-footer .name { color: #0f172a; }
+.galaxy-shell-day .sidebar-footer .role { color: #64748b; }
+.galaxy-shell-day .logo,
+.galaxy-shell-day .logo-sub { color: #0f172a; }
+
+.galaxy-shell-day .galaxy-top h1 { color: #0f172a; }
+.galaxy-shell-day .galaxy-top p { color: #334155; }
+
+.galaxy-shell-day .galaxy-search,
+.galaxy-shell-day .galaxy-icon-btn,
+.galaxy-shell-day .galaxy-stat,
+.galaxy-shell-day .galaxy-quote,
+.galaxy-shell-day .galaxy-panel {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(14, 116, 144, 0.18);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .galaxy-search input { color: #0f172a; }
+.galaxy-shell-day .galaxy-search input::placeholder { color: #64748b; }
+.galaxy-shell-day .galaxy-search kbd {
+  color: #475569;
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(100, 116, 139, 0.25);
+}
+
+.galaxy-shell-day .galaxy-points {
+  background: linear-gradient(145deg, rgba(253, 224, 71, 0.45), rgba(255, 255, 255, 0.65));
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.3);
+}
+.galaxy-shell-day .galaxy-points span { color: #b45309; }
+.galaxy-shell-day .galaxy-points strong { color: #0f172a; }
+
+.galaxy-shell-day .galaxy-stat-label,
+.galaxy-shell-day .muted { color: #475569; }
+.galaxy-shell-day .galaxy-stat-value { color: #0f172a; }
+.galaxy-shell-day .galaxy-quote p { color: #0f172a; }
+.galaxy-shell-day .galaxy-quote span { color: #0369a1; }
+
+.galaxy-shell-day .orbit-nebula.n1 {
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.35), rgba(251, 191, 36, 0.12) 50%, transparent 70%);
+}
+.galaxy-shell-day .orbit-nebula.n2 {
+  background: radial-gradient(circle, rgba(253, 224, 71, 0.28), transparent 70%);
+}
+.galaxy-shell-day .orbit-ring {
+  border-color: rgba(14, 116, 144, 0.28);
+}
+.galaxy-shell-day .orbit-planet-label {
+  color: #0f172a;
+  text-shadow: 0 1px 6px rgba(255, 255, 255, 0.8);
+}
+
+.galaxy-shell-night .galaxy-main,
+.galaxy-shell-night .dashboard-galaxy {
+  color: #f8fafc;
 }
 
 .galaxy-main {

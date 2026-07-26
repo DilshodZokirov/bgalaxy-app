@@ -20,7 +20,7 @@ function polar(angleDeg, radiusPct) {
   };
 }
 
-function Starfield() {
+function Starfield({ mode }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -28,11 +28,12 @@ function Starfield() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     let raf = 0;
-    const stars = Array.from({ length: 160 }, () => ({
+    const count = mode === "day" ? 40 : 160;
+    const stars = Array.from({ length: count }, () => ({
       x: Math.random(),
       y: Math.random(),
-      r: Math.random() * 1.4 + 0.2,
-      a: Math.random() * 0.7 + 0.2,
+      r: Math.random() * (mode === "day" ? 1.1 : 1.4) + 0.2,
+      a: Math.random() * (mode === "day" ? 0.35 : 0.7) + (mode === "day" ? 0.08 : 0.2),
       s: Math.random() * 0.25 + 0.05,
     }));
 
@@ -52,8 +53,9 @@ function Starfield() {
       ctx.clearRect(0, 0, w, h);
       for (const star of stars) {
         const twinkle = 0.55 + Math.sin(t * 0.002 * star.s + star.x * 20) * 0.45;
+        const color = mode === "day" ? `rgba(255,255,255,${star.a * twinkle})` : `rgba(241,245,249,${star.a * twinkle})`;
         ctx.beginPath();
-        ctx.fillStyle = `rgba(226,232,240,${star.a * twinkle})`;
+        ctx.fillStyle = color;
         ctx.arc(star.x * w, star.y * h, star.r, 0, Math.PI * 2);
         ctx.fill();
       }
@@ -67,17 +69,17 @@ function Starfield() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [mode]);
 
   return <canvas ref={ref} className="orbit-starfield" aria-hidden />;
 }
 
-export default function GalaxyOrbitHub({ companyName }) {
+export default function GalaxyOrbitHub({ companyName, skyMode = "night" }) {
   const navigate = useNavigate();
 
   return (
-    <div className="orbit-hub" aria-label="Business Galaxy navigatsiya">
-      <Starfield />
+    <div className={`orbit-hub orbit-hub-${skyMode}`} aria-label="Business Galaxy navigatsiya">
+      <Starfield mode={skyMode} />
 
       <div className="orbit-nebula n1" />
       <div className="orbit-nebula n2" />

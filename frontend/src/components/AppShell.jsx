@@ -8,11 +8,18 @@ import ComplaintButton from "./ComplaintButton";
 import SettingsPopup from "./SettingsPopup";
 import { useAuth } from "../hooks/useAuth";
 
-export default function AppShell({ children, variant }) {
+export default function AppShell({ children, variant, skyMode }) {
   const { user, refreshUser } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
-  const shellClass = variant === "galaxy" ? "app-shell galaxy-shell" : "app-shell";
-  const mainClass = variant === "galaxy" ? "main-content galaxy-main" : "main-content";
+  const isGalaxy = variant === "galaxy";
+  const shellClass = [
+    "app-shell",
+    isGalaxy ? "galaxy-shell" : "",
+    isGalaxy && skyMode ? `galaxy-shell-${skyMode}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const mainClass = isGalaxy ? "main-content galaxy-main" : "main-content";
 
   return (
     <div className={shellClass}>
@@ -21,8 +28,8 @@ export default function AppShell({ children, variant }) {
         <EmailVerifyBanner />
         {children}
       </main>
-      <ThemeToggleButton />
-      <NotificationBell />
+      {!isGalaxy && <ThemeToggleButton />}
+      {!isGalaxy && <NotificationBell />}
       <RafiqFloatingButton />
       <ComplaintButton />
       {showSettings && (
