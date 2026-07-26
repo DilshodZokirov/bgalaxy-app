@@ -188,7 +188,13 @@ export default function PartnerCall() {
               </div>
             )}
 
-            <UserSearchInput selected={null} onSelect={addPartner} onClear={() => {}} />
+            <UserSearchInput
+              selected={null}
+              onSelect={addPartner}
+              onClear={() => {}}
+              disabledIds={addPartners.map((p) => p.id)}
+              disabledLabel="Allaqachon tanlangan"
+            />
             {addError && <p className="error">{addError}</p>}
             <button
               type="button"

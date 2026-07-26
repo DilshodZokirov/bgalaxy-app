@@ -385,7 +385,13 @@ export default function MeetingsHub() {
               </div>
             )}
 
-            <UserSearchInput selected={null} onSelect={addPartner} onClear={() => {}} />
+            <UserSearchInput
+              selected={null}
+              onSelect={addPartner}
+              onClear={() => {}}
+              disabledIds={partners.map((p) => p.id)}
+              disabledLabel="Allaqachon tanlangan"
+            />
             {error && <p className="error">{error}</p>}
             <button
               type="button"

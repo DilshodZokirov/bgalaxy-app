@@ -1,11 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 
-export default function UserSearchInput({ onSelect, selected, onClear }) {
+export default function UserSearchInput({
+  onSelect,
+  selected,
+  onClear,
+  disabledIds = [],
+  disabledLabel = "Allaqachon a'zo",
+  placeholder = "Ism yoki email yozing...",
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
   const debounceRef = useRef(null);
+  const blocked = useMemo(() => new Set((disabledIds || []).map(String)), [disabledIds]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -29,29 +37,13 @@ export default function UserSearchInput({ onSelect, selected, onClear }) {
 
   if (selected) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          background: "var(--panel-2)",
-          borderRadius: "var(--radius-sm)",
-          padding: "10px 12px",
-        }}
-      >
-        <div className="avatar-circle" style={{ width: 28, height: 28, fontSize: 11 }}>
-          {selected.full_name.slice(0, 2).toUpperCase()}
+      <div className="user-search-selected">
+        <div className="avatar-circle user-search-avatar">{selected.full_name.slice(0, 2).toUpperCase()}</div>
+        <div className="user-search-selected-copy">
+          <div className="user-search-name">{selected.full_name}</div>
+          <div className="user-search-email">{selected.email}</div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13.5 }}>{selected.full_name}</div>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{selected.email}</div>
-        </div>
-        <button
-          type="button"
-          className="secondary"
-          style={{ width: "auto", padding: "5px 10px", fontSize: 12 }}
-          onClick={onClear}
-        >
+        <button type="button" className="secondary user-search-change" onClick={onClear}>
           O'zgartirish
         </button>
       </div>
@@ -59,46 +51,46 @@ export default function UserSearchInput({ onSelect, selected, onClear }) {
   }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="user-search">
       <input
         type="text"
-        placeholder="Ism yoki email yozing..."
+        placeholder={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
       {query.trim() && (
-        <div
-          style={{
-            marginTop: 4,
-            background: "var(--panel-2)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            overflow: "hidden",
-          }}
-        >
+        <div className="user-search-dropdown">
           {results.length > 0
-            ? results.map((u) => (
-                <div
-                  key={u.id}
-                  onClick={() => {
-                    onSelect(u);
-                    setQuery("");
-                    setResults([]);
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    fontSize: 13.5,
-                    cursor: "pointer",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                  onMouseDown={(e) => e.preventDefault()}
-                >
-                  <div>{u.full_name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{u.email}</div>
-                </div>
-              ))
+            ? results.map((u) => {
+                const isDisabled = blocked.has(String(u.id));
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className={`user-search-option ${isDisabled ? "is-disabled" : ""}`}
+                    disabled={isDisabled}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      onSelect(u);
+                      setQuery("");
+                      setResults([]);
+                    }}
+                  >
+                    <div className="user-search-option-main">
+                      <div className="user-search-name">{u.full_name}</div>
+                      <div className="user-search-email">{u.email}</div>
+                    </div>
+                    {isDisabled ? (
+                      <span className="user-search-badge">{disabledLabel}</span>
+                    ) : (
+                      <span className="user-search-add">+</span>
+                    )}
+                  </button>
+                );
+              })
             : searched && (
-                <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--text-dim)" }}>
+                <div className="user-search-empty">
                   Hech narsa topilmadi — bu email BG (Business Galaxy)'da ro'yxatdan o'tmagan.
                 </div>
               )}

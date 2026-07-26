@@ -26,17 +26,13 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId,
     if (!companyId) return;
     api
       .getMembers(companyId)
-      .then((list) =>
-        setTeammates(
-          list.filter((m) => m.approved !== false && !excluded.has(String(m.user_id || m.id))),
-        ),
-      )
+      .then((list) => setTeammates(list.filter((m) => m.approved !== false)))
       .catch(() => setTeammates([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
   function add(u) {
     const id = u.id || u.user_id;
+    if (excluded.has(String(id))) return;
     setPicked((prev) => (prev.some((p) => String(p.id) === String(id)) ? prev : [...prev, { id, full_name: u.full_name, email: u.email }]));
     setInfo(null);
     setError(null);
@@ -44,8 +40,6 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId,
   function remove(id) {
     setPicked((prev) => prev.filter((p) => String(p.id) !== String(id)));
   }
-
-  const availableTeammates = teammates.filter((m) => !picked.some((p) => String(p.id) === String(m.user_id || m.id)));
 
   return (
     <div className="chat-modal-backdrop" onClick={onClose}>
@@ -58,15 +52,24 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId,
         </div>
         <p className="chat-modal-hint">Kompaniya aʼzosini tanlang yoki ism/email bo‘yicha qidiring.</p>
 
-        {availableTeammates.length > 0 && (
+        {teammates.length > 0 && (
           <div className="chat-teammate-list">
-            {availableTeammates.slice(0, 8).map((m) => {
+            {teammates.slice(0, 12).map((m) => {
               const id = m.user_id || m.id;
+              const alreadyIn = excluded.has(String(id));
+              const alreadyPicked = picked.some((p) => String(p.id) === String(id));
+              const disabled = alreadyIn || alreadyPicked;
               return (
-                <button key={id} type="button" className="chat-teammate-item" onClick={() => add(m)}>
+                <button
+                  key={id}
+                  type="button"
+                  className={`chat-teammate-item ${disabled ? "is-disabled" : ""}`}
+                  disabled={disabled}
+                  onClick={() => add(m)}
+                >
                   <span className="avatar-circle chat-mini-avatar">{(m.full_name || "?").slice(0, 2).toUpperCase()}</span>
                   <span>{m.full_name}</span>
-                  <strong>+</strong>
+                  {alreadyIn ? <em>Kanalda</em> : alreadyPicked ? <em>Tanlandi</em> : <strong>+</strong>}
                 </button>
               );
             })}
@@ -85,7 +88,13 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose, companyId,
             ))}
           </div>
         )}
-        <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+        <UserSearchInput
+          selected={null}
+          onSelect={add}
+          onClear={() => {}}
+          disabledIds={[...excludeIds, ...picked.map((p) => p.id)]}
+          disabledLabel="Allaqachon kanalda"
+        />
         {error && <p className="error">{error}</p>}
         {info && <p className="chat-success-msg">{info}</p>}
         <button
@@ -208,7 +217,13 @@ function NewChannelModal({ onClose, onConfirm }) {
               ))}
             </div>
           )}
-          <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+          <UserSearchInput
+            selected={null}
+            onSelect={add}
+            onClear={() => {}}
+            disabledIds={picked.map((p) => p.id)}
+            disabledLabel="Allaqachon tanlangan"
+          />
           {error && <p className="error">{error}</p>}
           <button type="submit" className="chat-cta">
             Kanal yaratish
@@ -270,7 +285,13 @@ function NewConversationModal({ onClose, onStart }) {
             ))}
           </div>
         )}
-        <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
+        <UserSearchInput
+          selected={null}
+          onSelect={add}
+          onClear={() => {}}
+          disabledIds={picked.map((p) => p.id)}
+          disabledLabel="Allaqachon tanlangan"
+        />
         {error && <p className="error">{error}</p>}
         <button type="button" className="chat-cta" disabled={picked.length === 0 || starting} onClick={handleStart}>
           {starting ? "Boshlanmoqda..." : "Yangi chat yaratish"}
