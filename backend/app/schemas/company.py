@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -20,6 +21,7 @@ class CompanyOut(BaseModel):
     company_type: str = "kompaniya"
     has_warehouse: bool = False
     warehouse_type: str | None = None
+    created_at: datetime | None = None
 
     class Config:
         from_attributes = True
