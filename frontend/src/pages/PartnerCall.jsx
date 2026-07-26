@@ -6,6 +6,16 @@ import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
 
+function PartnerHeading({ title = "Hamkorlar uchrashuvi" }) {
+  return (
+    <div className="galaxy-page-heading">
+      <p className="galaxy-page-kicker">Partner Call</p>
+      <h1>{title}</h1>
+      <p>BG foydalanuvchilari bilan chegara yo‘q video uchrashuv.</p>
+    </div>
+  );
+}
+
 export default function PartnerCall() {
   const { roomName } = useParams();
   const navigate = useNavigate();
@@ -64,8 +74,11 @@ export default function PartnerCall() {
     setAdding(true);
     setAddError(null);
     try {
-      const res = await api.addToPartnerMeeting(roomName, addPartners.map((p) => p.id));
-      setAddedMsg(`✓ ${res.added.join(", ")} taklif qilindi.`);
+      const res = await api.addToPartnerMeeting(
+        roomName,
+        addPartners.map((p) => p.id)
+      );
+      setAddedMsg(`${res.added.join(", ")} taklif qilindi.`);
       setAddPartners([]);
       setTimeout(() => setAddedMsg(null), 4000);
     } catch (err) {
@@ -77,10 +90,15 @@ export default function PartnerCall() {
 
   if (error) {
     return (
-      <AppShell>
-        <div className="empty-card">
-          <p className="error">{error}</p>
-          <button onClick={() => navigate("/meetings")}>Ortga</button>
+      <AppShell topLeft={<PartnerHeading title="Ulanish xatosi" />}>
+        <div className="meetings-page">
+          <section className="meetings-lobby">
+            <h2>Uchrashuvga ulanib bo‘lmadi</h2>
+            <p className="error">{error}</p>
+            <button type="button" className="meetings-cta" onClick={() => navigate("/meetings")}>
+              Uchrashuvlar markazi
+            </button>
+          </section>
         </div>
       </AppShell>
     );
@@ -88,51 +106,27 @@ export default function PartnerCall() {
 
   if (!connection) {
     return (
-      <AppShell>
-        <div className="page-header">
-          <h1>Uchrashuvga ulanmoqda...</h1>
+      <AppShell topLeft={<PartnerHeading title="Ulanmoqda..." />}>
+        <div className="meetings-page">
+          <section className="meetings-lobby">
+            <div className="meetings-lobby-mark partner" aria-hidden>
+              H
+            </div>
+            <h2>Uchrashuvga ulanmoqda</h2>
+            <p>LiveKit xonasiga ulanish tayyorlanmoqda...</p>
+          </section>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <div style={{ height: "100vh", position: "relative" }} data-lk-theme="default">
-      <button
-        className="secondary"
-        style={{
-          position: "fixed",
-          top: 16,
-          right: 16,
-          zIndex: 60,
-          width: "auto",
-          padding: "8px 14px",
-          fontSize: 12.5,
-        }}
-        onClick={() => setShowAdd(true)}
-      >
-        ➕ Odam qo'shish
+    <div className="meetings-call-shell" data-lk-theme="default">
+      <button type="button" className="meetings-call-add" onClick={() => setShowAdd(true)}>
+        Odam qo‘shish
       </button>
 
-      {addedMsg && (
-        <div
-          style={{
-            position: "fixed",
-            top: 16,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 60,
-            background: "var(--panel)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 16px",
-            fontSize: 12.5,
-            color: "var(--green)",
-          }}
-        >
-          {addedMsg}
-        </div>
-      )}
+      {addedMsg && <div className="meetings-toast">{addedMsg}</div>}
 
       <LiveKitRoom
         serverUrl={connection.url}
@@ -140,85 +134,48 @@ export default function PartnerCall() {
         connect={true}
         video={true}
         audio={true}
-        onDisconnected={() => navigate("/dashboard")}
+        onDisconnected={() => navigate("/meetings")}
         style={{ height: "100%" }}
       >
         <VideoConference />
       </LiveKitRoom>
 
       {isHost && participants.length > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            top: 70,
-            right: 16,
-            width: 260,
-            background: "var(--panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            padding: 14,
-            zIndex: 50,
-            maxHeight: "60vh",
-            overflowY: "auto",
-          }}
-        >
-          <strong style={{ fontSize: 12.5, display: "block", marginBottom: 10 }}>👑 Ishtirokchilarni boshqarish</strong>
+        <aside className="meetings-host-panel">
+          <strong>Ishtirokchilar</strong>
           {participants.map((p) => (
-            <div key={p.identity} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12 }}>{p.name}</span>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "audio", true)} title="Ovozini o'chirish">🔇</button>
-                <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "video", true)} title="Kamerasini o'chirish">📷</button>
+            <div key={p.identity} className="meetings-host-row">
+              <span>{p.name}</span>
+              <div className="meetings-host-actions">
+                <button type="button" className="secondary" onClick={() => handleMute(p.identity, "audio", true)} title="Ovozni o‘chirish">
+                  Mic
+                </button>
+                <button type="button" className="secondary" onClick={() => handleMute(p.identity, "video", true)} title="Kamerani o‘chirish">
+                  Cam
+                </button>
               </div>
             </div>
           ))}
-        </div>
+        </aside>
       )}
 
       {showAdd && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 70,
-            padding: 20,
-          }}
-          onClick={() => setShowAdd(false)}
-        >
-          <div className="card" style={{ maxWidth: 380, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h3 style={{ fontSize: 16, margin: 0 }}>Uchrashuvga odam qo'shish</h3>
-              <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={() => setShowAdd(false)}>
-                ✕
+        <div className="meetings-modal-backdrop" onClick={() => setShowAdd(false)}>
+          <div className="card meetings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="meetings-modal-head">
+              <h3>Uchrashuvga odam qo‘shish</h3>
+              <button type="button" className="secondary meetings-soft-btn" onClick={() => setShowAdd(false)}>
+                Yopish
               </button>
             </div>
 
             {addPartners.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              <div className="meetings-chip-row">
                 {addPartners.map((p) => (
-                  <span
-                    key={p.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: "var(--panel-2)",
-                      borderRadius: 999,
-                      padding: "5px 6px 5px 12px",
-                      fontSize: 12.5,
-                    }}
-                  >
+                  <span key={p.id} className="meetings-chip">
                     {p.full_name}
-                    <button
-                      type="button"
-                      onClick={() => removePartner(p.id)}
-                      style={{ width: 18, height: 18, padding: 0, borderRadius: "50%", background: "var(--border)", fontSize: 11, lineHeight: 1 }}
-                    >
-                      ✕
+                    <button type="button" onClick={() => removePartner(p.id)} aria-label="Olib tashlash">
+                      ×
                     </button>
                   </span>
                 ))}
@@ -227,8 +184,13 @@ export default function PartnerCall() {
 
             <UserSearchInput selected={null} onSelect={addPartner} onClear={() => {}} />
             {addError && <p className="error">{addError}</p>}
-            <button onClick={handleAddPartners} disabled={addPartners.length === 0 || adding}>
-              {adding ? "Qo'shilmoqda..." : "Taklif qilish"}
+            <button
+              type="button"
+              className="meetings-cta"
+              onClick={handleAddPartners}
+              disabled={addPartners.length === 0 || adding}
+            >
+              {adding ? "Qo‘shilmoqda..." : "Taklif qilish"}
             </button>
           </div>
         </div>
