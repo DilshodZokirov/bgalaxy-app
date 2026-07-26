@@ -313,6 +313,59 @@ function TaskCharts({ data, period, setPeriod, chartType, setChartType }) {
   );
 }
 
+const MONTH_UZ = [
+  "Yanvar",
+  "Fevral",
+  "Mart",
+  "Aprel",
+  "May",
+  "Iyun",
+  "Iyul",
+  "Avgust",
+  "Sentabr",
+  "Oktabr",
+  "Noyabr",
+  "Dekabr",
+];
+
+function formatChampionMonth(monthKey) {
+  if (!monthKey) return "O'tgan oy";
+  const [y, m] = String(monthKey).split("-");
+  const idx = Number(m) - 1;
+  if (!y || Number.isNaN(idx) || idx < 0 || idx > 11) return "O'tgan oy";
+  return `${MONTH_UZ[idx]} ${y}`;
+}
+
+function PrevMonthChampion({ champion }) {
+  if (!champion) return null;
+  const initials = champion.full_name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <div className="st-champion" role="status">
+      <div className="st-champion-avatar" aria-hidden>
+        {champion.avatar_url ? <img src={champion.avatar_url} alt="" /> : <span>{initials}</span>}
+      </div>
+      <div className="st-champion-copy">
+        <span className="st-champion-kicker">O'tgan oyning eng faol ishchisi · {formatChampionMonth(champion.month)}</span>
+        <strong>{champion.full_name}</strong>
+        <em>{champion.role_name || "Lavozimsiz"}</em>
+      </div>
+      <div className="st-champion-stats">
+        <span className="good">{champion.accepted}✓</span>
+        <span className="bad">{champion.rejected}✕</span>
+        <strong className={champion.score >= 0 ? "good" : "bad"}>
+          {champion.score > 0 ? `+${champion.score}` : champion.score}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
 function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
   const trend = useMemo(
     () => (data.financial_trend || []).map((row) => ({ ...row, label: row.month })),
@@ -399,6 +452,7 @@ export default function Analytics() {
   const [finChartType, setFinChartType] = useState("3d");
   const [selectedMember, setSelectedMember] = useState(null);
   const [detailPeriod, setDetailPeriod] = useState("month");
+  const [champion, setChampion] = useState(null);
 
   function openMember(member, periodKey) {
     setDetailPeriod(periodKey);
@@ -423,6 +477,14 @@ export default function Analytics() {
         else setError(err.message);
       });
   }, [company, taskPeriod, perfPeriod, finPeriod]);
+
+  useEffect(() => {
+    if (!company) {
+      setChampion(null);
+      return;
+    }
+    api.getMonthlyChampion(company.id).then(setChampion).catch(() => setChampion(null));
+  }, [company]);
 
   const kpis = useMemo(() => {
     if (!data) return null;
@@ -604,6 +666,8 @@ export default function Analytics() {
             )}
 
             {tab === "team" && (
+              <>
+              <PrevMonthChampion champion={champion} />
               <div className="st-grid">
                 <section className="wh-panel st-panel-rise">
                   <div className="wh-panel-head">
@@ -662,6 +726,7 @@ export default function Analytics() {
                   )}
                 </section>
               </div>
+              </>
             )}
 
             {tab === "finance" && (
