@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,12 +13,14 @@ router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 class ComplaintCreate(BaseModel):
     message: str
+    contact_email: EmailStr
     path: str | None = None
 
 
 class ComplaintOut(BaseModel):
     id: str
     message: str
+    contact_email: str
     path: str | None
     status: str
     user_email: str
@@ -39,7 +41,17 @@ async def submit_complaint(
 ):
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="Xabar bo'sh bo'lmasin")
-    db.add(Complaint(user_id=current_user.id, message=payload.message.strip()[:4000], path=payload.path))
+    contact_email = str(payload.contact_email).strip().lower()
+    if not contact_email:
+        raise HTTPException(status_code=400, detail="Email manzilini kiriting")
+    db.add(
+        Complaint(
+            user_id=current_user.id,
+            message=payload.message.strip()[:4000],
+            contact_email=contact_email[:255],
+            path=payload.path,
+        )
+    )
     await db.commit()
 
 
@@ -66,6 +78,7 @@ async def list_complaints(
         ComplaintOut(
             id=str(c.id),
             message=c.message,
+            contact_email=c.contact_email or u.email,
             path=c.path,
             status=c.status,
             user_email=u.email,

@@ -33,8 +33,11 @@ export const api = {
   getDevelopers: () => request("/developers"),
   grantDeveloper: (email) => request("/developers/grant", { method: "POST", body: { email } }),
   revokeDeveloper: (userId) => request(`/developers/${userId}`, { method: "DELETE" }),
-  submitComplaint: (message, path) =>
-    request("/complaints", { method: "POST", body: { message, path } }),
+  submitComplaint: (message, path, contactEmail) =>
+    request("/complaints", {
+      method: "POST",
+      body: { message, path, contact_email: contactEmail },
+    }),
   getComplaints: (params = {}) => request(`/complaints?${new URLSearchParams(params)}`),
   resolveComplaint: (id) => request(`/complaints/${id}/resolve`, { method: "PATCH" }),
   register: (data) => request("/auth/register", { method: "POST", body: data, auth: false }),

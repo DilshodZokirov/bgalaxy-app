@@ -117,11 +117,31 @@ function ComplaintsTab() {
               <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: "auto" }}>{new Date(c.created_at).toLocaleString("uz-UZ")}</span>
             </div>
             <div style={{ fontSize: 13.5, margin: "6px 0" }}>{c.message}</div>
-            <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>👤 {c.user_full_name} ({c.user_email})</div>
+            <div style={{ fontSize: 12.5, marginBottom: 4 }}>
+              📧 Javob uchun:{" "}
+              <a href={`mailto:${c.contact_email || c.user_email}`} style={{ color: "var(--cyan, #22d3ee)", fontWeight: 600 }}>
+                {c.contact_email || c.user_email}
+              </a>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>
+              👤 {c.user_full_name}
+              {c.user_email && c.contact_email && c.user_email !== c.contact_email
+                ? ` · akkaunt: ${c.user_email}`
+                : ""}
+            </div>
             {c.status === "open" && (
-              <button style={{ width: "auto", padding: "5px 12px", fontSize: 11.5, marginTop: 8 }} onClick={() => handleResolve(c.id)}>
-                ✓ Hal qilindi deb belgilash
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <a
+                  className="secondary"
+                  href={`mailto:${c.contact_email || c.user_email}?subject=${encodeURIComponent("BG shikoyat javobi")}&body=${encodeURIComponent(`Salom ${c.user_full_name},\n\n`)}`}
+                  style={{ width: "auto", padding: "5px 12px", fontSize: 11.5, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                >
+                  Email yozish
+                </a>
+                <button style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => handleResolve(c.id)}>
+                  ✓ Hal qilindi deb belgilash
+                </button>
+              </div>
             )}
           </div>
         ))}
