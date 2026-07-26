@@ -116,7 +116,8 @@ export default function NotificationBell({ variant = "fixed" }) {
     }
     setOpen(false);
     if (n.company_id) setActiveCompanyId(n.company_id);
-    navigate("/group-meeting");
+    const q = n.invite_token ? `?scheduled=${encodeURIComponent(n.invite_token)}` : "";
+    navigate(`/group-meeting${q}`);
   }
 
   async function handleOpenMeetingsHub(n) {

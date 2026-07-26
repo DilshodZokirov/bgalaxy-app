@@ -11,6 +11,12 @@ class ScheduledMeetingCreate(BaseModel):
     starts_at: datetime
 
 
+class ScheduledMeetingUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    starts_at: datetime | None = None
+
+
 class ScheduledMeetingOut(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID

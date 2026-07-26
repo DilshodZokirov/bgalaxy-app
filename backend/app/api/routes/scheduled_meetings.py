@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -10,10 +10,16 @@ from app.models.company import Company, TeamMembership
 from app.models.notification import Notification
 from app.models.scheduled_meeting import ScheduledMeeting
 from app.models.user import User
-from app.schemas.scheduled_meeting import ScheduledMeetingCreate, ScheduledMeetingOut
+from app.schemas.scheduled_meeting import (
+    ScheduledMeetingCreate,
+    ScheduledMeetingOut,
+    ScheduledMeetingUpdate,
+)
 from app.services.notify import ping_notifications
 
 router = APIRouter(prefix="/scheduled-meetings", tags=["scheduled-meetings"])
+
+VISIBLE_STATUSES = ("scheduled", "notified")
 
 
 async def _require_company_member(db: AsyncSession, company_id, user_id) -> None:
@@ -51,7 +57,7 @@ async def list_my_scheduled_meetings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upcoming + recently notified meetings for companies the user belongs to."""
+    """Active upcoming meetings for companies the user belongs to."""
     memberships = await db.execute(
         select(TeamMembership.company_id).where(
             TeamMembership.user_id == current_user.id,
@@ -62,17 +68,11 @@ async def list_my_scheduled_meetings(
     if not company_ids:
         return []
 
-    now = datetime.now(timezone.utc)
-    # Show scheduled future ones + notified ones from the last 6 hours
     result = await db.execute(
         select(ScheduledMeeting)
         .where(
             ScheduledMeeting.company_id.in_(company_ids),
-            ScheduledMeeting.status != "cancelled",
-            or_(
-                ScheduledMeeting.status == "scheduled",
-                ScheduledMeeting.starts_at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
-            ),
+            ScheduledMeeting.status.in_(VISIBLE_STATUSES),
         )
         .order_by(ScheduledMeeting.starts_at.asc())
     )
@@ -110,7 +110,6 @@ async def create_scheduled_meeting(
     db.add(meeting)
     await db.flush()
 
-    # Let teammates know a meeting was booked
     members_result = await db.execute(
         select(TeamMembership.user_id).where(
             TeamMembership.company_id == payload.company_id,
@@ -143,6 +142,48 @@ async def create_scheduled_meeting(
     return await _to_out(db, meeting)
 
 
+@router.patch("/{meeting_id}", response_model=ScheduledMeetingOut)
+async def update_scheduled_meeting(
+    meeting_id: str,
+    payload: ScheduledMeetingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(ScheduledMeeting).where(ScheduledMeeting.id == meeting_id))
+    meeting = result.scalar_one_or_none()
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="Uchrashuv topilmadi")
+    if str(meeting.created_by) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Faqat yaratuvchi o‘zgartira oladi")
+    if meeting.status not in VISIBLE_STATUSES:
+        raise HTTPException(status_code=400, detail="Bu uchrashuvni endi o‘zgartirib bo‘lmaydi")
+
+    if payload.title is not None:
+        title = payload.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Sarlavha kiriting")
+        meeting.title = title
+
+    if payload.description is not None:
+        meeting.description = payload.description.strip()
+
+    if payload.starts_at is not None:
+        starts_at = payload.starts_at
+        if starts_at.tzinfo is None:
+            starts_at = starts_at.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if starts_at <= now:
+            raise HTTPException(status_code=400, detail="Uchrashuv vaqti kelajakda bo‘lishi kerak")
+        meeting.starts_at = starts_at
+        # Reschedule → wait for notifier again.
+        meeting.status = "scheduled"
+        meeting.notified_at = None
+
+    await db.commit()
+    await db.refresh(meeting)
+    return await _to_out(db, meeting)
+
+
 @router.delete("/{meeting_id}", status_code=204)
 async def cancel_scheduled_meeting(
     meeting_id: str,
@@ -155,6 +196,8 @@ async def cancel_scheduled_meeting(
         raise HTTPException(status_code=404, detail="Uchrashuv topilmadi")
     if str(meeting.created_by) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Faqat yaratuvchi bekor qila oladi")
+    if meeting.status not in VISIBLE_STATUSES:
+        raise HTTPException(status_code=400, detail="Bu uchrashuv allaqachon yopilgan")
     meeting.status = "cancelled"
     await db.commit()
 
