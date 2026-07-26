@@ -257,170 +257,137 @@ export default function VirtualOffice() {
     setIncomingPrompt(null);
   }
 
+
+  const officeHeading = (
+    <div className="galaxy-page-heading">
+      <p className="galaxy-page-kicker">3D Metaverse</p>
+      <h1>Virtual Ofis{company ? ` — ${company.name}` : ""}</h1>
+      <p>
+        {company
+          ? "3D xonada yuring — jamoa a’zolari real vaqtda ko‘rinadi va eshitiladi."
+          : "Avval kompaniya yarating — keyin virtual ofisingiz ochiladi."}
+      </p>
+    </div>
+  );
+
   if (!company) {
     return (
-      <AppShell>
-        <div className="page-header">
-          <h1>Virtual Ofis</h1>
-        </div>
-        <div className="empty-card">
-          <p>Virtual ofisni ko'rish uchun avval kompaniya yarating.</p>
-          <button onClick={() => navigate("/companies")}>+ Kompaniya yaratish</button>
+      <AppShell topLeft={officeHeading}>
+        <div className="office-page">
+          <div className="empty-card office-empty">
+            <p>Virtual ofisni ko‘rish uchun avval kompaniya yarating.</p>
+            <button className="office-cta" onClick={() => navigate("/companies")}>
+              + Kompaniya yaratish
+            </button>
+          </div>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell>
-      <div className="page-header">
-        <h1>Virtual Ofis — {company.name}</h1>
-        <p>
-          3D xonada yuring — jamoangizning boshqa a'zolari ham shu paytda xonada bo'lsa, real-vaqtda ko'rinadi va bir-biringizni eshitasiz.
-        </p>
-      </div>
-
-      <div ref={audioContainerRef} style={{ display: "none" }} />
-
-      <div className="office-3d-wrap" ref={wrapRef} onContextMenu={handleRightClick}>
-        <OfficeScene3D zoom={zoom} companyId={company.id} paused={paused} />
-        <div className="office-3d-controls">
-          <button
-            onClick={toggleMic}
-            title={micOn ? "Mikrofonni o'chirish" : "Mikrofonni yoqish"}
-            style={voiceStatus !== "connected" ? { opacity: 0.5 } : undefined}
-          >
-            {micOn ? "🎤" : "🔇"}
-          </button>
-          <button onClick={zoomIn} title="Yaqinlashtirish">➕</button>
-          <button onClick={zoomOut} title="Uzoqlashtirish">➖</button>
-          <button onClick={enterFullscreen} title="To'liq ekran (Enter)" style={{ display: isFullscreen ? "none" : undefined }}>⛶</button>
-          <button onClick={() => setPaused((p) => !p)} title={`Pauza (${keybinds.pause.toUpperCase()})`}>
-            {paused ? "▶️" : "⏸️"}
-          </button>
-          <button
-            onClick={() =>
-              setShowComms((v) => {
-                const next = !v;
-                if (next) setPaused(true);
-                return next;
-              })
-            }
-            title="Telefon bo'limi (E)"
-            style={{ position: "relative" }}
-          >
-            📱
-            {officeUnread > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  background: "#f87171",
-                  color: "white",
-                  borderRadius: "50%",
-                  width: 16,
-                  height: 16,
-                  fontSize: 9.5,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {officeUnread}
-              </span>
-            )}
-            {hasActiveCall && (
-              <span style={{ position: "absolute", bottom: -2, right: -2, width: 9, height: 9, borderRadius: "50%", background: "var(--green)" }} />
-            )}
-          </button>
+    <AppShell topLeft={officeHeading}>
+      <div className="office-page">
+        <div className="office-status-row">
+          <span className={`office-voice-pill is-${voiceStatus}`}>
+            {voiceStatus === "connected" && "🎙️ Ovozli chat ulangan"}
+            {voiceStatus === "connecting" && "🎙️ Ulanmoqda..."}
+            {voiceStatus === "error" && "⚠️ Ovozli chat sozlanmagan"}
+            {voiceStatus === "off" && "🔇 Ovoz o‘chiq"}
+          </span>
+          <span className="office-status-hint">O‘ng tugma yoki {keybinds.phone.toUpperCase()} — telefon paneli</span>
         </div>
-        {hintVisible && (
-          <div className="office-3d-hint">
-            🖱️ Sichqoncha bilan qarang · ⌨️ WASD — yurish · M — mikrofon · +/− kattalashtirish · {keybinds.fullscreen} — to'liq ekran · {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
-            {voiceStatus === "connecting" && " · 🎙️ Ovozli chatga ulanmoqda..."}
-            {voiceStatus === "error" && " · ⚠️ Ovozli chat sozlanmagan"}
-          </div>
-        )}
 
-        {!isFullscreen && (
-          <div
-            onClick={enterFullscreen}
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(5, 7, 12, 0.7)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              zIndex: 20,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 700,
-                color: "white",
-                background: "var(--gradient)",
-                padding: "18px 36px",
-                borderRadius: 16,
-              }}
+        <div ref={audioContainerRef} className="office-audio-sink" />
+
+        <div className="office-3d-wrap office-3d-wrap-galaxy" ref={wrapRef} onContextMenu={handleRightClick}>
+          <OfficeScene3D zoom={zoom} companyId={company.id} paused={paused} />
+          <div className="office-3d-controls">
+            <button
+              onClick={toggleMic}
+              title={micOn ? "Mikrofonni o'chirish" : "Mikrofonni yoqish"}
+              className={voiceStatus !== "connected" ? "is-dim" : undefined}
             >
-              ⏎ Enter tugmasini bosing
+              {micOn ? "🎤" : "🔇"}
+            </button>
+            <button onClick={zoomIn} title="Yaqinlashtirish">➕</button>
+            <button onClick={zoomOut} title="Uzoqlashtirish">➖</button>
+            <button
+              onClick={enterFullscreen}
+              title="To'liq ekran (Enter)"
+              className={isFullscreen ? "is-hidden" : undefined}
+            >
+              ⛶
+            </button>
+            <button onClick={() => setPaused((p) => !p)} title={`Pauza (${keybinds.pause.toUpperCase()})`}>
+              {paused ? "▶️" : "⏸️"}
+            </button>
+            <button
+              className="office-phone-btn"
+              onClick={() =>
+                setShowComms((v) => {
+                  const next = !v;
+                  if (next) setPaused(true);
+                  return next;
+                })
+              }
+              title="Telefon bo'limi (E)"
+            >
+              📱
+              {officeUnread > 0 && <span className="office-unread-badge">{officeUnread}</span>}
+              {hasActiveCall && <span className="office-call-dot" />}
+            </button>
+          </div>
+
+          {hintVisible && (
+            <div className="office-3d-hint">
+              🖱️ Sichqoncha · WASD — yurish · M — mikrofon · +/− zoom · {keybinds.fullscreen} — fullscreen ·{" "}
+              {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
+              {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
+              {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
             </div>
-          </div>
-        )}
+          )}
 
-        {isFullscreen && paused && (
-          <div
-            style={{
-              position: "absolute",
-              top: 24,
-              left: "50%",
-              transform: "translateX(-50%)",
-              fontSize: 26,
-              fontWeight: 800,
-              letterSpacing: 4,
-              color: "white",
-              background: "rgba(0,0,0,0.5)",
-              padding: "8px 28px",
-              borderRadius: 999,
-              zIndex: 20,
-              pointerEvents: "none",
-            }}
-          >
-            ⏸ PAUSE
-          </div>
-        )}
+          {!isFullscreen && (
+            <button type="button" className="office-enter-gate" onClick={enterFullscreen}>
+              <span className="office-enter-card">⏎ Enter tugmasini bosing</span>
+            </button>
+          )}
 
-        <OfficeCommsPanel
-          companyId={company.id}
-          open={showComms}
-          onOpenChange={setShowComms}
-          incomingCall={acceptedCall}
-          onIncomingHandled={() => setAcceptedCall(null)}
-          onUnreadChange={setOfficeUnread}
-          onCallStateChange={setHasActiveCall}
-          keybinds={keybinds}
-          onKeybindChange={updateKeybind}
-          callSignal={callSignal}
-          onBeforeRecording={pauseOfficeMicForRecording}
-          onAfterRecording={resumeOfficeMicAfterRecording}
-        />
+          {isFullscreen && paused && <div className="office-pause-badge">⏸ PAUSE</div>}
 
-        {incomingPrompt && (
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 90 }}>
-            <div className="card" style={{ maxWidth: 320, textAlign: "center" }}>
-              <div style={{ fontSize: 30, marginBottom: 10 }}>📞</div>
-              <p style={{ fontSize: 14, marginBottom: 18 }}><strong>{incomingPrompt.callerName}</strong> qo'ng'iroq qilmoqda...</p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={handleAcceptIncoming}>✅ Qabul qilish</button>
-                <button className="secondary" style={{ color: "#f87171" }} onClick={handleRejectIncoming}>❌ Rad etish</button>
+          <OfficeCommsPanel
+            companyId={company.id}
+            open={showComms}
+            onOpenChange={setShowComms}
+            incomingCall={acceptedCall}
+            onIncomingHandled={() => setAcceptedCall(null)}
+            onUnreadChange={setOfficeUnread}
+            onCallStateChange={setHasActiveCall}
+            keybinds={keybinds}
+            onKeybindChange={updateKeybind}
+            callSignal={callSignal}
+            onBeforeRecording={pauseOfficeMicForRecording}
+            onAfterRecording={resumeOfficeMicAfterRecording}
+          />
+
+          {incomingPrompt && (
+            <div className="office-incoming-backdrop">
+              <div className="card office-incoming-card">
+                <div className="office-incoming-icon">📞</div>
+                <p>
+                  <strong>{incomingPrompt.callerName}</strong> qo‘ng‘iroq qilmoqda...
+                </p>
+                <div className="office-incoming-actions">
+                  <button onClick={handleAcceptIncoming}>✅ Qabul qilish</button>
+                  <button className="secondary office-reject-btn" onClick={handleRejectIncoming}>
+                    ❌ Rad etish
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </AppShell>
   );
