@@ -6,6 +6,7 @@ import { pickActiveCompany } from "../hooks/useCompany";
 import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
+import GalaxySkyBackdrop from "../components/GalaxySkyBackdrop";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
@@ -68,8 +69,10 @@ function StatGlass({ label, value, delta, color, series }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshUser, lockScreen } = useAuth();
   const navigate = useNavigate();
+  const theme = user?.theme || "dark";
+  const skyMode = theme === "light" ? "day" : "night";
   const [company, setCompany] = useState(null);
   const [companyCount, setCompanyCount] = useState(0);
   const [loadingCompany, setLoadingCompany] = useState(true);
@@ -114,9 +117,20 @@ export default function Dashboard() {
   const chatSeries = [5, 9, 7, 14, 18, 16, Math.max(conversationCount, 3)];
   const points = (memberCount * 120 + channelCount * 40 + 12450).toLocaleString("en-US");
 
+  async function toggleSky() {
+    const next = theme === "dark" ? "light" : "dark";
+    try {
+      await api.updateProfile({ theme: next });
+      await refreshUser();
+    } catch {
+      // ignore
+    }
+  }
+
   return (
-    <AppShell variant="galaxy">
-      <div className="dashboard-galaxy">
+    <AppShell variant="galaxy" skyMode={skyMode}>
+      <div className={`dashboard-galaxy sky-${skyMode}`}>
+        <GalaxySkyBackdrop mode={skyMode} />
         <header className="galaxy-top">
           <div className="galaxy-top-left">
             <h1>Xush kelibsiz, {firstName}! 👋</h1>
@@ -130,11 +144,22 @@ export default function Dashboard() {
           </label>
 
           <div className="galaxy-top-right">
+            {user?.has_pin && (
+              <button type="button" className="galaxy-icon-btn" title="Ekranni qulflash" onClick={lockScreen}>
+                🔒
+              </button>
+            )}
+            <button
+              type="button"
+              className="galaxy-icon-btn galaxy-sky-toggle"
+              title={skyMode === "night" ? "Quyoshli fonga o'tish" : "Oylik fonga o'tish"}
+              onClick={toggleSky}
+            >
+              {skyMode === "night" ? "🌙" : "☀️"}
+            </button>
             <button type="button" className="galaxy-icon-btn" title="Bildirishnomalar" aria-label="Bildirishnomalar">
               🔔<span className="galaxy-badge">3</span>
             </button>
-            <button type="button" className="galaxy-icon-btn" title="Kalendar" aria-label="Kalendar">📅</button>
-            <button type="button" className="galaxy-icon-btn" title="Yordam" aria-label="Yordam">❓</button>
             <div className="galaxy-points">
               <span>BG Points</span>
               <strong>{points}</strong>
@@ -143,7 +168,7 @@ export default function Dashboard() {
         </header>
 
         <section className="galaxy-stage">
-          <GalaxyOrbitHub companyName={company?.name} />
+          <GalaxyOrbitHub companyName={company?.name} skyMode={skyMode} />
         </section>
 
         <section className="galaxy-stats">
