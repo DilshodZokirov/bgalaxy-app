@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
 import { getActiveCompanyId, setActiveCompanyId } from "../hooks/useCompany";
 import Logo from "./Logo";
+import RafiqAvatar from "./RafiqAvatar";
 
 const NAV_ITEMS = [
   { icon: "🌌", label: "Galaxy Home", hint: "Bosh sahifa", to: "/dashboard" },
@@ -12,7 +13,7 @@ const NAV_ITEMS = [
   { icon: "🎥", label: "Online Meeting", hint: "Meet & Connect", to: "/meetings" },
   { icon: "💬", label: "Chat", hint: "Messages", to: "/chat" },
   { icon: "🗂️", label: "Vazifalar", hint: "Jira-style board", to: "/tasks" },
-  { icon: "🤖", imageIcon: "/ziyo-icon.png", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
+  { icon: "ziyo", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
 
 export default function Sidebar({ onOpenSettings, variant = "default" }) {
@@ -130,8 +131,8 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
               title={collapsed ? item.label : undefined}
             >
               <span className="sidebar-link-icon">
-                {item.imageIcon ? (
-                  <img src={item.imageIcon} alt="" className="sidebar-ziyo-icon" />
+                {item.icon === "ziyo" ? (
+                  <RafiqAvatar size={16} variant="svg" />
                 ) : (
                   item.icon
                 )}

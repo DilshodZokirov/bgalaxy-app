@@ -3747,13 +3747,11 @@ video {
   justify-content: center;
 }
 
-.sidebar-ziyo-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
+.sidebar-link-icon .ziyo-avatar-svg,
+.sidebar-link-icon .ziyo-avatar-photo {
+  width: 16px !important;
+  height: 16px !important;
   display: block;
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
 }
 
 .sidebar-link-copy {
