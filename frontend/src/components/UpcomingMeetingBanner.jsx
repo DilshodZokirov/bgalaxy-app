@@ -30,8 +30,8 @@ export default function UpcomingMeetingBanner() {
   const next = pickNextMeeting(meetings);
   if (!next || next.id === hiddenId) return null;
 
-  // On Meetings hub we already show the full cards — keep a slim reminder only.
-  const slim = location.pathname.startsWith("/meetings");
+  // Meetings hub already lists full scheduled cards — avoid a second copy there.
+  if (location.pathname.startsWith("/meetings")) return null;
 
   function join() {
     if (next.company_id) setActiveCompanyId(next.company_id);
@@ -39,17 +39,15 @@ export default function UpcomingMeetingBanner() {
   }
 
   return (
-    <div className={`upcoming-meeting-banner ${slim ? "slim" : ""} ${next.status === "notified" ? "is-due" : ""}`}>
+    <div className={`upcoming-meeting-banner ${next.status === "notified" ? "is-due" : ""}`}>
       <div className="upcoming-meeting-banner-copy">
         <span className="upcoming-meeting-kicker">Keyingi uchrashuv</span>
         <strong>{next.title}</strong>
-        {!slim && (
-          <p>
-            {formatMeetingWhen(next.starts_at)}
-            {next.company_name ? ` · ${next.company_name}` : ""}
-            {next.description ? ` — ${next.description}` : ""}
-          </p>
-        )}
+        <p>
+          {formatMeetingWhen(next.starts_at)}
+          {next.company_name ? ` · ${next.company_name}` : ""}
+          {next.description ? ` — ${next.description}` : ""}
+        </p>
       </div>
 
       <CountdownBadge startsAt={next.starts_at} compact onDue={refresh} />
