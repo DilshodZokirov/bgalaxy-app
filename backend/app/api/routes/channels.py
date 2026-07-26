@@ -96,7 +96,26 @@ async def list_channels(
             .select_from(ChatChannelMember)
             .where(ChatChannelMember.channel_id == ch.id, ChatChannelMember.approved == True)  # noqa: E712
         )
-        out.append(ChannelOut.model_validate(ch, from_attributes=True).model_copy(update={"member_count": count_result.scalar_one()}))
+        last_result = await db.execute(
+            select(Message)
+            .where(Message.channel_id == ch.id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        last_msg = last_result.scalar_one_or_none()
+        last_message = None
+        if last_msg is not None:
+            last_message = "Xabar o'chirildi" if last_msg.deleted else (last_msg.content or "")
+        out.append(
+            ChannelOut.model_validate(ch, from_attributes=True).model_copy(
+                update={
+                    "member_count": count_result.scalar_one(),
+                    "last_message": last_message,
+                    "last_message_at": last_msg.created_at if last_msg else None,
+                }
+            )
+        )
+    out.sort(key=lambda c: c.last_message_at or c.created_at, reverse=True)
     return out
 
 

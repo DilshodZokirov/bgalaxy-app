@@ -5,6 +5,7 @@ import { pickActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
+import { formatChatTime, isChatUnread, markChatRead, seedChatRead } from "../components/chatUnread";
 
 const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 function isImage(fileName) {
@@ -25,21 +26,22 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
   }
 
   return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }}
-      onClick={onClose}
-    >
-      <div className="card" style={{ maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>{title}</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="chat-modal-backdrop" onClick={onClose}>
+      <div className="card chat-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-modal-head">
+          <h3>{title}</h3>
+          <button type="button" className="secondary chat-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
         </div>
         {picked.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          <div className="chat-chip-row">
             {picked.map((p) => (
-              <span key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel-2)", borderRadius: 999, padding: "5px 6px 5px 12px", fontSize: 12.5 }}>
+              <span key={p.id} className="chat-chip">
                 {p.full_name}
-                <button type="button" onClick={() => remove(p.id)} style={{ width: 18, height: 18, padding: 0, borderRadius: "50%", background: "var(--border)", fontSize: 11, lineHeight: 1 }}>✕</button>
+                <button type="button" onClick={() => remove(p.id)} aria-label="Olib tashlash">
+                  ×
+                </button>
               </span>
             ))}
           </div>
@@ -47,6 +49,8 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
         <UserSearchInput selected={null} onSelect={add} onClear={() => {}} />
         {error && <p className="error">{error}</p>}
         <button
+          type="button"
+          className="chat-cta"
           disabled={picked.length === 0}
           onClick={async () => {
             setError(null);
@@ -59,6 +63,52 @@ function MemberPickerModal({ title, confirmLabel, onConfirm, onClose }) {
         >
           {confirmLabel}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function RenameChannelModal({ currentName, onClose, onConfirm }) {
+  const [name, setName] = useState(currentName || "");
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const next = name.trim();
+    if (!next || next === currentName) {
+      onClose();
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await onConfirm(next);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="chat-modal-backdrop" onClick={onClose}>
+      <div className="card chat-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-modal-head">
+          <h3>Kanal nomini o‘zgartirish</h3>
+          <button type="button" className="secondary chat-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <label>Yangi nom</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+          {error && <p className="error">{error}</p>}
+          <button type="submit" className="chat-cta" disabled={saving || !name.trim()}>
+            {saving ? "Saqlanmoqda..." : "Saqlash"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -343,12 +393,28 @@ export default function Chat() {
   const [dmMembers, setDmMembers] = useState([]);
   const [showDmMembersPanel, setShowDmMembersPanel] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [showRename, setShowRename] = useState(false);
+  const [unreadTick, setUnreadTick] = useState(0);
 
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const membersPanelRef = useRef(null);
+
+  function bumpUnread() {
+    setUnreadTick((n) => n + 1);
+  }
+
+  function markActiveRead(at) {
+    if (activeKind === "channel" && activeChannelId) {
+      markChatRead("channel", activeChannelId, at);
+      bumpUnread();
+    } else if (activeKind === "direct" && activeConversationId) {
+      markChatRead("direct", activeConversationId, at);
+      bumpUnread();
+    }
+  }
 
   useEffect(() => {
     if (params.companyId) {
@@ -361,7 +427,9 @@ export default function Chat() {
   function refreshChannels() {
     if (!companyId) return;
     api.getChannels(companyId).then((list) => {
+      list.forEach((c) => seedChatRead("channel", c.id, c.last_message_at));
       setChannels(list);
+      bumpUnread();
       if (!activeChannelId && !activeConversationId && list.length > 0) {
         setActiveKind("channel");
         setActiveChannelId(list[0].id);
@@ -372,12 +440,26 @@ export default function Chat() {
   function refreshConversations() {
     api
       .getConversations()
-      .then((list) => setConversations(list.filter((c) => c.channel !== "office")))
+      .then((list) => {
+        const chats = list.filter((c) => c.channel !== "office");
+        chats.forEach((c) => seedChatRead("direct", c.id, c.last_message_at));
+        setConversations(chats);
+        bumpUnread();
+      })
       .catch(() => {});
   }
 
   useEffect(refreshChannels, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(refreshConversations, []);
+
+  // Keep dock unread badges fresh while other chats receive messages.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshChannels();
+      refreshConversations();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (params.channelId) {
@@ -408,11 +490,19 @@ export default function Chat() {
     const id = activeKind === "channel" ? activeChannelId : activeConversationId;
     if (!id) return;
 
-    if (activeKind === "channel") {
-      api.getMessages(id).then(setMessages).catch(() => setMessages([]));
-    } else {
-      api.getDirectMessages(id).then(setMessages).catch(() => setMessages([]));
-    }
+    const kind = activeKind === "channel" ? "channel" : "direct";
+    markChatRead(kind, id);
+    bumpUnread();
+
+    const load = activeKind === "channel" ? api.getMessages(id) : api.getDirectMessages(id);
+    load
+      .then((list) => {
+        setMessages(list);
+        const last = list[list.length - 1];
+        markChatRead(kind, id, last?.created_at || new Date().toISOString());
+        bumpUnread();
+      })
+      .catch(() => setMessages([]));
 
     const path = activeKind === "channel" ? `/ws/chat/${id}` : `/ws/direct/${id}`;
     const socket = new WebSocket(wsUrl(path));
@@ -424,11 +514,15 @@ export default function Chat() {
         setMessages((prev) => prev.map((m) => (m.id === data.id ? { ...m, deleted: true, content: "Xabar o'chirildi" } : m)));
       } else {
         setMessages((prev) => [...prev, data]);
+        markChatRead(kind, id, data.created_at || new Date().toISOString());
+        bumpUnread();
+        if (kind === "direct") refreshConversations();
+        else refreshChannels();
       }
     };
     socketRef.current = socket;
     return () => socket.close();
-  }, [activeKind, activeChannelId, activeConversationId]);
+  }, [activeKind, activeChannelId, activeConversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -483,16 +577,10 @@ export default function Chat() {
     }
   }
 
-  async function handleRenameChannel() {
+  async function handleRenameChannel(newName) {
     if (!activeChannel) return;
-    const newName = window.prompt("Kanalning yangi nomi:", activeChannel.name);
-    if (!newName || !newName.trim() || newName.trim() === activeChannel.name) return;
-    try {
-      await api.renameChannel(companyId, activeChannel.id, newName.trim());
-      refreshChannels();
-    } catch {
-      // ignore
-    }
+    await api.renameChannel(companyId, activeChannel.id, newName);
+    refreshChannels();
   }
 
   async function handleDeleteConversation() {
@@ -570,6 +658,7 @@ export default function Chat() {
       setDraft("");
       setReplyTo(null);
       setMentionCandidates([]);
+      markActiveRead();
     } else {
       if (!draft.trim() && !file) return;
       try {
@@ -577,6 +666,7 @@ export default function Chat() {
         setDraft("");
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
+        markActiveRead();
         refreshConversations();
       } catch {
         // ignore
@@ -669,35 +759,54 @@ export default function Chat() {
       ? activeConversation.participants.map((p) => p.full_name).join(", ")
       : "Maxfiy chat";
 
+  const headerHint =
+    activeKind === "channel"
+      ? activeChannel?.last_message
+        ? activeChannel.last_message
+        : "Kanalda jamoa bilan yozing — #bilan eslatish mumkin."
+      : activeConversation?.last_message
+      ? activeConversation.last_message
+      : "Maxfiy parallel suhbat — fayl yuborish mumkin.";
+
+  void unreadTick;
   const liveChats = [
     ...channels.map((c) => ({
       key: `ch-${c.id}`,
       kind: "channel",
       id: c.id,
       label: `#${c.name}`,
+      preview: c.last_message || "",
       active: activeKind === "channel" && c.id === activeChannelId,
+      unread: isChatUnread("channel", c.id, c.last_message_at),
     })),
     ...conversations.map((c) => ({
       key: `dm-${c.id}`,
       kind: "direct",
       id: c.id,
       label: c.participants.map((p) => p.full_name).join(", ") || "Suhbat",
+      preview: c.last_message || "",
       active: activeKind === "direct" && c.id === activeConversationId,
+      unread: isChatUnread("direct", c.id, c.last_message_at),
     })),
   ];
+
+  const unreadTotal = liveChats.filter((c) => c.unread && !c.active).length;
 
   return (
     <AppShell>
       <div className="chat-workspace">
         <div className="chat-workspace-head">
           <div>
-            <p className="chat-kicker">Live Chat</p>
+            <p className="chat-kicker">Live Chat Hub</p>
             <h1>{headerTitle}</h1>
-            <p>Bir nechta chat parallel ochiq — pastki qatordan tanlang yoki yangisini yarating.</p>
+            <p className="chat-head-preview">{headerHint}</p>
           </div>
-          <button type="button" className="chat-cta" onClick={() => setShowLauncher(true)}>
-            Chatlar / Yangi
-          </button>
+          <div className="chat-head-actions">
+            {unreadTotal > 0 && <span className="chat-unread-pill">{unreadTotal} ta yangi</span>}
+            <button type="button" className="chat-cta" onClick={() => setShowLauncher(true)}>
+              Chatlar / Yangi
+            </button>
+          </div>
         </div>
 
         <div className="chat-workspace-body">
@@ -709,16 +818,27 @@ export default function Chat() {
                   +
                 </button>
               </div>
-              {channels.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`chat-side-item ${activeKind === "channel" && c.id === activeChannelId ? "active" : ""}`}
-                  onClick={() => selectChannel(c.id)}
-                >
-                  #{c.name}
-                </button>
-              ))}
+              {channels.map((c) => {
+                const unread = isChatUnread("channel", c.id, c.last_message_at);
+                const active = activeKind === "channel" && c.id === activeChannelId;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chat-side-item ${active ? "active" : ""} ${unread && !active ? "has-unread" : ""}`}
+                    onClick={() => selectChannel(c.id)}
+                  >
+                    <span className="chat-side-item-main">
+                      <span className="chat-side-item-title">#{c.name}</span>
+                      {c.last_message && <span className="chat-side-item-preview">{c.last_message}</span>}
+                    </span>
+                    <span className="chat-side-item-meta">
+                      {c.last_message_at && <span>{formatChatTime(c.last_message_at)}</span>}
+                      {unread && !active && <i className="chat-unread-dot" aria-label="O‘qilmagan" />}
+                    </span>
+                  </button>
+                );
+              })}
               {!channels.length && <p className="chat-side-empty">Kanal yo‘q</p>}
             </div>
 
@@ -729,196 +849,290 @@ export default function Chat() {
                   +
                 </button>
               </div>
-              {conversations.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`chat-side-item ${activeKind === "direct" && c.id === activeConversationId ? "active" : ""}`}
-                  onClick={() => selectConversation(c.id)}
-                >
-                  {c.participants.map((p) => p.full_name).join(", ") || "Suhbat"}
-                </button>
-              ))}
+              {conversations.map((c) => {
+                const unread = isChatUnread("direct", c.id, c.last_message_at);
+                const active = activeKind === "direct" && c.id === activeConversationId;
+                const title = c.participants.map((p) => p.full_name).join(", ") || "Suhbat";
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chat-side-item ${active ? "active" : ""} ${unread && !active ? "has-unread" : ""}`}
+                    onClick={() => selectConversation(c.id)}
+                  >
+                    <span className="chat-side-item-main">
+                      <span className="chat-side-item-title">{title}</span>
+                      {c.last_message && <span className="chat-side-item-preview">{c.last_message}</span>}
+                    </span>
+                    <span className="chat-side-item-meta">
+                      {c.last_message_at && <span>{formatChatTime(c.last_message_at)}</span>}
+                      {unread && !active && <i className="chat-unread-dot" aria-label="O‘qilmagan" />}
+                    </span>
+                  </button>
+                );
+              })}
               {!conversations.length && <p className="chat-side-empty">Suhbat yo‘q</p>}
             </div>
           </aside>
 
           <div className="chat-main-pane">
-          {activeKind === "channel" && activeChannel && (
-            <div ref={membersPanelRef} style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10, position: "relative" }}>
-              <button className="secondary chat-members-btn" onClick={toggleMembersPanel}>
-                👥 A'zolar ({activeChannel.member_count})
-              </button>
-              {showMembersPanel && (
-                <div className="chat-members-panel">
-                  <h4>Kanal a'zolari</h4>
-                  {channelMembers.map((m) => (
-                    <div className="chat-member-row" key={m.user_id}>
-                      <div className="avatar-circle" style={{ width: 26, height: 26, fontSize: 10.5 }}>
-                        {m.full_name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span className="name">
-                        {m.full_name}
-                        {m.user_id === activeChannel.created_by && (
-                          <span style={{ fontSize: 10.5, color: "var(--text-dim)", marginLeft: 6 }}>(egasi)</span>
-                        )}
-                      </span>
-                      {m.user_id !== user?.id && m.user_id !== activeChannel.created_by && (
-                        <button className="remove-btn" onClick={() => handleRemoveMember(m.user_id)}>Chiqarish</button>
-                      )}
-                    </div>
-                  ))}
-                  <button className="chat-members-add-btn" onClick={() => { setShowMembersPanel(false); setShowAddMembers(true); }}>
-                    + A'zo qo'shish
-                  </button>
-                  {activeChannel.created_by === user?.id && (
-                    <button className="secondary chat-members-add-btn" onClick={handleRenameChannel}>
-                      ✏️ Nomini o'zgartirish
+            {(activeChannel || activeConversation) && (
+              <div className="chat-room-bar" ref={membersPanelRef}>
+                <div className="chat-room-bar-copy">
+                  <strong>{headerTitle}</strong>
+                  <span>
+                    {activeKind === "channel"
+                      ? `${activeChannel?.member_count || 0} aʼzo`
+                      : `${activeConversation?.participants?.length || 0} ishtirokchi`}
+                  </span>
+                </div>
+                <div className="chat-room-bar-actions">
+                  {activeKind === "channel" && activeChannel && (
+                    <button type="button" className="secondary chat-soft-btn" onClick={toggleMembersPanel}>
+                      Aʼzolar
                     </button>
                   )}
-                  {activeChannel.created_by === user?.id && (
-                    <button className="secondary chat-members-add-btn" style={{ color: "#f87171" }} onClick={handleCloseChannel}>
-                      🗑️ Kanalni yopish
+                  {activeKind === "direct" && activeConversation && (
+                    <button type="button" className="secondary chat-soft-btn" onClick={toggleDmMembersPanel}>
+                      Aʼzolar
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-          )}
 
-          {activeKind === "direct" && activeConversation && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10, position: "relative" }}>
-              <button className="secondary chat-members-btn" onClick={toggleDmMembersPanel}>
-                👥 A'zolar
-              </button>
-              {showDmMembersPanel && (
-                <div className="chat-members-panel">
-                  <h4>Suhbat a'zolari</h4>
-                  {dmMembers.map((m) => (
-                    <div className="chat-member-row" key={m.user_id}>
-                      <div className="avatar-circle" style={{ width: 26, height: 26, fontSize: 10.5 }}>
-                        {m.full_name.slice(0, 2).toUpperCase()}
+                {showMembersPanel && activeChannel && (
+                  <div className="chat-members-panel">
+                    <h4>Kanal aʼzolari</h4>
+                    {channelMembers.map((m) => (
+                      <div className="chat-member-row" key={m.user_id}>
+                        <div className="avatar-circle chat-mini-avatar">{m.full_name.slice(0, 2).toUpperCase()}</div>
+                        <span className="name">
+                          {m.full_name}
+                          {m.user_id === activeChannel.created_by && <span className="chat-owner-tag">egasi</span>}
+                        </span>
+                        {m.user_id !== user?.id && m.user_id !== activeChannel.created_by && (
+                          <button type="button" className="remove-btn" onClick={() => handleRemoveMember(m.user_id)}>
+                            Chiqarish
+                          </button>
+                        )}
                       </div>
-                      <span className="name">{m.full_name}</span>
-                      <span
-                        style={{
-                          fontSize: 10.5,
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          background: m.approved ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)",
-                          color: m.approved ? "var(--green)" : "var(--orange)",
+                    ))}
+                    <button
+                      type="button"
+                      className="chat-members-add-btn"
+                      onClick={() => {
+                        setShowMembersPanel(false);
+                        setShowAddMembers(true);
+                      }}
+                    >
+                      + Aʼzo qo‘shish
+                    </button>
+                    {activeChannel.created_by === user?.id && (
+                      <button
+                        type="button"
+                        className="secondary chat-members-add-btn"
+                        onClick={() => {
+                          setShowMembersPanel(false);
+                          setShowRename(true);
                         }}
                       >
-                        {m.approved ? "Active" : "Pending"}
-                      </span>
-                    </div>
-                  ))}
-                  <button className="secondary chat-members-add-btn" style={{ color: "var(--orange)" }} onClick={handleLeaveConversation}>
-                    🚪 Chatdan chiqish
-                  </button>
-                  {activeConversation.created_by === user?.id && (
-                    <button className="secondary chat-members-add-btn" style={{ color: "#f87171" }} onClick={handleDeleteConversation}>
-                      🗑️ Suhbatni o'chirish
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="chat-page">
-            <div className="messages">
-              {messages.length === 0 && <p style={{ color: "var(--text-dim)", fontSize: 14 }}>Hali xabar yo'q — birinchi bo'lib yozing!</p>}
-              {messages.map((m) => {
-                const isMine = m.sender_id === user?.id;
-                const isEditing = editingId === m.id;
-                return (
-                  <div className={`message-row ${isMine ? "mine" : "theirs"}`} key={m.id}>
-                    {!m.deleted && (
-                      <div className="message-actions">
-                        {activeKind === "channel" && <button type="button" onClick={() => setReplyTo(m)}>↩ Javob</button>}
-                        {activeKind === "channel" && <button type="button" onClick={() => setForwardMsg(m)}>↪ Forward</button>}
-                        {isMine && (
-                          <button type="button" onClick={() => { setEditingId(m.id); setEditDraft(m.content || ""); }}>✏️</button>
-                        )}
-                        {isMine && <button type="button" onClick={() => handleDelete(m.id)}>🗑️</button>}
-                      </div>
+                        Nomini o‘zgartirish
+                      </button>
                     )}
-                    <div className="message-bubble">
-                      {m.forwarded_from && <span className="forwarded-label">↪ Forwarded from {m.forwarded_from}</span>}
-                      {!isMine && <span className="sender">{m.sender_name || "Foydalanuvchi"}</span>}
-                      {m.reply_to_id && (
-                        <div className="reply-quote"><strong>{m.reply_sender_name}</strong>: {m.reply_preview}</div>
-                      )}
-                      {isEditing ? (
-                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                          <input value={editDraft} onChange={(e) => setEditDraft(e.target.value)} style={{ fontSize: 13.5 }} />
-                          <button type="button" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handleSaveEdit(m.id)}>Saqlash</button>
-                          <button type="button" className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => setEditingId(null)}>Bekor</button>
-                        </div>
-                      ) : (
-                        <div className="dm-file-bubble">
-                          {m.content}
-                          {m.file_url && isImage(m.file_name) && (
-                            <img
-                              src={`${API_BASE}${m.file_url}`}
-                              alt={m.file_name}
-                              style={{ cursor: "zoom-in" }}
-                              onClick={() => setLightboxUrl(`${API_BASE}${m.file_url}`)}
-                            />
-                          )}
-                          {m.file_url && !isImage(m.file_name) && (
-                            <a className="dm-file-link" href={`${API_BASE}${m.file_url}`} target="_blank" rel="noreferrer">📎 {m.file_name}</a>
-                          )}
-                          {m.edited && !m.deleted && <span style={{ fontSize: 10.5, color: "var(--text-dim)", marginLeft: 6 }}>(tahrirlangan)</span>}
-                        </div>
-                      )}
-                    </div>
+                    {activeChannel.created_by === user?.id && (
+                      <button type="button" className="secondary chat-members-add-btn chat-danger-btn" onClick={handleCloseChannel}>
+                        Kanalni yopish
+                      </button>
+                    )}
                   </div>
-                );
-              })}
-              <div ref={bottomRef} />
-            </div>
+                )}
 
-            {replyTo && activeKind === "channel" && (
-              <div className="reply-preview-bar">
-                <span><strong>{replyTo.sender_name}</strong>ga javob: {replyTo.content.slice(0, 60)}</span>
-                <button type="button" className="close-btn" onClick={() => setReplyTo(null)}>✕</button>
+                {showDmMembersPanel && activeConversation && (
+                  <div className="chat-members-panel">
+                    <h4>Suhbat aʼzolari</h4>
+                    {dmMembers.map((m) => (
+                      <div className="chat-member-row" key={m.user_id}>
+                        <div className="avatar-circle chat-mini-avatar">{m.full_name.slice(0, 2).toUpperCase()}</div>
+                        <span className="name">{m.full_name}</span>
+                        <span className={`chat-status-pill ${m.approved ? "ok" : "pending"}`}>
+                          {m.approved ? "Active" : "Pending"}
+                        </span>
+                      </div>
+                    ))}
+                    <button type="button" className="secondary chat-members-add-btn" onClick={handleLeaveConversation}>
+                      Chatdan chiqish
+                    </button>
+                    {activeConversation.created_by === user?.id && (
+                      <button type="button" className="secondary chat-members-add-btn chat-danger-btn" onClick={handleDeleteConversation}>
+                        Suhbatni o‘chirish
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
-            {file && activeKind === "direct" && (
-              <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 6 }}>
-                📎 {file.name} <button type="button" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ width: "auto", padding: "2px 8px", fontSize: 10.5 }}>✕</button>
-              </div>
-            )}
 
-            <div style={{ position: "relative" }}>
-              {mentionCandidates.length > 0 && (
-                <div style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 6, background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden", zIndex: 10, minWidth: 220 }}>
-                  {mentionCandidates.map((c) => (
-                    <div key={c.key} onMouseDown={(e) => { e.preventDefault(); pickMention(c); }} style={{ padding: "8px 12px", fontSize: 13, cursor: "pointer", borderBottom: "1px solid var(--border)" }}>
-                      #{c.key} <span style={{ color: "var(--text-dim)", fontSize: 11.5 }}>— {c.label}</span>
+            <div className="chat-page chat-stage">
+              <div className="messages chat-messages">
+                {messages.length === 0 && (
+                  <div className="chat-messages-empty">
+                    <strong>Suhbat bo‘sh</strong>
+                    <p>Birinchi xabarni yozing — bu yerda live oqim ochiladi.</p>
+                  </div>
+                )}
+                {messages.map((m) => {
+                  const isMine = m.sender_id === user?.id;
+                  const isEditing = editingId === m.id;
+                  return (
+                    <div className={`message-row ${isMine ? "mine" : "theirs"} ${m.deleted ? "is-deleted" : ""}`} key={m.id}>
+                      {!m.deleted && (
+                        <div className="message-actions">
+                          {activeKind === "channel" && (
+                            <button type="button" onClick={() => setReplyTo(m)}>
+                              Javob
+                            </button>
+                          )}
+                          {activeKind === "channel" && (
+                            <button type="button" onClick={() => setForwardMsg(m)}>
+                              Forward
+                            </button>
+                          )}
+                          {isMine && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(m.id);
+                                setEditDraft(m.content || "");
+                              }}
+                            >
+                              Tahrir
+                            </button>
+                          )}
+                          {isMine && (
+                            <button type="button" onClick={() => handleDelete(m.id)}>
+                              O‘chirish
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <div className="message-bubble">
+                        {m.forwarded_from && <span className="forwarded-label">Forward: {m.forwarded_from}</span>}
+                        {!isMine && <span className="sender">{m.sender_name || "Foydalanuvchi"}</span>}
+                        {m.reply_to_id && (
+                          <div className="reply-quote">
+                            <strong>{m.reply_sender_name}</strong>: {m.reply_preview}
+                          </div>
+                        )}
+                        {isEditing ? (
+                          <div className="chat-edit-row">
+                            <input value={editDraft} onChange={(e) => setEditDraft(e.target.value)} />
+                            <button type="button" className="chat-mini-btn" onClick={() => handleSaveEdit(m.id)}>
+                              Saqlash
+                            </button>
+                            <button type="button" className="secondary chat-mini-btn" onClick={() => setEditingId(null)}>
+                              Bekor
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="dm-file-bubble">
+                            {m.content}
+                            {m.file_url && isImage(m.file_name) && (
+                              <img
+                                src={`${API_BASE}${m.file_url}`}
+                                alt={m.file_name}
+                                onClick={() => setLightboxUrl(`${API_BASE}${m.file_url}`)}
+                              />
+                            )}
+                            {m.file_url && !isImage(m.file_name) && (
+                              <a className="dm-file-link" href={`${API_BASE}${m.file_url}`} target="_blank" rel="noreferrer">
+                                {m.file_name}
+                              </a>
+                            )}
+                            <div className="chat-bubble-meta">
+                              {m.edited && !m.deleted && <span>tahrirlangan</span>}
+                              {m.created_at && <span>{formatChatTime(m.created_at)}</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  );
+                })}
+                <div ref={bottomRef} />
+              </div>
+
+              {replyTo && activeKind === "channel" && (
+                <div className="reply-preview-bar">
+                  <span>
+                    <strong>{replyTo.sender_name}</strong>ga javob: {replyTo.content.slice(0, 60)}
+                  </span>
+                  <button type="button" className="close-btn" onClick={() => setReplyTo(null)}>
+                    ✕
+                  </button>
                 </div>
               )}
-              <form onSubmit={sendMessage}>
-                {activeKind === "direct" && (
-                  <>
-                    <button type="button" className="secondary dm-attach-btn" onClick={() => fileInputRef.current?.click()}>📎</button>
-                    <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                  </>
+              {file && activeKind === "direct" && (
+                <div className="chat-file-chip">
+                  <span>{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="chat-composer-wrap">
+                {mentionCandidates.length > 0 && (
+                  <div className="chat-mention-menu">
+                    {mentionCandidates.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickMention(c);
+                        }}
+                      >
+                        <strong>#{c.key}</strong>
+                        <span>{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
-                <input
-                  ref={inputRef}
-                  value={draft}
-                  onChange={handleDraftChange}
-                  placeholder={activeKind === "channel" ? "Xabar yozing... (#lavozim yoki #Ism bilan eslatish mumkin)" : "Xabar yozing..."}
-                />
-                <button type="submit">Yuborish</button>
-              </form>
+                <form className="chat-composer" onSubmit={sendMessage}>
+                  {activeKind === "direct" && (
+                    <>
+                      <button type="button" className="secondary chat-attach-btn" onClick={() => fileInputRef.current?.click()} title="Fayl">
+                        +
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        style={{ display: "none" }}
+                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      />
+                    </>
+                  )}
+                  <input
+                    ref={inputRef}
+                    value={draft}
+                    onChange={handleDraftChange}
+                    placeholder={
+                      activeKind === "channel"
+                        ? "Xabar yozing…  (#lavozim yoki #Ism)"
+                        : "Xabar yozing…"
+                    }
+                  />
+                  <button type="submit" className="chat-send-btn">
+                    Yuborish
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
           </div>
         </div>
 
@@ -928,12 +1142,13 @@ export default function Chat() {
               <button
                 key={item.key}
                 type="button"
-                className={`chat-live-chip ${item.active ? "active" : ""} ${item.kind}`}
+                className={`chat-live-chip ${item.active ? "active" : ""} ${item.kind} ${item.unread && !item.active ? "unread" : ""}`}
                 onClick={() => (item.kind === "channel" ? selectChannel(item.id) : selectConversation(item.id))}
-                title={item.label}
+                title={item.preview || item.label}
               >
                 <span className="chat-live-dot" aria-hidden />
-                <span>{item.label}</span>
+                <span className="chat-live-label">{item.label}</span>
+                {item.unread && !item.active && <i className="chat-unread-dot" />}
               </button>
             ))}
             {!liveChats.length && <span className="chat-live-empty">Hali ochiq chat yo‘q</span>}
@@ -970,6 +1185,13 @@ export default function Chat() {
       )}
       {showNewChannel && <NewChannelModal onClose={() => setShowNewChannel(false)} onConfirm={handleCreateChannel} />}
       {showNewConversation && <NewConversationModal onClose={() => setShowNewConversation(false)} onStart={handleStartConversation} />}
+      {showRename && activeChannel && (
+        <RenameChannelModal
+          currentName={activeChannel.name}
+          onClose={() => setShowRename(false)}
+          onConfirm={handleRenameChannel}
+        />
+      )}
 
       {showAddMembers && activeChannel && (
         <MemberPickerModal
