@@ -1,39 +1,31 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-import RafiqFloatingButton from "./RafiqFloatingButton";
-import NotificationBell from "./NotificationBell";
 import EmailVerifyBanner from "./EmailVerifyBanner";
-import ThemeToggleButton from "./ThemeToggleButton";
 import ComplaintButton from "./ComplaintButton";
 import SettingsPopup from "./SettingsPopup";
+import GalaxySkyBackdrop from "./GalaxySkyBackdrop";
+import GalaxyAppBar from "./GalaxyAppBar";
 import { useAuth } from "../hooks/useAuth";
 
-export default function AppShell({ children, variant, skyMode }) {
+export default function AppShell({ children, topLeft = null, hideAppBar = false }) {
   const { user, refreshUser } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
-  const isGalaxy = variant === "galaxy";
-  const shellClass = [
-    "app-shell",
-    isGalaxy ? "galaxy-shell" : "",
-    isGalaxy && skyMode ? `galaxy-shell-${skyMode}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const mainClass = isGalaxy ? "main-content galaxy-main" : "main-content";
+  const theme = user?.theme || "dark";
+  const skyMode = theme === "light" ? "day" : "night";
+
+  const shellClass = ["app-shell", "galaxy-shell", `galaxy-shell-${skyMode}`].join(" ");
 
   return (
     <div className={shellClass}>
-      <Sidebar
-        onOpenSettings={() => setShowSettings(true)}
-        variant={isGalaxy ? "galaxy" : "default"}
-      />
-      <main className={mainClass}>
-        <EmailVerifyBanner />
-        {children}
+      <Sidebar onOpenSettings={() => setShowSettings(true)} variant="galaxy" />
+      <main className="main-content galaxy-main">
+        <div className={`galaxy-chrome sky-${skyMode}`}>
+          <GalaxySkyBackdrop mode={skyMode} />
+          <EmailVerifyBanner />
+          {!hideAppBar && <GalaxyAppBar left={topLeft} />}
+          <div className="galaxy-chrome-body">{children}</div>
+        </div>
       </main>
-      {!isGalaxy && <ThemeToggleButton />}
-      {!isGalaxy && <NotificationBell />}
-      {!isGalaxy && <RafiqFloatingButton />}
       <ComplaintButton />
       {showSettings && (
         <SettingsPopup user={user} onClose={() => setShowSettings(false)} onSaved={refreshUser} />

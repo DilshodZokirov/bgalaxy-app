@@ -2546,10 +2546,6 @@ video {
   z-index: 0;
 }
 
-.dashboard-galaxy > *:not(.galaxy-sky) {
-  position: relative;
-  z-index: 1;
-}
 
 .galaxy-sky-sun {
   position: absolute;
@@ -3605,6 +3601,126 @@ video {
   40% { transform: rotate(-8deg); }
   60% { transform: rotate(12deg); }
   80% { transform: rotate(-4deg); }
+}
+
+
+/* ---------- Global galaxy chrome (all AppShell pages) ---------- */
+.galaxy-chrome {
+  position: relative;
+  min-height: calc(100vh - 36px);
+}
+
+.galaxy-chrome > *:not(.galaxy-sky) {
+  position: relative;
+  z-index: 1;
+}
+
+.galaxy-chrome-body {
+  position: relative;
+  z-index: 1;
+}
+
+.galaxy-app-bar {
+  margin-bottom: 18px;
+}
+
+.galaxy-app-bar-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.galaxy-app-bar-fallback strong {
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.galaxy-app-bar-fallback span {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.galaxy-shell-day .galaxy-app-bar-fallback strong {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .galaxy-app-bar-fallback span {
+  color: #334155;
+}
+
+/* Shared glass surfaces across the whole app */
+.galaxy-shell .card,
+.galaxy-shell .empty-card,
+.galaxy-shell .quick-action,
+.galaxy-shell .chat-sidebar,
+.galaxy-shell .chat-main,
+.galaxy-shell .settings-modal,
+.galaxy-shell .notif-panel {
+  background: rgba(15, 23, 42, 0.52) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 12px 36px rgba(2, 6, 23, 0.28);
+}
+
+.galaxy-shell .page-header h1,
+.galaxy-shell .page-header h2,
+.galaxy-shell h1,
+.galaxy-shell h2,
+.galaxy-shell h3 {
+  color: inherit;
+}
+
+.galaxy-shell .page-header p,
+.galaxy-shell .text-dim {
+  color: #94a3b8;
+}
+
+.galaxy-shell input,
+.galaxy-shell select,
+.galaxy-shell textarea {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(148, 163, 184, 0.25);
+  color: #f8fafc;
+}
+
+.galaxy-shell-day .card,
+.galaxy-shell-day .empty-card,
+.galaxy-shell-day .quick-action,
+.galaxy-shell-day .chat-sidebar,
+.galaxy-shell-day .chat-main,
+.galaxy-shell-day .settings-modal,
+.galaxy-shell-day .notif-panel {
+  background: rgba(255, 255, 255, 0.58) !important;
+  border-color: rgba(14, 116, 144, 0.18) !important;
+  color: #0f172a;
+}
+
+.galaxy-shell-day input,
+.galaxy-shell-day select,
+.galaxy-shell-day textarea {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(14, 116, 144, 0.22);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .page-header p {
+  color: #475569;
+}
+
+.galaxy-shell .main-content {
+  color: #f8fafc;
+}
+
+.galaxy-shell-day .main-content {
+  color: #0f172a;
+}
+
+.dashboard-galaxy {
+  min-height: auto;
 }
 
 /* ---------- Galaxy Hub 3D demo ---------- */

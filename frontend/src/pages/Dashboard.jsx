@@ -6,9 +6,6 @@ import { pickActiveCompany } from "../hooks/useCompany";
 import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
-import GalaxySkyBackdrop from "../components/GalaxySkyBackdrop";
-import NotificationBell from "../components/NotificationBell";
-import RafiqFloatingButton from "../components/RafiqFloatingButton";
 import GalaxyWelcome from "../components/GalaxyWelcome";
 
 function money(n) {
@@ -42,12 +39,6 @@ function Sparkline({ values, color }) {
 
   return (
     <svg className="galaxy-spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={`g-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
       <polyline fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" points={points} />
     </svg>
   );
@@ -72,10 +63,9 @@ function StatGlass({ label, value, delta, color, series }) {
 }
 
 export default function Dashboard() {
-  const { user, refreshUser, lockScreen } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const theme = user?.theme || "dark";
-  const skyMode = theme === "light" ? "day" : "night";
+  const skyMode = (user?.theme || "dark") === "light" ? "day" : "night";
   const [company, setCompany] = useState(null);
   const [companyCount, setCompanyCount] = useState(0);
   const [loadingCompany, setLoadingCompany] = useState(true);
@@ -118,57 +108,23 @@ export default function Dashboard() {
   const memberSeries = [40, 55, 48, 70, 82, 90, Math.max(memberCount, 8)];
   const channelSeries = [8, 12, 10, 16, 18, 20, Math.max(channelCount, 4)];
   const chatSeries = [5, 9, 7, 14, 18, 16, Math.max(conversationCount, 3)];
-  async function toggleSky() {
-    const next = theme === "dark" ? "light" : "dark";
-    try {
-      await api.updateProfile({ theme: next });
-      await refreshUser();
-    } catch {
-      // ignore
-    }
-  }
 
   return (
-    <AppShell variant="galaxy" skyMode={skyMode}>
-      <div className={`dashboard-galaxy sky-${skyMode}`}>
-        <GalaxySkyBackdrop mode={skyMode} />
-        <header className="galaxy-top">
-          <div className="galaxy-top-left">
-            <GalaxyWelcome name={firstName} />
-          </div>
-
-          <label className="galaxy-search">
-            <span className="galaxy-search-icon">⌕</span>
-            <input type="search" placeholder="Qidiruv..." disabled />
-            <kbd>⌘K</kbd>
-          </label>
-
-          <div className="galaxy-top-right">
-            {user?.has_pin && (
-              <button type="button" className="galaxy-icon-btn" title="Ekranni qulflash" onClick={lockScreen}>
-                🔒
-              </button>
-            )}
-            <button
-              type="button"
-              className="galaxy-icon-btn galaxy-sky-toggle"
-              title={skyMode === "night" ? "Quyoshli fonga o'tish" : "Oylik fonga o'tish"}
-              onClick={toggleSky}
-            >
-              {skyMode === "night" ? "🌙" : "☀️"}
-            </button>
-            <NotificationBell variant="inline" />
-            <RafiqFloatingButton variant="header" />
-          </div>
-        </header>
-
+    <AppShell topLeft={<GalaxyWelcome name={firstName} />}>
+      <div className="dashboard-galaxy">
         <section className="galaxy-stage">
           <GalaxyOrbitHub companyName={company?.name} skyMode={skyMode} />
         </section>
 
         <section className="galaxy-stats">
           <StatGlass label="Faol xodimlar" value={memberCount || 0} delta={12} color="#60a5fa" series={memberSeries} />
-          <StatGlass label="Kompaniya" value={companyCount} delta={8} color="#a78bfa" series={incomeSeries.slice(-7).map((n, i) => (typeof n === "number" ? n / 1e6 || i + 2 : i + 2))} />
+          <StatGlass
+            label="Kompaniya"
+            value={companyCount}
+            delta={8}
+            color="#a78bfa"
+            series={incomeSeries.slice(-7).map((n, i) => (typeof n === "number" ? n / 1e6 || i + 2 : i + 2))}
+          />
           <StatGlass label="Chat kanallari" value={channelCount} delta={5} color="#22d3ee" series={channelSeries} />
           <StatGlass label="Maxfiy suhbatlar" value={conversationCount} delta={9} color="#fbbf24" series={chatSeries} />
           <aside className="galaxy-quote">
