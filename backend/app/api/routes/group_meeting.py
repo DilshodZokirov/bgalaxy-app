@@ -17,6 +17,7 @@ from app.services.group_call_notifications import (
 )
 from app.services.notify import ping_notifications
 from app.services.permissions import require_permission
+from app.services.scheduled_meeting_lifecycle import complete_scheduled_meetings_for_company
 
 router = APIRouter(prefix="/companies/{company_id}/group-call", tags=["group-call"])
 
@@ -112,6 +113,7 @@ async def get_active_group_call(
     participants = await livekit_admin.list_room_participants(room_name)
     if not participants:
         await finalize_group_call_notifications(db, company_id, trust_live_presence=True)
+        await complete_scheduled_meetings_for_company(db, company_id)
     return {
         "active": len(participants) > 0,
         "room_name": room_name,
@@ -122,19 +124,25 @@ async def get_active_group_call(
 @router.post("/leave")
 async def leave_group_call(
     company_id: str,
+    scheduled_meeting_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Client calls this on disconnect. If nobody else remains in the LiveKit
-    room, join invites are cleaned up / converted to missed-call notices."""
+    room, join invites are cleaned up and due scheduled meetings are completed
+    so the global banner disappears automatically."""
     await require_permission(db, company_id, current_user.id, "start_meeting")
     room_name = f"company-{company_id}"
     participants = await livekit_admin.list_room_participants(room_name)
     others = [p for p in participants if p["identity"] != str(current_user.id)]
     finalized = 0
+    completed = 0
     if not others:
         finalized = await finalize_group_call_notifications(db, company_id, trust_live_presence=True)
-    return {"active": len(others) > 0, "finalized": finalized}
+        completed = await complete_scheduled_meetings_for_company(
+            db, company_id, scheduled_meeting_id=scheduled_meeting_id
+        )
+    return {"active": len(others) > 0, "finalized": finalized, "completed_scheduled": completed}
 
 
 @router.post("/mute/{user_id}")

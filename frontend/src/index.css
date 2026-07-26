@@ -6769,6 +6769,23 @@ video {
   cursor: pointer;
 }
 
+.upcoming-meeting-delete {
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  color: #fda4af !important;
+}
+
+.upcoming-meeting-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.upcoming-meeting-edit-actions .meetings-cta,
+.upcoming-meeting-edit-actions .meetings-soft-btn {
+  width: auto;
+}
+
 .upcoming-meeting-card {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.7fr) auto;

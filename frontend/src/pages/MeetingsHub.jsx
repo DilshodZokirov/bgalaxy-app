@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { pickActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
@@ -22,11 +22,19 @@ function toLocalInputValue(date = new Date()) {
   return local.toISOString().slice(0, 16);
 }
 
+function defaultSchedAt() {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return toLocalInputValue(d);
+}
+
 export default function MeetingsHub() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [showPartnerSearch, setShowPartnerSearch] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [partners, setPartners] = useState([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
@@ -38,11 +46,7 @@ export default function MeetingsHub() {
 
   const [schedTitle, setSchedTitle] = useState("");
   const [schedDescription, setSchedDescription] = useState("");
-  const [schedAt, setSchedAt] = useState(() => {
-    const d = new Date();
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-    return toLocalInputValue(d);
-  });
+  const [schedAt, setSchedAt] = useState(defaultSchedAt);
   const [schedSaving, setSchedSaving] = useState(false);
   const [schedError, setSchedError] = useState(null);
 
@@ -100,9 +104,43 @@ export default function MeetingsHub() {
     }
   }
 
+  function resetScheduleForm() {
+    setEditingId(null);
+    setSchedTitle("");
+    setSchedDescription("");
+    setSchedAt(defaultSchedAt());
+    setSchedError(null);
+  }
+
+  function openCreateSchedule() {
+    resetScheduleForm();
+    setShowSchedule(true);
+  }
+
+  function openEditSchedule(meeting) {
+    setEditingId(meeting.id);
+    setSchedTitle(meeting.title || "");
+    setSchedDescription(meeting.description || "");
+    setSchedAt(toLocalInputValue(new Date(meeting.starts_at)));
+    setSchedError(null);
+    setShowSchedule(true);
+  }
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || !scheduled.length) return;
+    const meeting = scheduled.find((m) => String(m.id) === String(editId));
+    if (!meeting) return;
+    openEditSchedule(meeting);
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduled, searchParams]);
+
   async function handleScheduleSubmit(e) {
     e.preventDefault();
-    if (!company) {
+    if (!editingId && !company) {
       setSchedError("Avval faol kompaniyani tanlang");
       return;
     }
@@ -113,15 +151,22 @@ export default function MeetingsHub() {
       if (Number.isNaN(startsAt.getTime())) {
         throw new Error("Vaqt noto‘g‘ri");
       }
-      await api.createScheduledMeeting({
-        company_id: company.id,
-        title: schedTitle.trim(),
-        description: schedDescription.trim(),
-        starts_at: startsAt.toISOString(),
-      });
+      if (editingId) {
+        await api.updateScheduledMeeting(editingId, {
+          title: schedTitle.trim(),
+          description: schedDescription.trim(),
+          starts_at: startsAt.toISOString(),
+        });
+      } else {
+        await api.createScheduledMeeting({
+          company_id: company.id,
+          title: schedTitle.trim(),
+          description: schedDescription.trim(),
+          starts_at: startsAt.toISOString(),
+        });
+      }
       setShowSchedule(false);
-      setSchedTitle("");
-      setSchedDescription("");
+      resetScheduleForm();
       refreshScheduled();
     } catch (err) {
       setSchedError(err.message);
@@ -131,8 +176,13 @@ export default function MeetingsHub() {
   }
 
   async function handleCancelScheduled(id) {
+    if (!window.confirm("Uchrashuvni o‘chirasizmi?")) return;
     try {
       await api.cancelScheduledMeeting(id);
+      if (editingId === id) {
+        setShowSchedule(false);
+        resetScheduleForm();
+      }
       refreshScheduled();
     } catch {
       // ignore
@@ -141,7 +191,7 @@ export default function MeetingsHub() {
 
   function joinScheduled(meeting) {
     if (meeting.company_id) setActiveCompanyId(meeting.company_id);
-    navigate("/group-meeting");
+    navigate(`/group-meeting?scheduled=${encodeURIComponent(meeting.id)}`);
   }
 
   const upcoming = useMemo(
@@ -167,10 +217,7 @@ export default function MeetingsHub() {
             type="button"
             className="meetings-cta"
             disabled={!company}
-            onClick={() => {
-              setSchedError(null);
-              setShowSchedule(true);
-            }}
+            onClick={openCreateSchedule}
           >
             Vaqtga belgilash
           </button>
@@ -210,14 +257,23 @@ export default function MeetingsHub() {
                           ? "Uchrashuvga kirish"
                           : "Erta kirish"}
                       </button>
-                      {isCreator && m.status === "scheduled" && (
-                        <button
-                          type="button"
-                          className="secondary meetings-soft-btn"
-                          onClick={() => handleCancelScheduled(m.id)}
-                        >
-                          Bekor qilish
-                        </button>
+                      {isCreator && (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary meetings-soft-btn"
+                            onClick={() => openEditSchedule(m)}
+                          >
+                            Update
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary meetings-soft-btn upcoming-meeting-delete"
+                            onClick={() => handleCancelScheduled(m.id)}
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </div>
                   </article>
@@ -296,10 +352,7 @@ export default function MeetingsHub() {
             type="button"
             className="meetings-launch-card schedule"
             disabled={!company}
-            onClick={() => {
-              setSchedError(null);
-              setShowSchedule(true);
-            }}
+            onClick={openCreateSchedule}
           >
             <span className="meetings-launch-mark" aria-hidden>
               V
@@ -314,17 +367,31 @@ export default function MeetingsHub() {
       </div>
 
       {showSchedule && (
-        <div className="meetings-modal-backdrop" onClick={() => setShowSchedule(false)}>
+        <div
+          className="meetings-modal-backdrop"
+          onClick={() => {
+            setShowSchedule(false);
+            resetScheduleForm();
+          }}
+        >
           <div className="card meetings-modal meetings-schedule-modal" onClick={(e) => e.stopPropagation()}>
             <div className="meetings-modal-head">
-              <h3>Uchrashuvni vaqtga belgilash</h3>
-              <button type="button" className="secondary meetings-soft-btn" onClick={() => setShowSchedule(false)}>
+              <h3>{editingId ? "Uchrashuvni yangilash" : "Uchrashuvni vaqtga belgilash"}</h3>
+              <button
+                type="button"
+                className="secondary meetings-soft-btn"
+                onClick={() => {
+                  setShowSchedule(false);
+                  resetScheduleForm();
+                }}
+              >
                 Yopish
               </button>
             </div>
             <p className="meetings-modal-hint">
-              Masalan: bugun soat 16:00 — mavzu “Oylik muammo”. Vaqt yaqinlashganda jamoa bildirishnoma oladi,
-              countdown esa soniyagacha sanaydi.
+              {editingId
+                ? "Vaqt, sarlavha yoki mavzuni o‘zgartiring. Kerak bo‘lmasa Delete bilan o‘chiring."
+                : "Masalan: bugun soat 16:00 — mavzu “Oylik muammo”. Vaqt yaqinlashganda jamoa bildirishnoma oladi, countdown esa soniyagacha sanaydi."}
             </p>
             <form onSubmit={handleScheduleSubmit}>
               <label>Sarlavha</label>
@@ -350,9 +417,24 @@ export default function MeetingsHub() {
                 required
               />
               {schedError && <p className="error">{schedError}</p>}
-              <button type="submit" className="meetings-cta" disabled={schedSaving || !company}>
-                {schedSaving ? "Saqlanmoqda..." : "Belgilash"}
-              </button>
+              <div className="upcoming-meeting-edit-actions">
+                <button
+                  type="submit"
+                  className="meetings-cta"
+                  disabled={schedSaving || (!editingId && !company)}
+                >
+                  {schedSaving ? "Saqlanmoqda..." : editingId ? "Saqlash" : "Belgilash"}
+                </button>
+                {editingId && (
+                  <button
+                    type="button"
+                    className="secondary meetings-soft-btn upcoming-meeting-delete"
+                    onClick={() => handleCancelScheduled(editingId)}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </form>
           </div>
         </div>

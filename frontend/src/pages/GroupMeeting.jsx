@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { api } from "../api/client";
@@ -19,6 +19,8 @@ function GroupHeading({ companyName }) {
 
 export default function GroupMeeting() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scheduledMeetingId = searchParams.get("scheduled");
   const [company, setCompany] = useState(null);
   const [connection, setConnection] = useState(null);
   const [error, setError] = useState(null);
@@ -102,7 +104,7 @@ export default function GroupMeeting() {
           audio={true}
           onDisconnected={() => {
             const companyId = company.id;
-            api.leaveGroupCall(companyId).catch(() => {});
+            api.leaveGroupCall(companyId, scheduledMeetingId).catch(() => {});
             setConnection(null);
             navigate("/meetings");
           }}

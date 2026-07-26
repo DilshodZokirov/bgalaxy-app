@@ -17,7 +17,7 @@ class ScheduledMeeting(Base):
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text, default="")
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    # scheduled | notified | cancelled
+    # scheduled | notified | cancelled | completed
     status: Mapped[str] = mapped_column(String(20), default="scheduled")
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

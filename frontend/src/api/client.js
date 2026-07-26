@@ -187,8 +187,13 @@ export const api = {
   getGroupCallToken: (companyId) =>
     request(`/companies/${companyId}/group-call/token`, { method: "POST" }),
   getActiveGroupCall: (companyId) => request(`/companies/${companyId}/group-call/active`),
-  leaveGroupCall: (companyId) =>
-    request(`/companies/${companyId}/group-call/leave`, { method: "POST" }),
+  leaveGroupCall: (companyId, scheduledMeetingId) =>
+    request(
+      `/companies/${companyId}/group-call/leave${
+        scheduledMeetingId ? `?scheduled_meeting_id=${encodeURIComponent(scheduledMeetingId)}` : ""
+      }`,
+      { method: "POST" }
+    ),
   muteGroupCallParticipant: (companyId, userId, kind, muted) =>
     request(`/companies/${companyId}/group-call/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
   getOfficeVoiceToken: (companyId) =>
@@ -213,6 +218,8 @@ export const api = {
     request(`/partner-meetings/${roomName}/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
   getScheduledMeetings: () => request("/scheduled-meetings"),
   createScheduledMeeting: (data) => request("/scheduled-meetings", { method: "POST", body: data }),
+  updateScheduledMeeting: (id, data) =>
+    request(`/scheduled-meetings/${id}`, { method: "PATCH", body: data }),
   cancelScheduledMeeting: (id) => request(`/scheduled-meetings/${id}`, { method: "DELETE" }),
   getScheduledMeeting: (id) => request(`/scheduled-meetings/${id}`),
   getTasks: (companyId) => request(`/companies/${companyId}/tasks`),
