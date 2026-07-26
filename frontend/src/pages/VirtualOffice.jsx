@@ -21,6 +21,7 @@ export default function VirtualOffice() {
   const [officeUnread, setOfficeUnread] = useState(0);
   const [hasActiveCall, setHasActiveCall] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [immersive, setImmersive] = useState(true);
   const [hintVisible, setHintVisible] = useState(true);
   const [keybinds, setKeybinds] = useState(() => {
     try {
@@ -181,17 +182,50 @@ export default function VirtualOffice() {
   }
 
   function enterFullscreen() {
-    wrapRef.current?.requestFullscreen?.();
+    setImmersive(true);
+    const el = wrapRef.current;
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => {
+        // Browser may block FS without gesture — CSS immersive still covers viewport.
+      });
+    }
+  }
+
+  function exitFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    setImmersive(false);
+    setPaused(false);
   }
 
   useEffect(() => {
     function handleFsChange() {
-      setIsFullscreen(!!document.fullscreenElement);
-      if (!document.fullscreenElement) setPaused(false);
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      if (!fs) {
+        // ESC (or browser exit) shrinks the office automatically.
+        setImmersive(false);
+        setPaused(false);
+      }
     }
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
+
+  // Keep browser fullscreen in sync while immersive; allow ESC to shrink.
+  useEffect(() => {
+    if (!company || !immersive) return undefined;
+    function onKeyDown(e) {
+      if (e.key !== "Escape") return;
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      exitFullscreen();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [company, immersive]);
 
   function zoomIn() {
     setZoom((z) => Math.max(2, z - 1));
@@ -285,6 +319,110 @@ export default function VirtualOffice() {
     );
   }
 
+  const officeScene = (
+    <div className={`office-3d-wrap office-3d-wrap-galaxy ${immersive ? "is-immersive" : ""}`} ref={wrapRef} onContextMenu={handleRightClick}>
+      <OfficeScene3D zoom={zoom} companyId={company.id} paused={paused || !immersive} />
+      <div className="office-3d-controls">
+        <button
+          onClick={toggleMic}
+          title={micOn ? "Mikrofonni o'chirish" : "Mikrofonni yoqish"}
+          className={voiceStatus !== "connected" ? "is-dim" : undefined}
+        >
+          {micOn ? "🎤" : "🔇"}
+        </button>
+        <button onClick={zoomIn} title="Yaqinlashtirish">➕</button>
+        <button onClick={zoomOut} title="Uzoqlashtirish">➖</button>
+        {immersive ? (
+          <button onClick={exitFullscreen} title="Kichraytirish (Esc)">⛶</button>
+        ) : (
+          <button onClick={enterFullscreen} title="To'liq ekran (Enter)">⛶</button>
+        )}
+        <button onClick={() => setPaused((p) => !p)} title={`Pauza (${keybinds.pause.toUpperCase()})`}>
+          {paused ? "▶️" : "⏸️"}
+        </button>
+        <button
+          className="office-phone-btn"
+          onClick={() =>
+            setShowComms((v) => {
+              const next = !v;
+              if (next) setPaused(true);
+              return next;
+            })
+          }
+          title="Telefon bo'limi (E)"
+        >
+          📱
+          {officeUnread > 0 && <span className="office-unread-badge">{officeUnread}</span>}
+          {hasActiveCall && <span className="office-call-dot" />}
+        </button>
+      </div>
+
+      {hintVisible && immersive && (
+        <div className="office-3d-hint">
+          🖱️ Sichqoncha · WASD — yurish · M — mikrofon · Esc — kichraytirish ·{" "}
+          {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
+          {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
+          {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
+        </div>
+      )}
+
+      {immersive && paused && <div className="office-pause-badge">⏸ PAUSE</div>}
+
+      <OfficeCommsPanel
+        companyId={company.id}
+        open={showComms}
+        onOpenChange={setShowComms}
+        incomingCall={acceptedCall}
+        onIncomingHandled={() => setAcceptedCall(null)}
+        onUnreadChange={setOfficeUnread}
+        onCallStateChange={setHasActiveCall}
+        keybinds={keybinds}
+        onKeybindChange={updateKeybind}
+        callSignal={callSignal}
+        onBeforeRecording={pauseOfficeMicForRecording}
+        onAfterRecording={resumeOfficeMicAfterRecording}
+      />
+
+      {incomingPrompt && (
+        <div className="office-incoming-backdrop">
+          <div className="card office-incoming-card">
+            <div className="office-incoming-icon">📞</div>
+            <p>
+              <strong>{incomingPrompt.callerName}</strong> qo‘ng‘iroq qilmoqda...
+            </p>
+            <div className="office-incoming-actions">
+              <button onClick={handleAcceptIncoming}>✅ Qabul qilish</button>
+              <button className="secondary office-reject-btn" onClick={handleRejectIncoming}>
+                ❌ Rad etish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (immersive) {
+    return (
+      <AppShell immersive>
+        <div ref={audioContainerRef} className="office-audio-sink" />
+        <div className="office-immersive-top">
+          <div>
+            <strong>{company.name}</strong>
+            <span>Virtual Ofis · Esc — chiqish</span>
+          </div>
+          <span className={`office-voice-pill is-${voiceStatus}`}>
+            {voiceStatus === "connected" && "🎙️ Ulangan"}
+            {voiceStatus === "connecting" && "🎙️ Ulanmoqda..."}
+            {voiceStatus === "error" && "⚠️ Sozlanmagan"}
+            {voiceStatus === "off" && "🔇 O‘chiq"}
+          </span>
+        </div>
+        {officeScene}
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell topLeft={officeHeading}>
       <div className="office-page">
@@ -295,98 +433,16 @@ export default function VirtualOffice() {
             {voiceStatus === "error" && "⚠️ Ovozli chat sozlanmagan"}
             {voiceStatus === "off" && "🔇 Ovoz o‘chiq"}
           </span>
-          <span className="office-status-hint">O‘ng tugma yoki {keybinds.phone.toUpperCase()} — telefon paneli</span>
+          <span className="office-status-hint">Ofis kichraytirilgan — Enter yoki tugma bilan to‘liq ekranga qayting</span>
         </div>
 
         <div ref={audioContainerRef} className="office-audio-sink" />
 
-        <div className="office-3d-wrap office-3d-wrap-galaxy" ref={wrapRef} onContextMenu={handleRightClick}>
-          <OfficeScene3D zoom={zoom} companyId={company.id} paused={paused} />
-          <div className="office-3d-controls">
-            <button
-              onClick={toggleMic}
-              title={micOn ? "Mikrofonni o'chirish" : "Mikrofonni yoqish"}
-              className={voiceStatus !== "connected" ? "is-dim" : undefined}
-            >
-              {micOn ? "🎤" : "🔇"}
-            </button>
-            <button onClick={zoomIn} title="Yaqinlashtirish">➕</button>
-            <button onClick={zoomOut} title="Uzoqlashtirish">➖</button>
-            <button
-              onClick={enterFullscreen}
-              title="To'liq ekran (Enter)"
-              className={isFullscreen ? "is-hidden" : undefined}
-            >
-              ⛶
-            </button>
-            <button onClick={() => setPaused((p) => !p)} title={`Pauza (${keybinds.pause.toUpperCase()})`}>
-              {paused ? "▶️" : "⏸️"}
-            </button>
-            <button
-              className="office-phone-btn"
-              onClick={() =>
-                setShowComms((v) => {
-                  const next = !v;
-                  if (next) setPaused(true);
-                  return next;
-                })
-              }
-              title="Telefon bo'limi (E)"
-            >
-              📱
-              {officeUnread > 0 && <span className="office-unread-badge">{officeUnread}</span>}
-              {hasActiveCall && <span className="office-call-dot" />}
-            </button>
-          </div>
-
-          {hintVisible && (
-            <div className="office-3d-hint">
-              🖱️ Sichqoncha · WASD — yurish · M — mikrofon · +/− zoom · {keybinds.fullscreen} — fullscreen ·{" "}
-              {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
-              {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
-              {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
-            </div>
-          )}
-
-          {!isFullscreen && (
-            <button type="button" className="office-enter-gate" onClick={enterFullscreen}>
-              <span className="office-enter-card">⏎ Enter tugmasini bosing</span>
-            </button>
-          )}
-
-          {isFullscreen && paused && <div className="office-pause-badge">⏸ PAUSE</div>}
-
-          <OfficeCommsPanel
-            companyId={company.id}
-            open={showComms}
-            onOpenChange={setShowComms}
-            incomingCall={acceptedCall}
-            onIncomingHandled={() => setAcceptedCall(null)}
-            onUnreadChange={setOfficeUnread}
-            onCallStateChange={setHasActiveCall}
-            keybinds={keybinds}
-            onKeybindChange={updateKeybind}
-            callSignal={callSignal}
-            onBeforeRecording={pauseOfficeMicForRecording}
-            onAfterRecording={resumeOfficeMicAfterRecording}
-          />
-
-          {incomingPrompt && (
-            <div className="office-incoming-backdrop">
-              <div className="card office-incoming-card">
-                <div className="office-incoming-icon">📞</div>
-                <p>
-                  <strong>{incomingPrompt.callerName}</strong> qo‘ng‘iroq qilmoqda...
-                </p>
-                <div className="office-incoming-actions">
-                  <button onClick={handleAcceptIncoming}>✅ Qabul qilish</button>
-                  <button className="secondary office-reject-btn" onClick={handleRejectIncoming}>
-                    ❌ Rad etish
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="office-shrunk-wrap">
+          {officeScene}
+          <button type="button" className="office-enter-gate" onClick={enterFullscreen}>
+            <span className="office-enter-card">⛶ To‘liq ekranga qaytish (Enter / Esc emas)</span>
+          </button>
         </div>
       </div>
     </AppShell>
