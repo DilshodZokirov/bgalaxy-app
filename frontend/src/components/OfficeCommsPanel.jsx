@@ -487,173 +487,136 @@ export default function OfficeCommsPanel({ companyId, open, onOpenChange, incomi
     setView(key);
   }
 
+  const homeCards = [
+    {
+      key: "aloqa",
+      title: "Aloqa",
+      desc: "Qo‘ng‘iroq qilish va xabarlar orqali bog‘laning",
+      tone: "blue",
+      icon: "📞",
+      onClick: () => setView("aloqa"),
+    },
+    {
+      key: "settings",
+      title: "Sozlamalar",
+      desc: "Ilova sozlamalarini boshqaring",
+      tone: "purple",
+      icon: "⚙️",
+      onClick: () => openSection("settings"),
+    },
+  ];
+
   return (
     <>
-      <div id="office-call-media" style={{ display: "none" }} />
-      {open && activeCall && (
-        <div
-          id="office-call-video"
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            width: 120,
-            height: 90,
-            background: "#000",
-            borderRadius: 12,
-            overflow: "hidden",
-            zIndex: 60,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-          }}
-        />
-      )}
+      <div id="office-call-media" className="office-call-media-sink" />
+      {open && activeCall && <div id="office-call-video" className="office-call-video-pip" />}
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: 56,
-            right: 12,
-            width: 320,
-            zIndex: 55,
-            background: "var(--panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 26,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-            overflow: "hidden",
-          }}
-        >
-          {/* Header */}
-          <div style={{ padding: "18px 18px 14px" }}>
-            {isHome ? (
-              <>
-                <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }}>👋 Telefon bo'limi</div>
-                <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Kerakli bo'limni tanlang</div>
-              </>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button
-                  className="secondary"
-                  style={{ width: 30, height: 30, padding: 0, borderRadius: "50%" }}
-                  onClick={() => setView("home")}
-                >
-                  ‹
-                </button>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>
-                  {CARD_META[section].icon} {CARD_META[section].title}
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="phone-device">
+          <div className="phone-device-bezel">
+            <div className="phone-dynamic-island" aria-hidden>
+              <span className="phone-island-camera" />
+            </div>
+            <div className="phone-status-bar" aria-hidden>
+              <span>9:41</span>
+              <span className="phone-status-icons">▮▮▮ ☀︎</span>
+            </div>
 
-          {/* Body */}
-          <div style={{ padding: "0 18px 14px", maxHeight: 340, overflowY: "auto" }}>
-            {isHome ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {SECTIONS.map((key) => (
-                  <div
-                    key={key}
-                    onClick={() => openSection(key)}
-                    className="office-comms-row"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: 14,
-                      borderRadius: 16,
-                      background: "var(--panel-2)",
-                      cursor: "pointer",
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 12,
-                        background: CARD_META[key].color,
-                        opacity: 0.9,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 19,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {CARD_META[key].icon}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{CARD_META[key].title}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{CARD_META[key].desc}</div>
-                    </div>
-                    <span style={{ color: "var(--text-dim)", fontSize: 16 }}>›</span>
-                    {key === "messages" && unreadCount > 0 && (
-                      <span
-                        style={{ position: "absolute", top: 8, right: 26, background: "#f87171", color: "white", borderRadius: "50%", minWidth: 16, height: 16, fontSize: 9.5, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}
-                      >
-                        {unreadCount}
-                      </span>
-                    )}
-                    {key === "call" && activeCall && (
-                      <span style={{ position: "absolute", top: 8, right: 26, width: 9, height: 9, borderRadius: "50%", background: "var(--green)" }} />
-                    )}
+            <div className="phone-screen">
+              <div className="phone-header">
+                {isHome || view === "aloqa" ? (
+                  <>
+                    <h2>{isHome ? "Xush kelibsiz!" : "Aloqa"}</h2>
+                    <p>{isHome ? "Kerakli bo‘limni tanlang" : "Qo‘ng‘iroq yoki xabar tanlang"}</p>
+                  </>
+                ) : (
+                  <div className="phone-header-nav">
+                    <button type="button" className="phone-back" onClick={() => setView(view === "settings" ? "home" : "aloqa")}>
+                      ‹
+                    </button>
+                    <h2>
+                      {CARD_META[section]?.icon} {CARD_META[section]?.title}
+                    </h2>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                {section === "messages" && <MessagesSection conversations={conversations} onRefresh={refreshConversations} />}
-                {section === "send" && <SendSection mode={sendMode} setMode={setSendMode} onBeforeRecording={onBeforeRecording} onAfterRecording={onAfterRecording} />}
-                {section === "call" && (
-                  <CallSection
-                    companyId={companyId}
-                    activeCall={activeCall}
-                    onStartCall={handleStartCall}
-                    onHangup={handleHangup}
-                    micOn={micOn}
-                    toggleMic={toggleMic}
-                    camOn={camOn}
-                    toggleCam={toggleCam}
-                  />
                 )}
-                {section === "settings" && <SettingsSection keybinds={keybinds} onKeybindChange={onKeybindChange} />}
-              </>
-            )}
-          </div>
+              </div>
 
-          {/* Bottom tab bar */}
-          <div style={{ display: "flex", borderTop: "1px solid var(--border)", background: "var(--panel-2)" }}>
-            {SECTIONS.map((key) => (
-              <button
-                key={key}
-                onClick={() => openSection(key)}
-                className="secondary"
-                style={{
-                  flex: 1,
-                  border: "none",
-                  borderRadius: 0,
-                  background: "transparent",
-                  padding: "10px 4px",
-                  fontSize: 9.5,
-                  color: !isHome && section === key ? "var(--blue)" : "var(--text-dim)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{CARD_META[key].icon}</span>
-                {CARD_META[key].title}
-              </button>
-            ))}
-            <button
-              onClick={() => onOpenChange(false)}
-              className="secondary"
-              style={{ flex: 1, border: "none", borderRadius: 0, background: "transparent", padding: "10px 4px", fontSize: 9.5, color: "var(--text-dim)", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}
-            >
-              <span style={{ fontSize: 16 }}>✕</span>
-              Yopish
-            </button>
+              <div className="phone-body">
+                {isHome && (
+                  <div className="phone-home-cards">
+                    {homeCards.map((card) => (
+                      <button key={card.key} type="button" className={`phone-feature-card tone-${card.tone}`} onClick={card.onClick}>
+                        <span className="phone-feature-icon">{card.icon}</span>
+                        <span className="phone-feature-copy">
+                          <strong>{card.title}</strong>
+                          <em>{card.desc}</em>
+                        </span>
+                        <span className="phone-feature-arrow">›</span>
+                        <span className="phone-feature-rings" aria-hidden />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {view === "aloqa" && (
+                  <div className="phone-home-cards">
+                    {["call", "messages", "send"].map((key) => (
+                      <button key={key} type="button" className={`phone-feature-card tone-${key === "call" ? "blue" : key === "messages" ? "cyan" : "purple"}`} onClick={() => openSection(key)}>
+                        <span className="phone-feature-icon">{CARD_META[key].icon}</span>
+                        <span className="phone-feature-copy">
+                          <strong>{CARD_META[key].title}</strong>
+                          <em>{CARD_META[key].desc}</em>
+                        </span>
+                        <span className="phone-feature-arrow">›</span>
+                        {key === "messages" && unreadCount > 0 && <span className="phone-card-badge">{unreadCount}</span>}
+                        {key === "call" && activeCall && <span className="phone-card-live" />}
+                        <span className="phone-feature-rings" aria-hidden />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {!isHome && view !== "aloqa" && (
+                  <div className="phone-section-content">
+                    {section === "messages" && <MessagesSection conversations={conversations} onRefresh={refreshConversations} />}
+                    {section === "send" && (
+                      <SendSection mode={sendMode} setMode={setSendMode} onBeforeRecording={onBeforeRecording} onAfterRecording={onAfterRecording} />
+                    )}
+                    {section === "call" && (
+                      <CallSection
+                        companyId={companyId}
+                        activeCall={activeCall}
+                        onStartCall={handleStartCall}
+                        onHangup={handleHangup}
+                        micOn={micOn}
+                        toggleMic={toggleMic}
+                        camOn={camOn}
+                        toggleCam={toggleCam}
+                      />
+                    )}
+                    {section === "settings" && <SettingsSection keybinds={keybinds} onKeybindChange={onKeybindChange} />}
+                  </div>
+                )}
+              </div>
+
+              <div className="phone-tabbar">
+                <button type="button" className={!isHome && section === "call" ? "active" : ""} onClick={() => openSection("call")}>
+                  <span>📞</span>
+                  Qo‘ng‘iroq
+                </button>
+                <button type="button" className={!isHome && section === "messages" ? "active" : ""} onClick={() => openSection("messages")}>
+                  <span>💬</span>
+                  Xabarlar
+                  {unreadCount > 0 && <i className="phone-tab-badge">{unreadCount}</i>}
+                </button>
+                <button type="button" onClick={() => onOpenChange(false)}>
+                  <span>✕</span>
+                  Yopish
+                </button>
+              </div>
+            </div>
+
+            <div className="phone-home-indicator" aria-hidden />
           </div>
         </div>
       )}
