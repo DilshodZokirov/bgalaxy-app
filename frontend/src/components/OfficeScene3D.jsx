@@ -10,6 +10,58 @@ const MOVE_SPEED = 5.5;
 const HALF = ROOM_SIZE / 2 - 1.2;
 const EYE_HEIGHT = 1.65;
 
+/** Warm natural ceramic tile floor (procedural, no external assets). */
+function createTileFloorTexture() {
+  const size = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  const grout = "#8a7d6e";
+  const tiles = ["#c4a882", "#b8956a", "#d0b090", "#ba9a78", "#c9ad8e", "#af8f6c"];
+  const tileCount = 4;
+  const gap = 6;
+  const tileSize = (size - gap * (tileCount + 1)) / tileCount;
+
+  ctx.fillStyle = grout;
+  ctx.fillRect(0, 0, size, size);
+
+  for (let row = 0; row < tileCount; row++) {
+    for (let col = 0; col < tileCount; col++) {
+      const x = gap + col * (tileSize + gap);
+      const y = gap + row * (tileSize + gap);
+      const base = tiles[(row * 3 + col * 2) % tiles.length];
+      ctx.fillStyle = base;
+      ctx.fillRect(x, y, tileSize, tileSize);
+
+      // Soft variation / stone grain
+      for (let i = 0; i < 40; i++) {
+        const px = x + Math.random() * tileSize;
+        const py = y + Math.random() * tileSize;
+        const a = 0.04 + Math.random() * 0.08;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,245,230,${a})` : `rgba(80,60,40,${a})`;
+        ctx.fillRect(px, py, 2 + Math.random() * 4, 1 + Math.random() * 3);
+      }
+
+      // Edge highlight
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(ROOM_SIZE / 2.2, ROOM_SIZE / 2.2);
+  texture.anisotropy = 8;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+const tileFloorMap = typeof document !== "undefined" ? createTileFloorTexture() : null;
+
 function Player({ camDistance, onMove, paused }) {
   const groupRef = useRef();
   const keys = useRef({});
@@ -200,14 +252,20 @@ function PendantLight({ position }) {
 function Room() {
   return (
     <group>
-      {/* Floor — light open-space */}
+      {/* Floor — natural ceramic tile */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[ROOM_SIZE, ROOM_SIZE]} />
-        <meshStandardMaterial color="#e8edf5" roughness={0.55} metalness={0.08} />
+        <meshStandardMaterial
+          map={tileFloorMap}
+          color="#d6c4a8"
+          roughness={0.72}
+          metalness={0.04}
+        />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[ROOM_SIZE * 0.55, ROOM_SIZE * 0.35]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.85} />
+      {/* Soft rug under lounge / center path */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 3.2]} receiveShadow>
+        <planeGeometry args={[4.2, 3.6]} />
+        <meshStandardMaterial color="#6b5344" roughness={0.95} />
       </mesh>
 
       {/* Ceiling */}
@@ -330,12 +388,12 @@ export default function OfficeScene3D({ zoom = 5, companyId, paused = false }) {
   }
 
   return (
-    <Canvas shadows camera={{ position: [0, 4, 10], fov: 55 }} style={{ background: "linear-gradient(#dbeafe, #f8fafc)" }}>
-      <fog attach="fog" args={["#e2e8f0", 18, 40]} />
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[8, 14, 6]} intensity={1.05} castShadow shadow-mapSize={[1024, 1024]} />
-      <pointLight position={[0, 3.8, 2]} color="#93c5fd" intensity={0.45} distance={14} />
-      <pointLight position={[0, 3.8, -6]} color="#c4b5fd" intensity={0.35} distance={14} />
+    <Canvas shadows camera={{ position: [0, 4, 10], fov: 55 }} style={{ background: "linear-gradient(#dbeafe, #efe6d8)" }}>
+      <fog attach="fog" args={["#e8dfd0", 20, 42]} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[8, 14, 6]} intensity={1.0} castShadow shadow-mapSize={[1024, 1024]} />
+      <pointLight position={[0, 3.8, 2]} color="#f5e6c8" intensity={0.4} distance={14} />
+      <pointLight position={[0, 3.8, -6]} color="#c4b5fd" intensity={0.28} distance={14} />
       <Environment preset="city" />
       <Room />
       <Player camDistance={zoom} onMove={sendMove} paused={paused} />
