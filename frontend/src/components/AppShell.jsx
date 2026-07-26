@@ -23,7 +23,10 @@ export default function AppShell({ children, variant, skyMode }) {
 
   return (
     <div className={shellClass}>
-      <Sidebar onOpenSettings={() => setShowSettings(true)} />
+      <Sidebar
+        onOpenSettings={() => setShowSettings(true)}
+        variant={isGalaxy ? "galaxy" : "default"}
+      />
       <main className={mainClass}>
         <EmailVerifyBanner />
         {children}

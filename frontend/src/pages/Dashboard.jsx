@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
 import GalaxySkyBackdrop from "../components/GalaxySkyBackdrop";
+import NotificationBell from "../components/NotificationBell";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(n)) + " so'm";
@@ -115,8 +116,6 @@ export default function Dashboard() {
   const memberSeries = [40, 55, 48, 70, 82, 90, Math.max(memberCount, 8)];
   const channelSeries = [8, 12, 10, 16, 18, 20, Math.max(channelCount, 4)];
   const chatSeries = [5, 9, 7, 14, 18, 16, Math.max(conversationCount, 3)];
-  const points = (memberCount * 120 + channelCount * 40 + 12450).toLocaleString("en-US");
-
   async function toggleSky() {
     const next = theme === "dark" ? "light" : "dark";
     try {
@@ -157,13 +156,7 @@ export default function Dashboard() {
             >
               {skyMode === "night" ? "🌙" : "☀️"}
             </button>
-            <button type="button" className="galaxy-icon-btn" title="Bildirishnomalar" aria-label="Bildirishnomalar">
-              🔔<span className="galaxy-badge">3</span>
-            </button>
-            <div className="galaxy-points">
-              <span>BG Points</span>
-              <strong>{points}</strong>
-            </div>
+            <NotificationBell variant="inline" />
           </div>
         </header>
 
