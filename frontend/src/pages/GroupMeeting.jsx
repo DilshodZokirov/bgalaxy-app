@@ -6,10 +6,20 @@ import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 
+function GroupHeading({ companyName }) {
+  return (
+    <div className="galaxy-page-heading">
+      <p className="galaxy-page-kicker">Guruh uchrashuvi</p>
+      <h1>{companyName || "Kompaniya xonasi"}</h1>
+      <p>Bir nechta aʼzo bilan bir vaqtda video muloqot.</p>
+    </div>
+  );
+}
+
 export default function GroupMeeting() {
   const navigate = useNavigate();
   const [company, setCompany] = useState(null);
-  const [connection, setConnection] = useState(null); // { token, url }
+  const [connection, setConnection] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [canHost, setCanHost] = useState(false);
@@ -66,13 +76,15 @@ export default function GroupMeeting() {
 
   if (!company) {
     return (
-      <AppShell>
-        <div className="page-header">
-          <h1>Guruh uchrashuvi</h1>
-        </div>
-        <div className="empty-card">
-          <p>Avval kompaniya yarating.</p>
-          <button onClick={() => navigate("/companies")}>+ Kompaniya yaratish</button>
+      <AppShell topLeft={<GroupHeading />}>
+        <div className="meetings-page">
+          <section className="meetings-lobby">
+            <h2>Kompaniya kerak</h2>
+            <p>Guruh uchrashuvi faol korxonaga bog‘langan. Avval kompaniya yarating yoki tanlang.</p>
+            <button type="button" className="meetings-cta" onClick={() => navigate("/companies")}>
+              Kompaniyalar paneli
+            </button>
+          </section>
         </div>
       </AppShell>
     );
@@ -80,7 +92,7 @@ export default function GroupMeeting() {
 
   if (connection) {
     return (
-      <div style={{ height: "100vh", position: "relative" }} data-lk-theme="default">
+      <div className="meetings-call-shell" data-lk-theme="default">
         <LiveKitRoom
           serverUrl={connection.url}
           token={connection.token}
@@ -89,7 +101,7 @@ export default function GroupMeeting() {
           audio={true}
           onDisconnected={() => {
             setConnection(null);
-            navigate("/dashboard");
+            navigate("/meetings");
           }}
           style={{ height: "100%" }}
         >
@@ -97,49 +109,49 @@ export default function GroupMeeting() {
         </LiveKitRoom>
 
         {canHost && participants.length > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              top: 16,
-              right: 16,
-              width: 260,
-              background: "var(--panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 14,
-              zIndex: 50,
-              maxHeight: "60vh",
-              overflowY: "auto",
-            }}
-          >
-            <strong style={{ fontSize: 12.5, display: "block", marginBottom: 10 }}>👑 Ishtirokchilarni boshqarish</strong>
+          <aside className="meetings-host-panel">
+            <strong>Ishtirokchilar</strong>
             {participants.map((p) => (
-              <div key={p.identity} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                <span style={{ fontSize: 12 }}>{p.name}</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "audio", true)} title="Ovozini o'chirish">🔇</button>
-                  <button className="secondary" style={{ width: "auto", padding: "3px 8px", fontSize: 11 }} onClick={() => handleMute(p.identity, "video", true)} title="Kamerasini o'chirish">📷</button>
+              <div key={p.identity} className="meetings-host-row">
+                <span>{p.name}</span>
+                <div className="meetings-host-actions">
+                  <button type="button" className="secondary" onClick={() => handleMute(p.identity, "audio", true)} title="Ovozni o‘chirish">
+                    Mic
+                  </button>
+                  <button type="button" className="secondary" onClick={() => handleMute(p.identity, "video", true)} title="Kamerani o‘chirish">
+                    Cam
+                  </button>
                 </div>
               </div>
             ))}
-          </div>
+          </aside>
         )}
       </div>
     );
   }
 
   return (
-    <AppShell>
-      <div className="page-header">
-        <h1>Guruh uchrashuvi — {company.name}</h1>
-        <p>Bir nechta kishi bilan bir vaqtda video orqali muloqot qiling.</p>
-      </div>
-      <div className="empty-card">
-        {error && <p className="error">{error}</p>}
-        <p>Kompaniyangizning umumiy guruh xonasiga qo'shiling — hozir u yerda bo'lgan boshqa a'zolarni ham ko'rasiz.</p>
-        <button onClick={handleJoin} disabled={loading}>
-          {loading ? "Ulanmoqda..." : "🎥 Guruh uchrashuviga qo'shilish"}
-        </button>
+    <AppShell topLeft={<GroupHeading companyName={company.name} />}>
+      <div className="meetings-page">
+        <section className="meetings-lobby">
+          <div className="meetings-lobby-mark" aria-hidden>
+            G
+          </div>
+          <h2>{company.name}</h2>
+          <p>
+            Kompaniyangizning umumiy guruh xonasiga qo‘shiling — hozir u yerda bo‘lgan boshqa aʼzolarni ham
+            ko‘rasiz.
+          </p>
+          {error && <p className="error">{error}</p>}
+          <div className="meetings-lobby-actions">
+            <button type="button" className="meetings-cta" onClick={handleJoin} disabled={loading}>
+              {loading ? "Ulanmoqda..." : "Uchrashuvga qo‘shilish"}
+            </button>
+            <button type="button" className="secondary meetings-soft-btn" onClick={() => navigate("/meetings")}>
+              Ortga
+            </button>
+          </div>
+        </section>
       </div>
     </AppShell>
   );
