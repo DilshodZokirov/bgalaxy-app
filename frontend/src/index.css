@@ -1280,6 +1280,22 @@ video {
   gap: 12px;
 }
 
+.ziyo-brand-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ziyo-reset-btn {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+}
+
 .ziyo-brand {
   margin: 0;
   font-family: "Syne", "Poppins", sans-serif;
@@ -1318,11 +1334,11 @@ video {
 
 .ziyo-hero-visual {
   position: relative;
-  width: min(280px, 70vw);
+  width: min(320px, 78vw);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .ziyo-wave {

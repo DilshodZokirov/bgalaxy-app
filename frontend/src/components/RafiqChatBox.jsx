@@ -59,6 +59,9 @@ export default function RafiqChatBox({ compact = false, onClose }) {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Hero mockup should show on every page open — not disappear just because
+  // older chat history already exists on the server.
+  const [started, setStarted] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -70,12 +73,14 @@ export default function RafiqChatBox({ compact = false, onClose }) {
   }, []);
 
   useEffect(() => {
+    if (!started) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, started]);
 
   async function sendMessage(text) {
     const content = (text ?? draft).trim();
     if (!content || loading) return;
+    setStarted(true);
     setError(null);
     setDraft("");
     setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: "user", content }]);
@@ -103,7 +108,7 @@ export default function RafiqChatBox({ compact = false, onClose }) {
     sendMessage();
   }
 
-  const showHero = !compact && messages.length === 0 && !loading;
+  const showHero = !compact && !started;
 
   if (compact) {
     return (
@@ -152,12 +157,21 @@ export default function RafiqChatBox({ compact = false, onClose }) {
     <div className={`ziyo-page ${showHero ? "is-hero" : "is-chat"}`}>
       <div className="ziyo-brand-row">
         <p className="ziyo-brand">AI Ziyo</p>
-        {!showHero && (
+        <div className="ziyo-brand-actions">
+          {!showHero && (
+            <button
+              type="button"
+              className="ziyo-reset-btn"
+              onClick={() => setStarted(false)}
+            >
+              Bosh sahifa
+            </button>
+          )}
           <div className="ziyo-online">
             <span className="dot" />
             Onlayn
           </div>
-        )}
+        </div>
       </div>
 
       {showHero ? (
