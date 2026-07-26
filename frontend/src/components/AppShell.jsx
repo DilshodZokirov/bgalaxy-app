@@ -33,7 +33,7 @@ export default function AppShell({ children, variant, skyMode }) {
       </main>
       {!isGalaxy && <ThemeToggleButton />}
       {!isGalaxy && <NotificationBell />}
-      <RafiqFloatingButton />
+      {!isGalaxy && <RafiqFloatingButton />}
       <ComplaintButton />
       {showSettings && (
         <SettingsPopup user={user} onClose={() => setShowSettings(false)} onSaved={refreshUser} />

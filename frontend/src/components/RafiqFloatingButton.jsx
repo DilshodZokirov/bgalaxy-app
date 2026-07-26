@@ -8,7 +8,7 @@ const WAKE_WORD = "ziyo";
 const SpeechRecognitionAPI =
   typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
-export default function RafiqFloatingButton() {
+export default function RafiqFloatingButton({ variant = "fab" }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [enabled, setEnabled] = useState(true);
@@ -16,6 +16,7 @@ export default function RafiqFloatingButton() {
   const recognitionRef = useRef(null);
   const awaitingCommandRef = useRef(false);
   const stoppedRef = useRef(false);
+  const isHeader = variant === "header";
 
   useEffect(() => {
     if (location.pathname.startsWith("/rafiq")) return undefined; // the dedicated page is text-only, avoid mic contention
@@ -108,7 +109,35 @@ export default function RafiqFloatingButton() {
 
   if (location.pathname.startsWith("/rafiq")) return null;
 
-  const icons = { idle: "🤖", listening: "🎙️", thinking: "💭", speaking: "🔊" };
+  const icons = { idle: "🎙️", listening: "🎙️", thinking: "💭", speaking: "🔊" };
+
+  if (isHeader) {
+    return (
+      <div className="rafiq-header-wrap">
+        <button
+          type="button"
+          className={`rafiq-header-chip ${enabled ? `is-${status}` : "is-off"}`}
+          onClick={() => navigate("/rafiq")}
+          title="AI Ziyo chatini ochish"
+        >
+          <span className="rafiq-header-icon">{enabled ? icons[status] : "🤖"}</span>
+          <span>Ziyo</span>
+        </button>
+        <button
+          type="button"
+          className="rafiq-header-mic"
+          onClick={() => setEnabled((v) => !v)}
+          title={
+            enabled
+              ? `Mikrofon yoqilgan — "${WAKE_WORD}" deb ayting`
+              : "Mikrofon o'chirilgan — yoqish uchun bosing"
+          }
+        >
+          {enabled ? "ON" : "OFF"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button
