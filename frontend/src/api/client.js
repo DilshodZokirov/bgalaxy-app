@@ -33,11 +33,26 @@ export const api = {
   getDevelopers: () => request("/developers"),
   grantDeveloper: (email) => request("/developers/grant", { method: "POST", body: { email } }),
   revokeDeveloper: (userId) => request(`/developers/${userId}`, { method: "DELETE" }),
-  submitComplaint: (message, path, contactEmail) =>
-    request("/complaints", {
+  submitComplaint: async (message, path, contactEmail, files = []) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("message", message || "");
+    formData.append("contact_email", contactEmail || "");
+    if (path) formData.append("path", path);
+    for (const file of files || []) {
+      formData.append("files", file);
+    }
+    const res = await fetch(`${API_BASE}/complaints`, {
       method: "POST",
-      body: { message, path, contact_email: contactEmail },
-    }),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || `Request failed: ${res.status}`);
+    }
+    return null;
+  },
   getComplaints: (params = {}) => request(`/complaints?${new URLSearchParams(params)}`),
   resolveComplaint: (id) => request(`/complaints/${id}/resolve`, { method: "PATCH" }),
   register: (data) => request("/auth/register", { method: "POST", body: data, auth: false }),

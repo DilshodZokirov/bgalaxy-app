@@ -1,15 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
+
+const MAX_IMAGES = 5;
 
 export default function ComplaintButton() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
+  const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
+
+  const previews = useMemo(
+    () =>
+      files.map((file, index) => ({
+        key: `${file.name}-${file.size}-${index}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+      })),
+    [files]
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
 
   useEffect(() => {
     if (open && user?.email && !email) {
@@ -17,15 +36,48 @@ export default function ComplaintButton() {
     }
   }, [open, user, email]);
 
+  function resetForm() {
+    setMessage("");
+    setFiles([]);
+    setError(null);
+  }
+
+  function handleFilesChange(e) {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!picked.length) return;
+
+    const images = picked.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
+    if (images.length !== picked.length) {
+      setError("Faqat rasm fayllari biriktiriladi (JPG, PNG, WEBP, GIF)");
+    } else {
+      setError(null);
+    }
+
+    setFiles((prev) => {
+      const next = [...prev];
+      for (const file of images) {
+        if (next.length >= MAX_IMAGES) break;
+        const dup = next.some((f) => f.name === file.name && f.size === file.size);
+        if (!dup) next.push(file);
+      }
+      return next.slice(0, MAX_IMAGES);
+    });
+  }
+
+  function removeFile(index) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!message.trim() || !email.trim()) return;
     setSending(true);
     setError(null);
     try {
-      await api.submitComplaint(message.trim(), window.location.pathname, email.trim());
+      await api.submitComplaint(message.trim(), window.location.pathname, email.trim(), files);
       setSent(true);
-      setMessage("");
+      resetForm();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -75,7 +127,7 @@ export default function ComplaintButton() {
           }}
           onClick={() => setOpen(false)}
         >
-          <div className="card" style={{ maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+          <div className="card" style={{ maxWidth: 420, width: "100%" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h3 style={{ fontSize: 16, margin: 0 }}>📢 Fikr yoki shikoyat</h3>
               <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={() => setOpen(false)}>
@@ -129,8 +181,87 @@ export default function ComplaintButton() {
                   }}
                   required
                 />
+
+                <label style={{ display: "block", fontSize: 12.5, color: "var(--text-dim)", marginBottom: 6 }}>
+                  Rasmlar (ixtiyoriy, max {MAX_IMAGES})
+                </label>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    width: "100%",
+                    padding: "12px 10px",
+                    marginBottom: 10,
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px dashed var(--border)",
+                    background: "var(--panel-2)",
+                    color: "var(--text-dim)",
+                    fontSize: 13,
+                    cursor: files.length >= MAX_IMAGES ? "not-allowed" : "pointer",
+                    opacity: files.length >= MAX_IMAGES ? 0.6 : 1,
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={files.length >= MAX_IMAGES}
+                    onChange={handleFilesChange}
+                    style={{ display: "none" }}
+                  />
+                  🖼 Rasm biriktirish
+                </label>
+
+                {previews.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    {previews.map((p, index) => (
+                      <div
+                        key={p.key}
+                        style={{
+                          position: "relative",
+                          width: 72,
+                          height: 72,
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          border: "1px solid var(--border)",
+                          background: "#0f172a",
+                        }}
+                      >
+                        <img
+                          src={p.url}
+                          alt={p.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            right: 2,
+                            width: 22,
+                            height: 22,
+                            padding: 0,
+                            borderRadius: "50%",
+                            fontSize: 12,
+                            lineHeight: "20px",
+                            background: "rgba(15,23,42,0.8)",
+                            border: "1px solid rgba(148,163,184,0.35)",
+                            color: "#fff",
+                          }}
+                          aria-label="Rasmni olib tashlash"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <p style={{ fontSize: 11.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
-                  Javobni shu email manziliga yozamiz.
+                  Javobni shu email manziliga yozamiz. Muammo skrinshotini ham yuborishingiz mumkin.
                 </p>
                 {error && <p className="error">{error}</p>}
                 <button type="submit" disabled={sending || !email.trim() || !message.trim()}>
