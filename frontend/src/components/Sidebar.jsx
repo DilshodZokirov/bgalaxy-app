@@ -91,7 +91,7 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
     finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Mahsulot oqimi", to: "/warehouse" }];
   }
   if (canViewAnalytics) {
-    finalNavItems = [...finalNavItems, { icon: "📈", label: "Analitika", hint: "Analytics", to: "/analytics" }];
+    finalNavItems = [...finalNavItems, { icon: "📈", label: "Statistika", hint: "Statistics", to: "/statistika" }];
   }
   if (user?.is_developer) {
     finalNavItems = [...finalNavItems, { icon: "🛠️", label: "Developer", hint: "Panel", to: "/developer" }];

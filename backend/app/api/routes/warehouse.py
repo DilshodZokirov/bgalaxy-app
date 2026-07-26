@@ -45,7 +45,7 @@ def _month_key(d: date) -> str:
 
 def _dashboard_buckets(period: str):
     """Returns (bucket_keys, start_date, key_fn) — mirrors the granularity
-    pattern used on the Kompaniya Analitikasi trend charts."""
+    pattern used on the Kompaniya Statistika trend charts."""
     today = date.today()
     if period == "today":
         return [_day_key(today)], today, _day_key

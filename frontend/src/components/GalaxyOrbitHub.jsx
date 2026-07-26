@@ -9,7 +9,7 @@ const ORBITS = [
   { n: 5, label: "VAZIFALAR", icon: "🗂️", to: "/tasks", color: "#10b981", angle: 30 },
   { n: 6, label: "DASHBOARD", icon: "📊", to: "/dashboard", color: "#2563eb", angle: 75 },
   { n: 7, label: "CHAT", icon: "💬", to: "/chat", color: "#38bdf8", angle: 120 },
-  { n: 8, label: "ANALITIKA", icon: "📈", to: "/analytics", color: "#ec4899", angle: 165 },
+  { n: 8, label: "STATISTIKA", icon: "📈", to: "/statistika", color: "#22d3ee", angle: 165 },
 ];
 
 function polar(angleDeg, radiusPct) {
