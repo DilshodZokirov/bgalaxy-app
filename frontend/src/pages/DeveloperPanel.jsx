@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, API_BASE } from "../api/client";
 import AppShell from "../components/AppShell";
 
 const TABS = [
@@ -117,11 +117,59 @@ function ComplaintsTab() {
               <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: "auto" }}>{new Date(c.created_at).toLocaleString("uz-UZ")}</span>
             </div>
             <div style={{ fontSize: 13.5, margin: "6px 0" }}>{c.message}</div>
-            <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>👤 {c.user_full_name} ({c.user_email})</div>
+            {Array.isArray(c.attachments) && c.attachments.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0 10px" }}>
+                {c.attachments.map((a) => (
+                  <a
+                    key={a.url}
+                    href={`${API_BASE}${a.url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={a.name || "Rasm"}
+                    style={{
+                      display: "block",
+                      width: 96,
+                      height: 96,
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      border: "1px solid var(--border)",
+                      background: "var(--panel-2)",
+                    }}
+                  >
+                    <img
+                      src={`${API_BASE}${a.url}`}
+                      alt={a.name || "Rasm"}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 12.5, marginBottom: 4 }}>
+              📧 Javob uchun:{" "}
+              <a href={`mailto:${c.contact_email || c.user_email}`} style={{ color: "var(--cyan, #22d3ee)", fontWeight: 600 }}>
+                {c.contact_email || c.user_email}
+              </a>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>
+              👤 {c.user_full_name}
+              {c.user_email && c.contact_email && c.user_email !== c.contact_email
+                ? ` · akkaunt: ${c.user_email}`
+                : ""}
+            </div>
             {c.status === "open" && (
-              <button style={{ width: "auto", padding: "5px 12px", fontSize: 11.5, marginTop: 8 }} onClick={() => handleResolve(c.id)}>
-                ✓ Hal qilindi deb belgilash
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <a
+                  className="secondary"
+                  href={`mailto:${c.contact_email || c.user_email}?subject=${encodeURIComponent("BG shikoyat javobi")}&body=${encodeURIComponent(`Salom ${c.user_full_name},\n\n`)}`}
+                  style={{ width: "auto", padding: "5px 12px", fontSize: 11.5, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                >
+                  Email yozish
+                </a>
+                <button style={{ width: "auto", padding: "5px 12px", fontSize: 11.5 }} onClick={() => handleResolve(c.id)}>
+                  ✓ Hal qilindi deb belgilash
+                </button>
+              </div>
             )}
           </div>
         ))}
