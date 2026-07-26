@@ -13,6 +13,27 @@ function timeAgo(iso) {
   return `${Math.floor(hours / 24)} kun oldin`;
 }
 
+const TYPE_META = {
+  group_call_started: { icon: "📹", accent: "live", label: "Guruh uchrashuvi" },
+  group_call_ended: { icon: "⌛", accent: "ended", label: "Uchrashuv yakunlandi" },
+  partner_call: { icon: "🎥", accent: "live", label: "Hamkor chaqiruvi" },
+  scheduled_meeting: { icon: "🗓️", accent: "meet", label: "Belgilangan uchrashuv" },
+  scheduled_meeting_booked: { icon: "⏱️", accent: "meet", label: "Uchrashuv band qilindi" },
+  join_request: { icon: "👤", accent: "invite", label: "A'zolik so'rovi" },
+  invite: { icon: "✉️", accent: "invite", label: "Taklifnoma" },
+  channel_invite: { icon: "💬", accent: "invite", label: "Kanal taklifi" },
+  direct_chat_invite: { icon: "💬", accent: "invite", label: "Chat taklifi" },
+  task_assigned: { icon: "🗂️", accent: "task", label: "Vazifa" },
+  task_update: { icon: "🗂️", accent: "task", label: "Vazifa yangilandi" },
+  direct_message: { icon: "✉️", accent: "chat", label: "Xabar" },
+  mention: { icon: "@", accent: "chat", label: "Eslatma" },
+  info: { icon: "ℹ️", accent: "info", label: "Ma'lumot" },
+};
+
+function metaFor(type) {
+  return TYPE_META[type] || { icon: "🔔", accent: "info", label: "Bildirishnoma" };
+}
+
 export default function NotificationBell({ variant = "fixed" }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
@@ -40,7 +61,6 @@ export default function NotificationBell({ variant = "fixed" }) {
       }
     };
 
-    // Slow fallback poll in case the socket ever drops silently.
     const interval = setInterval(refresh, 60000);
     return () => {
       clearInterval(interval);
@@ -62,6 +82,10 @@ export default function NotificationBell({ variant = "fixed" }) {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, ...updates } : n)));
   }
 
+  function removeLocally(id) {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
+
   async function handleAcceptInvite(n) {
     try {
       await api.acceptInvite(n.invite_token);
@@ -74,8 +98,8 @@ export default function NotificationBell({ variant = "fixed" }) {
 
   async function handleJoinPartnerCall(n) {
     try {
-      await api.markNotificationRead(n.id);
-      markLocally(n.id, { read: true });
+      await api.dismissNotification(n.id);
+      removeLocally(n.id);
     } catch {
       // ignore
     }
@@ -109,8 +133,8 @@ export default function NotificationBell({ variant = "fixed" }) {
 
   async function handleJoinGroupCall(n) {
     try {
-      await api.markNotificationRead(n.id);
-      markLocally(n.id, { read: true });
+      await api.dismissNotification(n.id);
+      removeLocally(n.id);
     } catch {
       // ignore
     }
@@ -137,10 +161,19 @@ export default function NotificationBell({ variant = "fixed" }) {
     }
   }
 
-  async function handleDismiss(id) {
+  async function handleDismiss(n) {
     try {
-      await api.markNotificationRead(id);
-      markLocally(id, { read: true });
+      if (
+        n.type === "group_call_started" ||
+        n.type === "group_call_ended" ||
+        n.type === "partner_call"
+      ) {
+        await api.dismissNotification(n.id);
+        removeLocally(n.id);
+      } else {
+        await api.markNotificationRead(n.id);
+        markLocally(n.id, { read: true, resolved: true });
+      }
     } catch {
       // ignore
     }
@@ -183,12 +216,11 @@ export default function NotificationBell({ variant = "fixed" }) {
           </div>
 
           {notifications.length === 0 && (
-            <p style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "20px 0" }}>
-              Hali bildirishnoma yo'q
-            </p>
+            <p className="notif-empty">Hali bildirishnoma yo'q</p>
           )}
 
           {notifications.map((n) => {
+            const meta = metaFor(n.type);
             const isActionable =
               !n.resolved &&
               (n.type === "join_request" ||
@@ -197,6 +229,7 @@ export default function NotificationBell({ variant = "fixed" }) {
                 n.type === "invite" ||
                 n.type === "partner_call" ||
                 n.type === "group_call_started" ||
+                n.type === "group_call_ended" ||
                 n.type === "scheduled_meeting" ||
                 n.type === "scheduled_meeting_booked" ||
                 n.type === "task_assigned" ||
@@ -204,85 +237,124 @@ export default function NotificationBell({ variant = "fixed" }) {
                 n.type === "direct_message");
 
             return (
-              <div className="notif-item" key={n.id} style={{ opacity: n.read ? 0.55 : 1 }}>
-                <div style={{ color: n.read ? "var(--text-dim)" : "var(--text)", fontWeight: n.read ? 400 : 600 }}>
-                  {n.message}
+              <article
+                className={`notif-card ${n.read ? "is-read" : "is-unread"} accent-${meta.accent}`}
+                key={n.id}
+              >
+                <div className="notif-card-icon" aria-hidden>
+                  {meta.icon}
                 </div>
-                {n.company_name && (
-                  <div style={{ color: "var(--text-dim)", fontSize: 12 }}>{n.company_name}</div>
-                )}
-                <div className="notif-time">{timeAgo(n.created_at)}</div>
+                <div className="notif-card-body">
+                  <div className="notif-card-meta">
+                    <span className="notif-card-kind">{meta.label}</span>
+                    <span className="notif-time">{timeAgo(n.created_at)}</span>
+                  </div>
+                  <p className="notif-card-message">{n.message}</p>
+                  {n.company_name && <div className="notif-card-company">{n.company_name}</div>}
 
-                {!isActionable ? (
-                  !n.read && (
+                  {!isActionable ? (
+                    !n.read && (
+                      <div className="notif-item-actions">
+                        <button className="secondary" onClick={() => handleDismiss(n)}>
+                          O'qildi
+                        </button>
+                      </div>
+                    )
+                  ) : n.type === "join_request" || n.type === "channel_invite" || n.type === "direct_chat_invite" ? (
                     <div className="notif-item-actions">
-                      <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                        O'qildi deb belgilash
+                      <button className="notif-btn-primary" onClick={() => handleAccept(n.id)}>
+                        Qabul qilish
+                      </button>
+                      <button className="secondary" onClick={() => handleReject(n.id)}>
+                        Rad qilish
                       </button>
                     </div>
-                  )
-                ) : n.type === "join_request" || n.type === "channel_invite" || n.type === "direct_chat_invite" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleAccept(n.id)}>Qabul qilish</button>
-                    <button className="secondary" onClick={() => handleReject(n.id)}>
-                      Rad qilish
-                    </button>
-                  </div>
-                ) : n.type === "invite" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleAcceptInvite(n)}>A'zo bo'lish</button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Rad qilish
-                    </button>
-                  </div>
-                ) : n.type === "partner_call" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleJoinPartnerCall(n)}>🎥 Qo'shilish</button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                ) : n.type === "group_call_started" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleJoinGroupCall(n)}>🎥 Qo'shilish</button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                ) : n.type === "scheduled_meeting" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleJoinScheduledMeeting(n)}>Uchrashuvga kirish</button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                ) : n.type === "scheduled_meeting_booked" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => handleOpenMeetingsHub(n)}>Countdown ko‘rish</button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                ) : n.type === "task_assigned" || n.type === "task_update" ? (
-                  <div className="notif-item-actions">
-                    <button onClick={() => { handleDismiss(n.id); setOpen(false); navigate("/tasks"); }}>
-                      🗂️ Ko'rish
-                    </button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                ) : (
-                  <div className="notif-item-actions">
-                    <button onClick={() => { handleDismiss(n.id); setOpen(false); navigate("/direct-chat"); }}>
-                      💬 Ko'rish
-                    </button>
-                    <button className="secondary" onClick={() => handleDismiss(n.id)}>
-                      Yopish
-                    </button>
-                  </div>
-                )}
-              </div>
+                  ) : n.type === "invite" ? (
+                    <div className="notif-item-actions">
+                      <button className="notif-btn-primary" onClick={() => handleAcceptInvite(n)}>
+                        A'zo bo'lish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Rad qilish
+                      </button>
+                    </div>
+                  ) : n.type === "partner_call" ? (
+                    <div className="notif-item-actions">
+                      <button className="notif-btn-join" onClick={() => handleJoinPartnerCall(n)}>
+                        Qo'shilish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "group_call_started" ? (
+                    <div className="notif-item-actions">
+                      <button className="notif-btn-join" onClick={() => handleJoinGroupCall(n)}>
+                        Qo'shilish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "group_call_ended" ? (
+                    <div className="notif-item-actions">
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Tushundim
+                      </button>
+                    </div>
+                  ) : n.type === "scheduled_meeting" ? (
+                    <div className="notif-item-actions">
+                      <button className="notif-btn-primary" onClick={() => handleJoinScheduledMeeting(n)}>
+                        Uchrashuvga kirish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "scheduled_meeting_booked" ? (
+                    <div className="notif-item-actions">
+                      <button className="notif-btn-primary" onClick={() => handleOpenMeetingsHub(n)}>
+                        Countdown ko‘rish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "task_assigned" || n.type === "task_update" ? (
+                    <div className="notif-item-actions">
+                      <button
+                        className="notif-btn-primary"
+                        onClick={() => {
+                          handleDismiss(n);
+                          setOpen(false);
+                          navigate("/tasks");
+                        }}
+                      >
+                        Ko'rish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="notif-item-actions">
+                      <button
+                        className="notif-btn-primary"
+                        onClick={() => {
+                          handleDismiss(n);
+                          setOpen(false);
+                          navigate("/direct-chat");
+                        }}
+                      >
+                        Ko'rish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </article>
             );
           })}
         </div>
