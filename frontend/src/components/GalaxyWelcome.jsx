@@ -1,5 +1,22 @@
+function FancyLine({ text, className = "", startDelay = 0 }) {
+  const letters = text.split("");
+  return (
+    <span className={`galaxy-welcome-face ${className}`}>
+      {letters.map((ch, i) => (
+        <span
+          key={`${ch}-${i}`}
+          className="galaxy-welcome-letter"
+          style={{ animationDelay: `${startDelay + i * 0.035}s` }}
+        >
+          {ch === " " ? "\u00A0" : ch}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function GalaxyWelcome({ name }) {
-  const letters = `Xush kelibsiz, ${name}!`.split("");
+  const displayName = name || "foydalanuvchi";
 
   return (
     <div className="galaxy-welcome">
@@ -15,20 +32,17 @@ export default function GalaxyWelcome({ name }) {
 
       <h1 className="galaxy-welcome-title">
         <span className="galaxy-welcome-depth" aria-hidden>
-          Xush kelibsiz, {name}!
+          <span>Xush kelibsiz</span>
+          <span>{displayName}!</span>
         </span>
-        <span className="galaxy-welcome-face">
-          {letters.map((ch, i) => (
-            <span
-              key={`${ch}-${i}`}
-              className="galaxy-welcome-letter"
-              style={{ animationDelay: `${i * 0.035}s` }}
-            >
-              {ch === " " ? "\u00A0" : ch}
+
+        <span className="galaxy-welcome-lines">
+          <FancyLine text="Xush kelibsiz" className="galaxy-welcome-line-top" />
+          <span className="galaxy-welcome-line-name">
+            <FancyLine text={`${displayName}!`} className="galaxy-welcome-name" startDelay={0.35} />
+            <span className="galaxy-welcome-wave" style={{ animationDelay: "0.7s" }}>
+              👋
             </span>
-          ))}
-          <span className="galaxy-welcome-wave" style={{ animationDelay: `${letters.length * 0.035}s` }}>
-            👋
           </span>
         </span>
       </h1>
