@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { pickActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
+import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
 
@@ -10,14 +11,69 @@ function MeetingsHeading() {
     <div className="galaxy-page-heading">
       <p className="galaxy-page-kicker">Online Meeting</p>
       <h1>Uchrashuvlar</h1>
-      <p>Guruh yoki hamkorlar bilan video uchrashuv — bitta markazda.</p>
+      <p>Hozir boshlang yoki vaqtga belgilang — mavzu va countdown bilan.</p>
+    </div>
+  );
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function formatCountdown(ms) {
+  if (ms <= 0) return { label: "Vaqti keldi", parts: { d: 0, h: 0, m: 0, s: 0 }, due: true };
+  const totalSec = Math.floor(ms / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const label =
+    d > 0
+      ? `${d}k ${pad2(h)}:${pad2(m)}:${pad2(s)}`
+      : `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+  return { label, parts: { d, h, m, s }, due: false };
+}
+
+function toLocalInputValue(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function CountdownBadge({ startsAt, onDue }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const ms = new Date(startsAt).getTime() - now;
+  const info = formatCountdown(ms);
+
+  useEffect(() => {
+    if (info.due && onDue) onDue();
+  }, [info.due]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className={`meetings-countdown ${info.due ? "due" : ""}`}>
+      <span className="meetings-countdown-label">{info.due ? "Uchrashuv vaqti" : "Qolgan vaqt"}</span>
+      <strong className="meetings-countdown-digits">{info.label}</strong>
+      {!info.due && (
+        <div className="meetings-countdown-units" aria-hidden>
+          <span>{pad2(info.parts.h)} soat</span>
+          <span>{pad2(info.parts.m)} daq</span>
+          <span>{pad2(info.parts.s)} son</span>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function MeetingsHub() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [showPartnerSearch, setShowPartnerSearch] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [partners, setPartners] = useState([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
@@ -25,6 +81,17 @@ export default function MeetingsHub() {
   const [company, setCompany] = useState(null);
   const [activeGroupCall, setActiveGroupCall] = useState(null);
   const [activePartnerMeetings, setActivePartnerMeetings] = useState([]);
+  const [scheduled, setScheduled] = useState([]);
+
+  const [schedTitle, setSchedTitle] = useState("");
+  const [schedDescription, setSchedDescription] = useState("");
+  const [schedAt, setSchedAt] = useState(() => {
+    const d = new Date();
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+    return toLocalInputValue(d);
+  });
+  const [schedSaving, setSchedSaving] = useState(false);
+  const [schedError, setSchedError] = useState(null);
 
   useEffect(() => {
     api
@@ -33,9 +100,17 @@ export default function MeetingsHub() {
       .catch(() => {});
   }, []);
 
+  function refreshScheduled() {
+    api.getScheduledMeetings().then(setScheduled).catch(() => setScheduled([]));
+  }
+
   useEffect(() => {
     refreshActive();
-    const interval = setInterval(refreshActive, 15000);
+    refreshScheduled();
+    const interval = setInterval(() => {
+      refreshActive();
+      refreshScheduled();
+    }, 15000);
     return () => clearInterval(interval);
   }, [company?.id]);
 
@@ -72,6 +147,55 @@ export default function MeetingsHub() {
     }
   }
 
+  async function handleScheduleSubmit(e) {
+    e.preventDefault();
+    if (!company) {
+      setSchedError("Avval faol kompaniyani tanlang");
+      return;
+    }
+    setSchedSaving(true);
+    setSchedError(null);
+    try {
+      const startsAt = new Date(schedAt);
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new Error("Vaqt noto‘g‘ri");
+      }
+      await api.createScheduledMeeting({
+        company_id: company.id,
+        title: schedTitle.trim(),
+        description: schedDescription.trim(),
+        starts_at: startsAt.toISOString(),
+      });
+      setShowSchedule(false);
+      setSchedTitle("");
+      setSchedDescription("");
+      refreshScheduled();
+    } catch (err) {
+      setSchedError(err.message);
+    } finally {
+      setSchedSaving(false);
+    }
+  }
+
+  async function handleCancelScheduled(id) {
+    try {
+      await api.cancelScheduledMeeting(id);
+      refreshScheduled();
+    } catch {
+      // ignore
+    }
+  }
+
+  function joinScheduled(meeting) {
+    if (meeting.company_id) setActiveCompanyId(meeting.company_id);
+    navigate("/group-meeting");
+  }
+
+  const upcoming = useMemo(
+    () => scheduled.filter((m) => m.status === "scheduled" || m.status === "notified"),
+    [scheduled]
+  );
+
   const hasActive = activeGroupCall || activePartnerMeetings.length > 0;
 
   return (
@@ -86,7 +210,69 @@ export default function MeetingsHub() {
                 : "Guruh uchrashuvi uchun avval kompaniya tanlang"}
             </p>
           </div>
+          <button
+            type="button"
+            className="meetings-cta"
+            disabled={!company}
+            onClick={() => {
+              setSchedError(null);
+              setShowSchedule(true);
+            }}
+          >
+            Vaqtga belgilash
+          </button>
         </div>
+
+        {upcoming.length > 0 && (
+          <section className="meetings-scheduled" aria-label="Belgilangan uchrashuvlar">
+            <div className="meetings-section-head">
+              <h3>Belgilangan uchrashuvlar</h3>
+            </div>
+            <div className="meetings-scheduled-list">
+              {upcoming.map((m) => {
+                const when = new Date(m.starts_at);
+                const whenLabel = when.toLocaleString("uz-UZ", {
+                  weekday: "short",
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                const isCreator = user?.id === m.created_by;
+                return (
+                  <article key={m.id} className={`meetings-scheduled-card ${m.status === "notified" ? "is-due" : ""}`}>
+                    <div className="meetings-scheduled-copy">
+                      <strong>{m.title}</strong>
+                      <p className="meetings-scheduled-meta">
+                        {m.company_name} · {whenLabel}
+                        {m.creator_name ? ` · ${m.creator_name}` : ""}
+                      </p>
+                      {m.description && <p className="meetings-scheduled-desc">{m.description}</p>}
+                    </div>
+                    <CountdownBadge startsAt={m.starts_at} onDue={() => refreshScheduled()} />
+                    <div className="meetings-scheduled-actions">
+                      <button type="button" className="meetings-cta" onClick={() => joinScheduled(m)}>
+                        {m.status === "notified" || new Date(m.starts_at) <= new Date()
+                          ? "Uchrashuvga kirish"
+                          : "Erta kirish"}
+                      </button>
+                      {isCreator && m.status === "scheduled" && (
+                        <button
+                          type="button"
+                          className="secondary meetings-soft-btn"
+                          onClick={() => handleCancelScheduled(m.id)}
+                        >
+                          Bekor qilish
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {hasActive && (
           <section className="meetings-live" aria-label="Faol uchrashuvlar">
@@ -137,7 +323,7 @@ export default function MeetingsHub() {
             </span>
             <span className="meetings-launch-copy">
               <strong>Guruh uchrashuvi</strong>
-              <em>Kompaniya aʼzolari bilan LiveKit xona</em>
+              <em>Hozir kompaniya xonasiga qo‘shiling</em>
             </span>
             <span className="meetings-launch-cta">Boshlash</span>
           </button>
@@ -152,8 +338,72 @@ export default function MeetingsHub() {
             </span>
             <span className="meetings-launch-cta">Tanlash</span>
           </button>
+
+          <button
+            type="button"
+            className="meetings-launch-card schedule"
+            disabled={!company}
+            onClick={() => {
+              setSchedError(null);
+              setShowSchedule(true);
+            }}
+          >
+            <span className="meetings-launch-mark" aria-hidden>
+              V
+            </span>
+            <span className="meetings-launch-copy">
+              <strong>Vaqtga belgilash</strong>
+              <em>Mavzu + sana/soat + soniyagacha countdown</em>
+            </span>
+            <span className="meetings-launch-cta">Belgilash</span>
+          </button>
         </section>
       </div>
+
+      {showSchedule && (
+        <div className="meetings-modal-backdrop" onClick={() => setShowSchedule(false)}>
+          <div className="card meetings-modal meetings-schedule-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="meetings-modal-head">
+              <h3>Uchrashuvni vaqtga belgilash</h3>
+              <button type="button" className="secondary meetings-soft-btn" onClick={() => setShowSchedule(false)}>
+                Yopish
+              </button>
+            </div>
+            <p className="meetings-modal-hint">
+              Masalan: bugun soat 16:00 — mavzu “Oylik muammo”. Vaqt yaqinlashganda jamoa bildirishnoma oladi,
+              countdown esa soniyagacha sanaydi.
+            </p>
+            <form onSubmit={handleScheduleSubmit}>
+              <label>Sarlavha</label>
+              <input
+                value={schedTitle}
+                onChange={(e) => setSchedTitle(e.target.value)}
+                placeholder="Oylik muhokama"
+                required
+              />
+              <label>Mavzu / description</label>
+              <textarea
+                value={schedDescription}
+                onChange={(e) => setSchedDescription(e.target.value)}
+                placeholder="Uchrashuvda oylik muammo haqida gaplashamiz..."
+                rows={3}
+              />
+              <label>Sana va soat</label>
+              <input
+                type="datetime-local"
+                value={schedAt}
+                min={toLocalInputValue(new Date())}
+                onChange={(e) => setSchedAt(e.target.value)}
+                required
+              />
+              {schedError && <p className="error">{schedError}</p>}
+              <button type="submit" className="meetings-cta" disabled={schedSaving || !company}>
+                {schedSaving ? "Saqlanmoqda..." : "Belgilash"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showPartnerSearch && (
         <div className="meetings-modal-backdrop" onClick={() => setShowPartnerSearch(false)}>

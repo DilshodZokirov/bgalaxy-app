@@ -4846,9 +4846,163 @@ video {
   font-size: 0.82rem;
 }
 
+/* ---------- Scheduled meetings + countdown ---------- */
+.meetings-scheduled {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meetings-scheduled-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meetings-scheduled-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.7fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.16), transparent 40%),
+    rgba(15, 23, 42, 0.62);
+}
+
+.meetings-scheduled-card.is-due {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.18);
+}
+
+.meetings-scheduled-copy strong {
+  display: block;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.05rem;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+
+.meetings-scheduled-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.meetings-scheduled-desc {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.meetings-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 140px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  text-align: center;
+}
+
+.meetings-countdown.due {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.meetings-countdown-label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.meetings-countdown-digits {
+  font-family: "Syne", "Poppins", ui-monospace, monospace;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+}
+
+.meetings-countdown.due .meetings-countdown-digits {
+  color: #34d399;
+  font-size: 1.05rem;
+}
+
+.meetings-countdown-units {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.meetings-scheduled-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meetings-launch-card.schedule .meetings-launch-mark {
+  background: linear-gradient(145deg, #0ea5e9, #14b8a6 55%, #2563eb);
+}
+
+.meetings-launch-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.meetings-schedule-modal textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  margin-bottom: 10px;
+  font-family: inherit;
+}
+
+.meetings-toolbar .meetings-cta {
+  flex-shrink: 0;
+}
+
+.galaxy-shell-day .meetings-scheduled-card {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(14, 116, 144, 0.2);
+}
+
+.galaxy-shell-day .meetings-scheduled-copy strong {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .meetings-countdown {
+  background: rgba(241, 245, 249, 0.95);
+}
+
+.galaxy-shell-day .meetings-countdown-digits {
+  color: #0369a1;
+}
+
+@media (max-width: 900px) {
+  .meetings-scheduled-card {
+    grid-template-columns: 1fr;
+  }
+  .meetings-scheduled-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
 .meetings-launch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 

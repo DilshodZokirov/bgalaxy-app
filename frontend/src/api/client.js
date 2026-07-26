@@ -190,6 +190,10 @@ export const api = {
   getActivePartnerMeetings: () => request("/partner-meetings/active"),
   mutePartnerMeetingParticipant: (roomName, userId, kind, muted) =>
     request(`/partner-meetings/${roomName}/mute/${userId}?kind=${kind}&muted=${muted}`, { method: "POST" }),
+  getScheduledMeetings: () => request("/scheduled-meetings"),
+  createScheduledMeeting: (data) => request("/scheduled-meetings", { method: "POST", body: data }),
+  cancelScheduledMeeting: (id) => request(`/scheduled-meetings/${id}`, { method: "DELETE" }),
+  getScheduledMeeting: (id) => request(`/scheduled-meetings/${id}`),
   getTasks: (companyId) => request(`/companies/${companyId}/tasks`),
   createTask: (companyId, data) =>
     request(`/companies/${companyId}/tasks`, { method: "POST", body: data }),
