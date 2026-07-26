@@ -52,6 +52,9 @@ export default function Landing() {
       <nav className="landing-nav">
         <Logo />
         <div className="nav-actions">
+          <Link to="/galaxy-demo">
+            <button className="secondary">3D Galaxy Demo</button>
+          </Link>
           {!loading && user ? (
             <Link to="/dashboard">
               <button>Boshqaruv paneli →</button>

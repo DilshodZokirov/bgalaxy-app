@@ -2167,3 +2167,237 @@ video {
 .office-comms-row:hover {
   background: var(--panel-2);
 }
+
+/* ---------- Galaxy Hub 3D demo ---------- */
+.galaxy-demo {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #030712;
+}
+
+.galaxy-demo canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.galaxy-demo-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  padding: clamp(16px, 3vw, 36px);
+  background:
+    linear-gradient(180deg, rgba(3, 7, 18, 0.72) 0%, transparent 28%),
+    linear-gradient(0deg, rgba(3, 7, 18, 0.78) 0%, transparent 34%);
+}
+
+.galaxy-demo-top,
+.galaxy-demo-panel,
+.galaxy-demo-back,
+.galaxy-demo-cta,
+.galaxy-demo-brand {
+  pointer-events: auto;
+}
+
+.galaxy-demo-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.galaxy-demo-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+.galaxy-demo-mark {
+  width: 48px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: white;
+  background: linear-gradient(135deg, #2563eb, #7c3aed 70%, #22d3ee);
+  box-shadow: 0 0 28px rgba(37, 99, 235, 0.45);
+}
+
+.galaxy-demo-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.galaxy-demo-brand-text strong {
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.galaxy-demo-brand-text em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.galaxy-demo-back {
+  color: #e2e8f0;
+  text-decoration: none;
+  font-size: 0.92rem;
+  padding: 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.galaxy-demo-back:hover {
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(30, 41, 59, 0.65);
+}
+
+.galaxy-demo-hero {
+  align-self: end;
+  max-width: 34rem;
+  padding-bottom: 8px;
+  animation: galaxy-rise 0.9s ease both;
+}
+
+.galaxy-demo-kicker {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #67e8f9;
+}
+
+.galaxy-demo-hero h1 {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #f8fafc;
+  text-shadow: 0 10px 40px rgba(2, 6, 23, 0.65);
+}
+
+.galaxy-demo-lead {
+  margin: 12px 0 0;
+  max-width: 28rem;
+  color: #cbd5e1;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.galaxy-demo-panel {
+  justify-self: end;
+  align-self: end;
+  display: flex;
+  gap: 14px;
+  min-width: min(100%, 280px);
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(12px);
+  animation: galaxy-panel-in 0.45s ease both;
+}
+
+.galaxy-demo-swatch {
+  width: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: 0 0 18px currentColor;
+}
+
+.galaxy-demo-panel h2 {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.2rem;
+  color: #f8fafc;
+}
+
+.galaxy-demo-panel p {
+  margin: 4px 0 12px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.galaxy-demo-cta {
+  display: inline-flex;
+  color: #0f172a;
+  background: linear-gradient(135deg, #67e8f9, #93c5fd);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.galaxy-demo-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.galaxy-demo-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+@keyframes galaxy-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes galaxy-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .galaxy-demo-overlay {
+    grid-template-rows: auto auto 1fr auto;
+    gap: 12px;
+  }
+
+  .galaxy-demo-hero {
+    align-self: start;
+  }
+
+  .galaxy-demo-panel {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .galaxy-demo-brand-text em {
+    display: none;
+  }
+}
