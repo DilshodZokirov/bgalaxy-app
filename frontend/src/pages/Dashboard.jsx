@@ -15,7 +15,7 @@ function DeltaBadge({ value }) {
   if (value === null || value === undefined) return null;
   const positive = value >= 0;
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color: positive ? "var(--green)" : "#f87171", marginLeft: 8 }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color: positive ? "#34d399" : "#f87171", marginLeft: 8 }}>
       {positive ? "▲ +" : "▼ "}{new Intl.NumberFormat("uz-UZ").format(Math.round(value))}
     </span>
   );
@@ -38,7 +38,13 @@ function Sparkline({ values, color }) {
 
   return (
     <svg className="galaxy-spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="2.2" points={points} />
+      <defs>
+        <linearGradient id={`g-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polyline fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" points={points} />
     </svg>
   );
 }
@@ -49,7 +55,7 @@ function StatGlass({ label, value, delta, color, series }) {
     <div className="galaxy-stat">
       <div className="galaxy-stat-label">{label}</div>
       <div className="galaxy-stat-row">
-        <div className="galaxy-stat-value" style={{ color }}>{value}</div>
+        <div className="galaxy-stat-value">{value}</div>
         {delta != null && (
           <span className={`galaxy-stat-delta ${up ? "up" : "down"}`}>
             {up ? "▲" : "▼"} {Math.abs(delta)}%
@@ -91,49 +97,47 @@ export default function Dashboard() {
       setYearlySummary(null);
       return;
     }
-    api
-      .getMembers(company.id)
-      .then((members) => setMemberCount(members.length))
-      .catch(() => setMemberCount(0));
-    api
-      .getChannels(company.id)
-      .then((channels) => setChannelCount(channels.length))
-      .catch(() => setChannelCount(0));
-    api
-      .getMonthlyChampion(company.id)
-      .then(setChampion)
-      .catch(() => setChampion(null));
-    api
-      .getYearlySummary(company.id)
-      .then((res) => setYearlySummary(res.years))
-      .catch(() => setYearlySummary(null));
+    api.getMembers(company.id).then((m) => setMemberCount(m.length)).catch(() => setMemberCount(0));
+    api.getChannels(company.id).then((c) => setChannelCount(c.length)).catch(() => setChannelCount(0));
+    api.getMonthlyChampion(company.id).then(setChampion).catch(() => setChampion(null));
+    api.getYearlySummary(company.id).then((res) => setYearlySummary(res.years)).catch(() => setYearlySummary(null));
   }, [company]);
 
   useEffect(() => {
-    api
-      .getConversations()
-      .then((list) => setConversationCount(list.length))
-      .catch(() => setConversationCount(0));
+    api.getConversations().then((list) => setConversationCount(list.length)).catch(() => setConversationCount(0));
   }, []);
 
   const firstName = user?.full_name?.split(" ")[0] || "foydalanuvchi";
-  const incomeSeries = yearlySummary?.map((y) => y.income) || [2, 4, 3, 6, 5, 8, companyCount + 2];
-  const memberSeries = yearlySummary?.map((y) => Math.max(1, Math.round(y.balance / 1e7))) || [3, 5, 4, 7, 6, 8, memberCount || 1];
-  const channelSeries = [2, 3, 4, channelCount || 1, Math.max(channelCount, 2), channelCount + 1, channelCount + 2];
-  const chatSeries = [1, 2, 2, 4, 3, conversationCount || 1, conversationCount + 1];
+  const incomeSeries = yearlySummary?.map((y) => y.income) || [12, 18, 15, 22, 28, 24, 32];
+  const memberSeries = [40, 55, 48, 70, 82, 90, Math.max(memberCount, 8)];
+  const channelSeries = [8, 12, 10, 16, 18, 20, Math.max(channelCount, 4)];
+  const chatSeries = [5, 9, 7, 14, 18, 16, Math.max(conversationCount, 3)];
+  const points = (memberCount * 120 + channelCount * 40 + 12450).toLocaleString("en-US");
 
   return (
     <AppShell variant="galaxy">
       <div className="dashboard-galaxy">
         <header className="galaxy-top">
-          <div>
+          <div className="galaxy-top-left">
             <h1>Xush kelibsiz, {firstName}! 👋</h1>
-            <p>BG — Sizning biznesingiz uchun yagona galaktika</p>
+            <p>BG - Sizning biznesingiz uchun yagona galaktika</p>
           </div>
-          <div className="galaxy-top-actions">
+
+          <label className="galaxy-search">
+            <span className="galaxy-search-icon">⌕</span>
+            <input type="search" placeholder="Qidiruv..." disabled />
+            <kbd>⌘K</kbd>
+          </label>
+
+          <div className="galaxy-top-right">
+            <button type="button" className="galaxy-icon-btn" title="Bildirishnomalar" aria-label="Bildirishnomalar">
+              🔔<span className="galaxy-badge">3</span>
+            </button>
+            <button type="button" className="galaxy-icon-btn" title="Kalendar" aria-label="Kalendar">📅</button>
+            <button type="button" className="galaxy-icon-btn" title="Yordam" aria-label="Yordam">❓</button>
             <div className="galaxy-points">
               <span>BG Points</span>
-              <strong>{(memberCount * 120 + channelCount * 40 + 1240).toLocaleString("uz-UZ")}</strong>
+              <strong>{points}</strong>
             </div>
           </div>
         </header>
@@ -143,13 +147,16 @@ export default function Dashboard() {
         </section>
 
         <section className="galaxy-stats">
-          <StatGlass label="Kompaniya" value={companyCount} delta={companyCount ? 8 : null} color="#60a5fa" series={incomeSeries.slice(-7)} />
-          <StatGlass label="Faol a'zolar" value={memberCount} delta={memberCount ? 12 : null} color="#a78bfa" series={memberSeries.slice(-7)} />
-          <StatGlass label="Chat kanallari" value={channelCount} delta={channelCount ? 5 : null} color="#22d3ee" series={channelSeries.slice(-7)} />
-          <StatGlass label="Maxfiy suhbatlar" value={conversationCount} delta={conversationCount ? 9 : null} color="#fbbf24" series={chatSeries.slice(-7)} />
+          <StatGlass label="Faol xodimlar" value={memberCount || 0} delta={12} color="#60a5fa" series={memberSeries} />
+          <StatGlass label="Kompaniya" value={companyCount} delta={8} color="#a78bfa" series={incomeSeries.slice(-7).map((n, i) => (typeof n === "number" ? n / 1e6 || i + 2 : i + 2))} />
+          <StatGlass label="Chat kanallari" value={channelCount} delta={5} color="#22d3ee" series={channelSeries} />
+          <StatGlass label="Maxfiy suhbatlar" value={conversationCount} delta={9} color="#fbbf24" series={chatSeries} />
           <aside className="galaxy-quote">
-            <p>“Katta g‘oyalar kattaroq galaktikalarda yaratiladi.”</p>
-            <span>— BG Team</span>
+            <div className="galaxy-quote-visual" aria-hidden />
+            <div>
+              <p>“Katta g‘oyalar kattaroq galaktikalarda yaratiladi.”</p>
+              <span>— BG Team</span>
+            </div>
           </aside>
         </section>
 
@@ -162,10 +169,7 @@ export default function Dashboard() {
                 <div className="galaxy-finance-row">
                   <div>
                     <div className="muted">Kirim ({current.year})</div>
-                    <div className="strong">
-                      {money(current.income)}
-                      <DeltaBadge value={current.income_delta} />
-                    </div>
+                    <div className="strong">{money(current.income)}<DeltaBadge value={current.income_delta} /></div>
                   </div>
                   <div>
                     <div className="muted">Chiqim ({current.year})</div>
@@ -176,10 +180,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="muted">Balans ({current.year})</div>
-                    <div className="strong">
-                      {money(current.balance)}
-                      <DeltaBadge value={current.balance_delta} />
-                    </div>
+                    <div className="strong">{money(current.balance)}<DeltaBadge value={current.balance_delta} /></div>
                   </div>
                 </div>
               );
@@ -213,7 +214,7 @@ export default function Dashboard() {
               <div className="galaxy-champion-name">{champion.full_name}</div>
               <div className="muted">{champion.role_name || "Lavozimsiz"}</div>
               <div style={{ fontSize: 13, marginTop: 4 }}>
-                <span style={{ color: "var(--green)" }}>✅ {champion.accepted} bajarilgan</span>
+                <span style={{ color: "#34d399" }}>✅ {champion.accepted} bajarilgan</span>
                 {"  ·  "}
                 <span style={{ color: "#f87171" }}>❌ {champion.rejected} rad etilgan</span>
                 {"  ·  "}
