@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import RafiqAvatar from "./RafiqAvatar";
 
 const SCRIPT = [
-  "Salom! Men Ziyo 👋",
+  "Salom! Men Ziyo.",
   "BG (Business Galaxy) platformasining AI yordamchisiman.",
   "Uchrashuvlaringizni rejalashtiraman, hujjatlarni tahlil qilaman va jamoangizga har doim yordam beraman.",
   "Ro'yxatdan o'ting — birga ishlashni boshlaymiz!",
@@ -52,7 +52,7 @@ export default function RafiqWidget() {
           <span className="rafiq-ring" />
           <span className="rafiq-ring" />
           <div className="rafiq-orb">
-            <RafiqAvatar size={52} />
+            <RafiqAvatar size={52} variant="photo" />
           </div>
         </div>
         <div>

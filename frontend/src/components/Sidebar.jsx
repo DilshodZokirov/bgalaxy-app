@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { icon: "🎥", label: "Online Meeting", hint: "Meet & Connect", to: "/meetings" },
   { icon: "💬", label: "Chat", hint: "Messages", to: "/chat" },
   { icon: "🗂️", label: "Vazifalar", hint: "Jira-style board", to: "/tasks" },
-  { icon: "🤖", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
+  { icon: "🤖", imageIcon: "/ziyo-icon.png", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
 
 export default function Sidebar({ onOpenSettings, variant = "default" }) {
@@ -129,7 +129,13 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
               className={`sidebar-link ${active ? "active" : ""}`}
               title={collapsed ? item.label : undefined}
             >
-              <span className="sidebar-link-icon">{item.icon}</span>
+              <span className="sidebar-link-icon">
+                {item.imageIcon ? (
+                  <img src={item.imageIcon} alt="" className="sidebar-ziyo-icon" />
+                ) : (
+                  item.icon
+                )}
+              </span>
               {!collapsed && (
                 <span className="sidebar-link-copy">
                   <span className="sidebar-link-label">{item.label}</span>

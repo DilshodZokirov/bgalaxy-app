@@ -1,62 +1,71 @@
-export default function RafiqAvatar({ size = 52 }) {
+/** Compact Ziyo mark — SVG for tiny UI, photo for larger sizes. */
+export default function RafiqAvatar({ size = 52, variant = "svg" }) {
+  if (variant === "photo" || size >= 64) {
+    return (
+      <img
+        className="ziyo-avatar-photo"
+        src="/ziyo-icon.png"
+        alt="Ziyo"
+        width={size}
+        height={size}
+        draggable={false}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
-    <svg width={size} height={size} viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      className="ziyo-avatar-svg"
+      width={size}
+      height={size}
+      viewBox="0 0 80 80"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
       <defs>
-        <radialGradient id="rafiq-glow" cx="50%" cy="45%" r="60%">
-          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+        <radialGradient id="ziyo-glow" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="rafiq-body" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#2563eb" />
-          <stop offset="100%" stopColor="#7c3aed" />
+        <linearGradient id="ziyo-shell" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7dd3fc" />
+          <stop offset="45%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#0ea5e9" />
         </linearGradient>
-        <linearGradient id="rafiq-body-light" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#4f7fff" />
-          <stop offset="100%" stopColor="#7c3aed" />
+        <linearGradient id="ziyo-visor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0f172a" />
+          <stop offset="100%" stopColor="#020617" />
         </linearGradient>
-        <radialGradient id="rafiq-eye" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="55%" stopColor="#bfeaff" />
-          <stop offset="100%" stopColor="#22d3ee" />
-        </radialGradient>
       </defs>
 
-      {/* ambient glow */}
-      <circle cx="40" cy="38" r="34" fill="url(#rafiq-glow)" />
+      <circle cx="40" cy="40" r="34" fill="url(#ziyo-glow)" />
+      <circle cx="40" cy="40" r="28" fill="url(#ziyo-shell)" />
+      <circle cx="40" cy="40" r="28" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" />
 
-      {/* shoulders / torso hint */}
-      <path d="M18 68 C18 54 27 48 40 48 C53 48 62 54 62 68 Z" fill="url(#rafiq-body-light)" opacity="0.9" />
+      {/* ear pods */}
+      <circle cx="14" cy="40" r="7" fill="#1e293b" stroke="#a78bfa" strokeWidth="2.2" />
+      <circle cx="66" cy="40" r="7" fill="#1e293b" stroke="#a78bfa" strokeWidth="2.2" />
+      <circle cx="14" cy="40" r="2.2" fill="#c4b5fd" />
+      <circle cx="66" cy="40" r="2.2" fill="#c4b5fd" />
 
-      {/* antenna, peeking above the doppi */}
-      <line x1="40" y1="13" x2="40" y2="7" stroke="#22d3ee" strokeWidth="2.2" strokeLinecap="round" />
-      <circle cx="40" cy="5.5" r="2.4" fill="#22d3ee" />
-
-      {/* robot head — rounded square, soft gradient */}
-      <rect x="16" y="17" width="48" height="44" rx="17" fill="url(#rafiq-body)" />
-      <rect x="16" y="17" width="48" height="22" rx="17" fill="#ffffff" opacity="0.08" />
-
-      {/* do'ppi (traditional Uzbek Chust cap) sitting on top of the head */}
-      <path d="M14 25 A26 14.5 0 0 1 66 25 L62.5 28 A22 12 0 0 0 17.5 28 Z" fill="#111827" />
-      <rect x="13.5" y="23" width="53" height="6" rx="3" fill="#111827" />
-      <g fill="#f1f5f9">
-        <path d="M23.5 25.6c0-1.2.9-2.1 2.1-2.1s2.1.9 2.1 2.1-2.1 3-2.1 3-2.1-1.8-2.1-3z" />
-        <path d="M33.6 24.8c0-1.2.9-2.1 2.1-2.1s2.1.9 2.1 2.1-2.1 3-2.1 3-2.1-1.8-2.1-3z" />
-        <path d="M44.2 24.8c0-1.2.9-2.1 2.1-2.1s2.1.9 2.1 2.1-2.1 3-2.1 3-2.1-1.8-2.1-3z" />
-        <path d="M54.3 25.6c0-1.2.9-2.1 2.1-2.1s2.1.9 2.1 2.1-2.1 3-2.1 3-2.1-1.8-2.1-3z" />
-      </g>
-
-      {/* glowing eyes */}
-      <ellipse cx="29.5" cy="41" rx="6.2" ry="8" fill="url(#rafiq-eye)" />
-      <ellipse cx="50.5" cy="41" rx="6.2" ry="8" fill="url(#rafiq-eye)" />
-      <ellipse cx="29.5" cy="41" rx="6.2" ry="8" fill="none" stroke="#0a0e17" strokeWidth="1" opacity="0.15" />
-      <ellipse cx="50.5" cy="41" rx="6.2" ry="8" fill="none" stroke="#0a0e17" strokeWidth="1" opacity="0.15" />
-
-      {/* soft smile */}
-      <path d="M31 52c3 2.5 15 2.5 18 0" stroke="#0a0e17" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.55" />
-
-      {/* cheek glow accents */}
-      <circle cx="21" cy="46" r="2.4" fill="#22d3ee" opacity="0.5" />
-      <circle cx="59" cy="46" r="2.4" fill="#22d3ee" opacity="0.5" />
+      {/* visor */}
+      <ellipse cx="40" cy="41" rx="18" ry="14" fill="url(#ziyo-visor)" />
+      <path
+        d="M30 40c2.2-3.2 5-4.8 10-4.8s7.8 1.6 10 4.8"
+        stroke="#67e8f9"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M33 48c2 1.6 12 1.6 14 0"
+        stroke="#67e8f9"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.55"
+      />
     </svg>
   );
 }

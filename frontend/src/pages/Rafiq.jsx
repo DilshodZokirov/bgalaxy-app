@@ -4,7 +4,9 @@ import RafiqChatBox from "../components/RafiqChatBox";
 export default function Rafiq() {
   return (
     <AppShell>
-      <RafiqChatBox />
+      <div className="ziyo-shell">
+        <RafiqChatBox />
+      </div>
     </AppShell>
   );
 }
