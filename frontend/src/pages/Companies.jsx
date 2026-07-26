@@ -16,19 +16,23 @@ function slugify(name) {
 }
 
 const COMPANY_TYPES = [
-  { key: "kompaniya", icon: "🏭", label: "Kompaniya", desc: "Ishlab chiqarish" },
-  { key: "distributor", icon: "🚚", label: "Distributiv firma", desc: "Ombordan buyurtma qiladi" },
-  { key: "market", icon: "🏪", label: "Market", desc: "Distributivdan buyurtma qiladi" },
+  { key: "kompaniya", mark: "K", label: "Kompaniya", desc: "Ishlab chiqarish va boshqaruv" },
+  { key: "distributor", mark: "D", label: "Distributiv", desc: "Ombordan buyurtma oladi" },
+  { key: "market", mark: "M", label: "Market", desc: "Distributivdan buyurtma qiladi" },
 ];
 
 function CompaniesHeading() {
   return (
     <div className="galaxy-page-heading">
-      <p className="galaxy-page-kicker">Korxona markazi</p>
+      <p className="galaxy-page-kicker">Korxona stansiyasi</p>
       <h1>Kompaniyalar</h1>
-      <p>Galaktikangizdagi barcha korxonalar — boshqaring, taklif qiling, o‘sing.</p>
+      <p>Faol korxonani boshqaring — jamoa, lavozimlar va takliflar bir joyda.</p>
     </div>
   );
+}
+
+function typeMeta(key) {
+  return COMPANY_TYPES.find((t) => t.key === key) || COMPANY_TYPES[0];
 }
 
 export default function Companies() {
@@ -40,6 +44,7 @@ export default function Companies() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [permMap, setPermMap] = useState({});
+  const [memberCount, setMemberCount] = useState(0);
   const [rolesOpenFor, setRolesOpenFor] = useState(null);
   const navigate = useNavigate();
 
@@ -76,6 +81,21 @@ export default function Companies() {
       })
       .catch(() => setCompanies([]));
   }
+
+  const activeCompany =
+    companies?.find((c) => c.id === (activeId || companies[0]?.id)) || null;
+  const otherCompanies = (companies || []).filter((c) => c.id !== activeCompany?.id);
+
+  useEffect(() => {
+    if (!activeCompany) {
+      setMemberCount(0);
+      return;
+    }
+    api
+      .getMembers(activeCompany.id)
+      .then((list) => setMemberCount(list.length))
+      .catch(() => setMemberCount(0));
+  }, [activeCompany?.id]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -152,28 +172,34 @@ export default function Companies() {
     );
   }
 
-  const visible = companies.filter((c) => c.id === (activeId || companies[0]?.id));
+  const canInvite =
+    activeCompany &&
+    (activeCompany.owner_id === user?.id || permMap[activeCompany.id]?.permissions?.invite_members);
+  const isOwner = activeCompany && activeCompany.owner_id === user?.id;
+  const activeType = activeCompany ? typeMeta(activeCompany.company_type) : null;
 
   return (
     <AppShell topLeft={<CompaniesHeading />}>
       <div className="companies-page">
         <div className="companies-toolbar">
           <div>
-            <h2>Faol korxona</h2>
-            <p>Tanlangan kompaniya galaktikangizning markaziy stansiyasi.</p>
+            <h2>Faol stansiya</h2>
+            <p>
+              {companies.length
+                ? `${companies.length} ta korxona galaktikangizda`
+                : "Hali korxona yo‘q — birinchisini yarating"}
+            </p>
           </div>
-          {companies.length > 0 && (
-            <button className="companies-cta" onClick={() => setShowCreateForm((v) => !v)}>
-              {showCreateForm ? "Yopish" : "+ Yangi kompaniya"}
-            </button>
-          )}
+          <button className="companies-cta" onClick={() => setShowCreateForm((v) => !v)}>
+            {showCreateForm ? "Yopish" : "Yangi kompaniya"}
+          </button>
         </div>
 
         {(showCreateForm || companies.length === 0) && (
-          <div className="card companies-create">
+          <section className="companies-create" aria-label="Yangi kompaniya">
             <div className="companies-create-head">
               <h3>Yangi kompaniya yaratish</h3>
-              <p>Nomini kiriting — siz avtomatik admin bo‘lasiz.</p>
+              <p>Nomini kiriting — siz avtomatik egasi va admin bo‘lasiz.</p>
             </div>
             <form onSubmit={handleSubmit}>
               <label>Kompaniya nomi</label>
@@ -193,7 +219,7 @@ export default function Companies() {
                     className={`companies-type-card ${companyType === t.key ? "active" : ""}`}
                     onClick={() => setCompanyType(t.key)}
                   >
-                    <span className="companies-type-icon">{t.icon}</span>
+                    <span className="companies-type-mark">{t.mark}</span>
                     <span className="companies-type-label">{t.label}</span>
                     <span className="companies-type-desc">{t.desc}</span>
                   </button>
@@ -201,101 +227,111 @@ export default function Companies() {
               </div>
               {error && <p className="error">{error}</p>}
               <button type="submit" className="companies-cta" disabled={loading}>
-                {loading ? "Yaratilmoqda..." : "+ Kompaniya yaratish"}
+                {loading ? "Yaratilmoqda..." : "Kompaniya yaratish"}
               </button>
             </form>
-          </div>
+          </section>
         )}
 
-        <div className="companies-list">
-          {visible.map((company) => {
-            const typeMeta = COMPANY_TYPES.find((t) => t.key === company.company_type);
-            return (
-              <div className="card companies-card" key={company.id}>
-                <div className="companies-card-top">
-                  <div className="companies-avatar">{company.name.slice(0, 2).toUpperCase()}</div>
-                  <div className="companies-card-meta">
-                    <div className="companies-card-title">
-                      <strong>{company.name}</strong>
-                      <span className="companies-type-pill">
-                        {typeMeta?.icon} {typeMeta?.label || "Kompaniya"}
-                      </span>
-                    </div>
-                    <div className="companies-slug">/{company.slug}</div>
-                  </div>
-                  {company.id === activeId ? (
-                    <span className="companies-active-badge">Faol</span>
-                  ) : (
-                    <button className="secondary companies-soft-btn" onClick={() => activate(company)}>
-                      Faol qilish
-                    </button>
-                  )}
-                  {company.owner_id === user?.id && (
-                    <button
-                      className="secondary companies-soft-btn companies-danger"
-                      onClick={() => {
-                        setDeleteTarget(company);
-                        setDeleteError(null);
-                      }}
-                      title="Kompaniyani o'chirish"
-                    >
-                      🗑️
-                    </button>
-                  )}
+        {activeCompany && (
+          <section className="companies-station" aria-label="Faol kompaniya">
+            <div className="companies-station-glow" aria-hidden />
+            <div className="companies-station-main">
+              <div className="companies-station-mark" aria-hidden>
+                {activeCompany.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="companies-station-copy">
+                <div className="companies-station-title-row">
+                  <h3>{activeCompany.name}</h3>
+                  <span className="companies-active-badge">Faol</span>
                 </div>
-
-                <div className="quick-actions companies-actions">
-                  <div className="quick-action" onClick={() => navigate(`/chat/${company.id}`)}>
-                    <div className="icon">💬</div>
-                    Chat
-                  </div>
-                  <div className="quick-action" onClick={() => navigate("/group-meeting")}>
-                    <div className="icon">🎥</div>
-                    Guruh uchrashuvi
-                  </div>
-                  {(company.owner_id === user?.id || permMap[company.id]?.permissions?.invite_members) && (
-                    <div
-                      className="quick-action"
-                      onClick={() => {
-                        setInviteFor(inviteFor?.id === company.id ? null : company);
-                        setInviteLink(null);
-                        setInviteError(null);
-                        setInviteUser(null);
-                      }}
-                    >
-                      <div className="icon">👥</div>
-                      A'zo qo'shish
-                    </div>
-                  )}
-                  {company.owner_id === user?.id && (
-                    <div
-                      className="quick-action"
-                      onClick={() => setRolesOpenFor(rolesOpenFor === company.id ? null : company.id)}
-                    >
-                      <div className="icon">🛡️</div>
-                      Lavozimlar
-                    </div>
-                  )}
+                <p className="companies-slug">/{activeCompany.slug}</p>
+                <div className="companies-station-meta">
+                  <span className="companies-type-pill">{activeType.label}</span>
+                  <span className="companies-meta-dot">{memberCount} aʼzo</span>
+                  {activeCompany.has_warehouse && <span className="companies-meta-dot">Ombor yoqilgan</span>}
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {companies.length > 1 && (
-          <div className="companies-switcher">
-            <h3>Boshqa kompaniyalar</h3>
-            <div className="companies-switcher-grid">
-              {companies
-                .filter((c) => c.id !== (activeId || companies[0]?.id))
-                .map((c) => (
-                  <button key={c.id} type="button" className="companies-switch-chip" onClick={() => activate(c)}>
-                    <span>{c.name}</span>
-                    <em>Faol qilish</em>
-                  </button>
-                ))}
+              {isOwner && (
+                <button
+                  type="button"
+                  className="companies-text-danger"
+                  onClick={() => {
+                    setDeleteTarget(activeCompany);
+                    setDeleteError(null);
+                  }}
+                >
+                  O‘chirish
+                </button>
+              )}
             </div>
-          </div>
+
+            <div className="companies-action-dock">
+              <button type="button" className="companies-action" onClick={() => navigate(`/chat/${activeCompany.id}`)}>
+                <strong>Chat</strong>
+                <span>Jamoa kanallari</span>
+              </button>
+              <button type="button" className="companies-action" onClick={() => navigate("/group-meeting")}>
+                <strong>Uchrashuv</strong>
+                <span>Guruh meeting</span>
+              </button>
+              {canInvite && (
+                <button
+                  type="button"
+                  className="companies-action"
+                  onClick={() => {
+                    setInviteFor(activeCompany);
+                    setInviteLink(null);
+                    setInviteError(null);
+                    setInviteUser(null);
+                  }}
+                >
+                  <strong>Taklif</strong>
+                  <span>Aʼzo qo‘shish</span>
+                </button>
+              )}
+              {isOwner && (
+                <button
+                  type="button"
+                  className="companies-action"
+                  onClick={() => setRolesOpenFor(activeCompany.id)}
+                >
+                  <strong>Lavozimlar</strong>
+                  <span>Huquqlar va rollar</span>
+                </button>
+              )}
+              <button type="button" className="companies-action" onClick={() => navigate("/office")}>
+                <strong>Ofis</strong>
+                <span>Virtual Office</span>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {otherCompanies.length > 0 && (
+          <section className="companies-fleet" aria-label="Boshqa kompaniyalar">
+            <div className="companies-fleet-head">
+              <h3>Boshqa stansiyalar</h3>
+              <p>Bosib faol korxonani almashtiring</p>
+            </div>
+            <div className="companies-fleet-grid">
+              {otherCompanies.map((c) => {
+                const meta = typeMeta(c.company_type);
+                return (
+                  <button key={c.id} type="button" className="companies-fleet-item" onClick={() => activate(c)}>
+                    <span className="companies-fleet-mark">{c.name.slice(0, 2).toUpperCase()}</span>
+                    <span className="companies-fleet-copy">
+                      <strong>{c.name}</strong>
+                      <em>
+                        {meta.label} · /{c.slug}
+                      </em>
+                    </span>
+                    <span className="companies-fleet-cta">Faol qilish</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
 
@@ -305,7 +341,7 @@ export default function Companies() {
             <div className="companies-modal-head">
               <h3>{companies.find((c) => c.id === rolesOpenFor)?.name} — lavozimlar</h3>
               <button className="secondary companies-soft-btn" onClick={() => setRolesOpenFor(null)}>
-                ✕
+                Yopish
               </button>
             </div>
             <RoleManager companyId={rolesOpenFor} />
@@ -317,9 +353,9 @@ export default function Companies() {
         <div className="companies-modal-backdrop" onClick={() => setInviteFor(null)}>
           <div className="card companies-modal companies-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="companies-modal-head">
-              <h3>{inviteFor.name}ga a'zo qo'shish</h3>
+              <h3>{inviteFor.name}ga aʼzo qo‘shish</h3>
               <button className="secondary companies-soft-btn" onClick={() => setInviteFor(null)}>
-                ✕
+                Yopish
               </button>
             </div>
 
@@ -337,11 +373,11 @@ export default function Companies() {
 
             {inviteLink && (
               <div className="companies-invite-result">
-                <p>✓ Taklif yuborildi — u kishining bildirishnomasida ko‘rinadi.</p>
+                <p>Taklif yuborildi — bildirishnomada ko‘rinadi.</p>
                 <div className="companies-invite-link">
                   <span>{inviteLink}</span>
                   <button type="button" className="secondary companies-soft-btn" onClick={() => copy(inviteLink, "invite")}>
-                    {copiedKey === "invite" ? "Nusxalandi ✓" : "Nusxalash"}
+                    {copiedKey === "invite" ? "Nusxalandi" : "Nusxalash"}
                   </button>
                 </div>
               </div>
@@ -355,12 +391,12 @@ export default function Companies() {
           <div className="card companies-modal companies-modal-sm companies-delete">
             <p>
               <strong>{deleteTarget.name}</strong> kompaniyasini o‘chirmoqchimisiz? Bu amalni ortga qaytarib
-              bo‘lmaydi — chat va a’zolik ma’lumotlari o‘chadi.
+              bo‘lmaydi — chat va aʼzolik maʼlumotlari o‘chadi.
             </p>
             {deleteError && <p className="error">{deleteError}</p>}
             <div className="companies-delete-actions">
               <button onClick={handleDelete} disabled={deleting} className="companies-danger-btn">
-                {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
+                {deleting ? "O‘chirilmoqda..." : "Ha, o‘chirish"}
               </button>
               <button className="secondary" onClick={() => setDeleteTarget(null)}>
                 Bekor qilish
