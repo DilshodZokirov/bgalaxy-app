@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
 import GalaxyWelcome from "../components/GalaxyWelcome";
+import UpcomingMeetingCard from "../components/UpcomingMeetingCard";
 
 function Sparkline({ values, color }) {
   const points = useMemo(() => {
@@ -94,6 +95,8 @@ export default function Dashboard() {
   return (
     <AppShell topLeft={<GalaxyWelcome name={firstName} />}>
       <div className="dashboard-galaxy">
+        <UpcomingMeetingCard />
+
         <section className="galaxy-stage">
           <GalaxyOrbitHub companyName={company?.name} skyMode={skyMode} />
         </section>

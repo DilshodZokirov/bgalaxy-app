@@ -5,6 +5,7 @@ import ComplaintButton from "./ComplaintButton";
 import SettingsPopup from "./SettingsPopup";
 import GalaxySkyBackdrop from "./GalaxySkyBackdrop";
 import GalaxyAppBar from "./GalaxyAppBar";
+import UpcomingMeetingBanner from "./UpcomingMeetingBanner";
 import { useAuth } from "../hooks/useAuth";
 
 export default function AppShell({
@@ -39,6 +40,7 @@ export default function AppShell({
           <GalaxySkyBackdrop mode={skyMode} />
           <EmailVerifyBanner />
           {!hideAppBar && <GalaxyAppBar left={topLeft} />}
+          <UpcomingMeetingBanner />
           <div className="galaxy-chrome-body">{children}</div>
         </div>
       </main>

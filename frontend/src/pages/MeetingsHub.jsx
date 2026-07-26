@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { pickActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
+import CountdownBadge from "../components/CountdownBadge";
 import UserSearchInput from "../components/UserSearchInput";
 
 function MeetingsHeading() {
@@ -16,57 +17,9 @@ function MeetingsHeading() {
   );
 }
 
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-function formatCountdown(ms) {
-  if (ms <= 0) return { label: "Vaqti keldi", parts: { d: 0, h: 0, m: 0, s: 0 }, due: true };
-  const totalSec = Math.floor(ms / 1000);
-  const d = Math.floor(totalSec / 86400);
-  const h = Math.floor((totalSec % 86400) / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const label =
-    d > 0
-      ? `${d}k ${pad2(h)}:${pad2(m)}:${pad2(s)}`
-      : `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-  return { label, parts: { d, h, m, s }, due: false };
-}
-
 function toLocalInputValue(date = new Date()) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
-}
-
-function CountdownBadge({ startsAt, onDue }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const ms = new Date(startsAt).getTime() - now;
-  const info = formatCountdown(ms);
-
-  useEffect(() => {
-    if (info.due && onDue) onDue();
-  }, [info.due]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div className={`meetings-countdown ${info.due ? "due" : ""}`}>
-      <span className="meetings-countdown-label">{info.due ? "Uchrashuv vaqti" : "Qolgan vaqt"}</span>
-      <strong className="meetings-countdown-digits">{info.label}</strong>
-      {!info.due && (
-        <div className="meetings-countdown-units" aria-hidden>
-          <span>{pad2(info.parts.h)} soat</span>
-          <span>{pad2(info.parts.m)} daq</span>
-          <span>{pad2(info.parts.s)} son</span>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function MeetingsHub() {
