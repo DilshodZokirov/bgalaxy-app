@@ -1860,7 +1860,23 @@ video {
   top: calc(100% + 10px);
   right: 0;
   left: auto;
-  z-index: 50;
+  z-index: 80;
+  /* Soft scrollbar so it doesn't flash white over the galaxy UI */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.notif-panel-inline::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notif-panel-inline::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notif-panel-inline::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
 }
 
 /* ---------- Accounting: detail modal, filters, pagination, stats modal ---------- */
@@ -3002,6 +3018,9 @@ video {
   min-height: min(62vh, 580px);
   margin: 0 0 14px;
   animation: galaxy-rise 0.85s ease both 0.06s;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
 }
 
 .orbit-hub {
@@ -3009,6 +3028,7 @@ video {
   width: min(620px, 96vw);
   aspect-ratio: 1;
   max-height: 620px;
+  z-index: 0;
 }
 
 .orbit-starfield {
@@ -3737,6 +3757,12 @@ video {
 .galaxy-chrome-body {
   position: relative;
   z-index: 1;
+}
+
+/* Keep app bar (and notification dropdown) above orbit planets / page content */
+.galaxy-chrome > .galaxy-top,
+.galaxy-chrome > .galaxy-app-bar {
+  z-index: 40;
 }
 
 .galaxy-app-bar {
