@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { useEffect, useRef, useState } from "react";
+import { api, API_BASE, wsUrl } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
@@ -10,8 +10,14 @@ const COLUMNS = [
   { key: "testing", label: "Tekshiruvda" },
 ];
 
+const VIEWS = [
+  { key: "board", label: "Board" },
+  { key: "rating", label: "Reyting" },
+  { key: "history", label: "Tarix" },
+];
+
 const PRIORITY_LABELS = { hard: "Qiyin", medium: "O'rtacha", easy: "Oson" };
-const PRIORITY_COLORS = { hard: "#f87171", medium: "#f59e0b", easy: "#10b981" };
+const PRIORITY_COLORS = { hard: "#f87171", medium: "#f59e0b", easy: "#34d399" };
 const STATUS_BADGE = {
   accepted: { label: "Bajarilgan", color: "var(--green)" },
   rejected: { label: "Qabul qilinmagan", color: "#f87171" },
@@ -22,35 +28,77 @@ function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
-function TaskCard({ task, isPM, onDragStart, onEdit, onDelete, onReview }) {
+function isImage(name) {
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name || "");
+}
+
+function formatWhen(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("uz-UZ", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function TasksHeading({ companyName }) {
   return (
-    <div className="kanban-card" draggable onDragStart={(e) => onDragStart(e, task.id)}>
-      <div className="title">{task.title}</div>
-      {task.description && <div className="desc">{task.description}</div>}
-      <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-        <span style={{ fontSize: 10.5, padding: "2px 8px", borderRadius: 999, background: `${PRIORITY_COLORS[task.priority]}22`, color: PRIORITY_COLORS[task.priority] }}>
+    <div className="galaxy-page-heading">
+      <p className="galaxy-page-kicker">Task Orbit</p>
+      <h1>Vazifalar</h1>
+      <p>{companyName ? `${companyName} — board, izoh va fayllar bitta oqimda.` : "Kompaniya vazifalari."}</p>
+    </div>
+  );
+}
+
+function TaskCard({ task, isPM, onDragStart, onOpen, onReview }) {
+  return (
+    <article
+      className="tasks-card"
+      draggable
+      onDragStart={(e) => onDragStart(e, task.id)}
+      onClick={() => onOpen(task)}
+    >
+      <div className="tasks-card-top">
+        <span
+          className="tasks-priority"
+          style={{
+            background: `${PRIORITY_COLORS[task.priority]}22`,
+            color: PRIORITY_COLORS[task.priority],
+          }}
+        >
           {PRIORITY_LABELS[task.priority]}
         </span>
-        <span style={{ fontSize: 10.5, color: "var(--text-dim)" }}>Muddat: {task.due_date}</span>
+        <span className="tasks-due">{task.due_date}</span>
       </div>
-      <div className="meta">
-        <span className="assignee-tag">{task.assignee_name}</span>
-        <div className="card-actions">
-          {isPM && task.status === "testing" && (
-            <>
-              <button onClick={() => onReview(task.id, "accepted")} title="Qabul qilish">✅</button>
-              <button onClick={() => onReview(task.id, "rejected")} title="Rad etish">❌</button>
-            </>
-          )}
-          {isPM && (
-            <>
-              <button onClick={() => onEdit(task)}>✏️</button>
-              <button onClick={() => onDelete(task.id)}>🗑️</button>
-            </>
+      <h4 className="tasks-card-title">{task.title}</h4>
+      {task.description && <p className="tasks-card-desc">{task.description}</p>}
+      <div className="tasks-card-meta">
+        <span className="tasks-assignee">{task.assignee_name}</span>
+        <div className="tasks-card-stats">
+          {(task.comment_count > 0 || task.file_count > 0) && (
+            <span>
+              {task.comment_count > 0 ? `${task.comment_count} izoh` : ""}
+              {task.comment_count > 0 && task.file_count > 0 ? " · " : ""}
+              {task.file_count > 0 ? `${task.file_count} fayl` : ""}
+            </span>
           )}
         </div>
       </div>
-    </div>
+      {isPM && task.status === "testing" && (
+        <div className="tasks-card-review" onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="tasks-accept" onClick={() => onReview(task.id, "accepted")}>
+            Qabul
+          </button>
+          <button type="button" className="tasks-reject" onClick={() => onReview(task.id, "rejected")}>
+            Rad
+          </button>
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -79,7 +127,14 @@ function TaskModal({ members, roles, onClose, onSave }) {
     setSaving(true);
     try {
       const target_ids = targetType === "users" ? selectedUsers : targetType === "role" ? [selectedRole] : [];
-      await onSave({ title, description: description || null, priority, due_date: dueDate, target_type: targetType, target_ids });
+      await onSave({
+        title,
+        description: description || null,
+        priority,
+        due_date: dueDate,
+        target_type: targetType,
+        target_ids,
+      });
       onClose();
     } catch (err) {
       setError(err.message);
@@ -89,227 +144,75 @@ function TaskModal({ members, roles, onClose, onSave }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Yangi vazifa</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="tasks-modal-backdrop" onClick={onClose}>
+      <div className="card tasks-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="tasks-modal-head">
+          <h3>Yangi vazifa</h3>
+          <button type="button" className="secondary tasks-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
         </div>
         <form onSubmit={handleSubmit}>
           <label>Sarlavha</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required />
           <label>Tavsif (ixtiyoriy)</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
-
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label>Muhimlik darajasi</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px", width: "100%" }}>
+          <div className="tasks-form-row">
+            <div>
+              <label>Muhimlik</label>
+              <select value={priority} onChange={(e) => setPriority(e.target.value)}>
                 <option value="hard">Qiyin (+5 / -1)</option>
-                <option value="medium">O'rtacha (+3 / -2)</option>
+                <option value="medium">O&apos;rtacha (+3 / -2)</option>
                 <option value="easy">Oson (+1 / -3)</option>
               </select>
             </div>
-            <div style={{ flex: 1 }}>
-              <label>Muddat (tugash sanasi)</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+            <div>
+              <label>Muddat</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required min={isoDate(today)} />
             </div>
           </div>
-
-          <label style={{ marginTop: 6 }}>Kimga</label>
-          <div style={{ display: "flex", gap: 12, marginBottom: 10, fontSize: 13 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <input type="radio" style={{ width: "auto" }} checked={targetType === "users"} onChange={() => setTargetType("users")} />
-              Aniq odam(lar)
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <input type="radio" style={{ width: "auto" }} checked={targetType === "role"} onChange={() => setTargetType("role")} />
-              Lavozim/guruh
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <input type="radio" style={{ width: "auto" }} checked={targetType === "everyone"} onChange={() => setTargetType("everyone")} />
-              Hammaga
-            </label>
+          <label>Kimga</label>
+          <div className="tasks-target-row">
+            {[
+              ["users", "Aniq odam"],
+              ["role", "Lavozim"],
+              ["everyone", "Hammaga"],
+            ].map(([key, label]) => (
+              <label key={key}>
+                <input
+                  type="radio"
+                  checked={targetType === key}
+                  onChange={() => setTargetType(key)}
+                />
+                {label}
+              </label>
+            ))}
           </div>
-
           {targetType === "users" && (
-            <div style={{ maxHeight: 140, overflowY: "auto", background: "var(--panel-2)", borderRadius: "var(--radius-sm)", padding: 8, marginBottom: 14 }}>
+            <div className="tasks-member-pick">
               {members.map((m) => (
-                <label key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", fontSize: 13 }}>
-                  <input type="checkbox" style={{ width: "auto" }} checked={selectedUsers.includes(m.user_id)} onChange={() => toggleUser(m.user_id)} />
+                <label key={m.user_id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.includes(m.user_id)}
+                    onChange={() => toggleUser(m.user_id)}
+                  />
                   {m.full_name}
                 </label>
               ))}
             </div>
           )}
-
           {targetType === "role" && (
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px", width: "100%", marginBottom: 14 }}
-            >
+            <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} required>
               <option value="">Tanlang</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
             </select>
           )}
-
           {error && <p className="error">{error}</p>}
           <button type="submit" disabled={saving}>{saving ? "Yaratilmoqda..." : "Vazifa yaratish"}</button>
         </form>
-      </div>
-    </div>
-  );
-}
-
-function HistoryModal({ companyId, onClose }) {
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [priority, setPriority] = useState("");
-  const [status, setStatus] = useState("");
-  const [sortBy, setSortBy] = useState("completed_at");
-  const [sortDir, setSortDir] = useState("desc");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [error, setError] = useState(null);
-  const pageSize = 10;
-
-  function fetchPage() {
-    const params = { page, page_size: pageSize, sort_by: sortBy, sort_dir: sortDir };
-    if (search) params.search = search;
-    if (priority) params.priority = priority;
-    if (status) params.status = status;
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    api.getTaskHistory(companyId, params).then((res) => { setItems(res.items); setTotal(res.total); }).catch((err) => setError(err.message));
-  }
-
-  useEffect(fetchPage, [companyId, page, search, priority, status, sortBy, sortDir, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleDownload() {
-    setError(null);
-    try {
-      const from = dateFrom || "2000-01-01";
-      const to = dateTo || isoDate(new Date());
-      await api.downloadTaskHistoryExcel(companyId, from, to);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  return (
-    <div className="acc-modal-backdrop" onClick={onClose}>
-      <div className="acc-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="acc-modal-header">
-          <h3 style={{ fontSize: 16, margin: 0 }}>Vazifalar tarixi</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕ Yopish</button>
-        </div>
-
-        <div className="acc-filter-bar">
-          <input placeholder="Qidirish..." value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} style={{ minWidth: 140 }} />
-          <select value={priority} onChange={(e) => { setPage(1); setPriority(e.target.value); }}>
-            <option value="">Barcha darajalar</option>
-            <option value="hard">Qiyin</option>
-            <option value="medium">O'rtacha</option>
-            <option value="easy">Oson</option>
-          </select>
-          <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
-            <option value="">Barcha holatlar</option>
-            <option value="accepted">Bajarilgan</option>
-            <option value="rejected">Qabul qilinmagan</option>
-            <option value="failed">Bajarilmagan</option>
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="completed_at">Tugatilgan sana bo'yicha</option>
-            <option value="due_date">Muddat bo'yicha</option>
-            <option value="priority">Daraja bo'yicha</option>
-            <option value="title">Nomi bo'yicha</option>
-          </select>
-          <select value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
-            <option value="desc">Kamayish</option>
-            <option value="asc">O'sish</option>
-          </select>
-          <input type="date" value={dateFrom} onChange={(e) => { setPage(1); setDateFrom(e.target.value); }} />
-          <input type="date" value={dateTo} onChange={(e) => { setPage(1); setDateTo(e.target.value); }} />
-          <button className="secondary" style={{ width: "auto", padding: "8px 14px", fontSize: 12.5 }} onClick={handleDownload}>⬇️ Excel</button>
-        </div>
-        {error && <p className="error">{error}</p>}
-
-        <table className="acc-table">
-          <thead>
-            <tr>
-              <th>Sarlavha</th><th>Daraja</th><th>Kimga</th><th>Muddat</th><th>Tugatilgan</th><th>Tekshirgan</th><th>Holati</th><th>Ball</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((t) => (
-              <tr key={t.id}>
-                <td>{t.title}</td>
-                <td>{PRIORITY_LABELS[t.priority]}</td>
-                <td>{t.assignee_name}</td>
-                <td>{t.due_date}</td>
-                <td>{t.completed_at}</td>
-                <td style={{ color: "var(--text-dim)" }}>{t.checked_by_name || "Hech kim"}</td>
-                <td>
-                  <span className="acc-badge" style={{ background: `${STATUS_BADGE[t.status]?.color}22`, color: STATUS_BADGE[t.status]?.color }}>
-                    {STATUS_BADGE[t.status]?.label}
-                  </span>
-                </td>
-                <td style={{ color: t.points >= 0 ? "var(--green)" : "#f87171" }}>{t.points > 0 ? `+${t.points}` : t.points}</td>
-              </tr>
-            ))}
-            {items.length === 0 && <tr><td colSpan={8} style={{ color: "var(--text-dim)", textAlign: "center" }}>Yozuv topilmadi</td></tr>}
-          </tbody>
-        </table>
-
-        <div className="acc-pagination">
-          <button className="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Oldingi</button>
-          <span>{page} / {totalPages} ({total} ta yozuv)</span>
-          <button className="secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Keyingi →</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LeaderboardModal({ companyId, onClose }) {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    api.getTaskLeaderboard(companyId).then(setRows).catch((err) => setError(err.message));
-  }, [companyId]);
-
-  const medals = ["🥇", "🥈", "🥉"];
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ maxWidth: 420, width: "100%", maxHeight: "80vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>🏆 Umumiy reyting</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
-        </div>
-        {error && <p className="error">{error}</p>}
-        {!rows && !error && <p style={{ fontSize: 13, color: "var(--text-dim)" }}>Yuklanmoqda...</p>}
-        {rows && rows.length === 0 && <p style={{ fontSize: 13, color: "var(--text-dim)" }}>Hali hech kim yo'q</p>}
-        {rows && rows.map((r, i) => (
-          <div key={r.user_id} className={`leaderboard-row ${i < 3 ? `top${i + 1}` : ""}`}>
-            <div className="leaderboard-rank">{medals[i] || i + 1}</div>
-            <div style={{ flex: 1 }}>
-              <div className="leaderboard-name">{r.full_name}</div>
-              <div className="leaderboard-sub">✅ {r.accepted} bajarilgan · ❌ {r.rejected} rad etilgan</div>
-            </div>
-            <div className="leaderboard-score" style={{ color: r.score >= 0 ? "var(--green)" : "#f87171" }}>
-              {r.score > 0 ? `+${r.score}` : r.score}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -338,27 +241,29 @@ function EditTaskModal({ task, onClose, onSave }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ maxWidth: 420, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Vazifani tahrirlash</h3>
-          <button className="secondary" style={{ width: "auto", padding: "6px 12px" }} onClick={onClose}>✕</button>
+    <div className="tasks-modal-backdrop" onClick={onClose}>
+      <div className="card tasks-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="tasks-modal-head">
+          <h3>Vazifani tahrirlash</h3>
+          <button type="button" className="secondary tasks-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
         </div>
         <form onSubmit={handleSubmit}>
           <label>Sarlavha</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required />
           <label>Tavsif (ixtiyoriy)</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label>Muhimlik darajasi</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px", width: "100%" }}>
+          <div className="tasks-form-row">
+            <div>
+              <label>Muhimlik</label>
+              <select value={priority} onChange={(e) => setPriority(e.target.value)}>
                 <option value="hard">Qiyin (+5 / -1)</option>
-                <option value="medium">O'rtacha (+3 / -2)</option>
+                <option value="medium">O&apos;rtacha (+3 / -2)</option>
                 <option value="easy">Oson (+1 / -3)</option>
               </select>
             </div>
-            <div style={{ flex: 1 }}>
+            <div>
               <label>Muddat</label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
             </div>
@@ -371,6 +276,322 @@ function EditTaskModal({ task, onClose, onSave }) {
   );
 }
 
+function TaskDetailDrawer({
+  companyId,
+  task,
+  user,
+  isPM,
+  liveTick,
+  onClose,
+  onEdit,
+  onDelete,
+  onReview,
+}) {
+  const [comments, setComments] = useState([]);
+  const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState(null);
+  const [sending, setSending] = useState(false);
+  const fileRef = useRef(null);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    if (!task) return;
+    setError(null);
+    api.getTaskComments(companyId, task.id)
+      .then(setComments)
+      .catch((err) => setError(err.message));
+  }, [companyId, task?.id, liveTick]);
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [comments]);
+
+  if (!task) return null;
+
+  async function handleSend(e) {
+    e.preventDefault();
+    setError(null);
+    setSending(true);
+    try {
+      const created = await api.addTaskComment(companyId, task.id, text, file);
+      setComments((prev) => [...prev, created]);
+      setText("");
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    try {
+      await api.deleteTaskComment(companyId, task.id, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="tasks-drawer-backdrop" onClick={onClose}>
+      <aside className="tasks-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="tasks-drawer-head">
+          <div>
+            <span
+              className="tasks-priority"
+              style={{
+                background: `${PRIORITY_COLORS[task.priority]}22`,
+                color: PRIORITY_COLORS[task.priority],
+              }}
+            >
+              {PRIORITY_LABELS[task.priority]}
+            </span>
+            <h3>{task.title}</h3>
+            <p className="tasks-drawer-meta">
+              {task.assignee_name} · muddat {task.due_date}
+            </p>
+          </div>
+          <button type="button" className="secondary tasks-soft-btn" onClick={onClose}>
+            Yopish
+          </button>
+        </div>
+
+        {task.description && <p className="tasks-drawer-desc">{task.description}</p>}
+
+        <div className="tasks-drawer-actions">
+          {isPM && task.status === "testing" && (
+            <>
+              <button type="button" className="tasks-accept" onClick={() => onReview(task.id, "accepted")}>
+                Qabul qilish
+              </button>
+              <button type="button" className="tasks-reject" onClick={() => onReview(task.id, "rejected")}>
+                Rad etish
+              </button>
+            </>
+          )}
+          {isPM && (
+            <>
+              <button type="button" className="secondary tasks-soft-btn" onClick={() => onEdit(task)}>
+                Tahrirlash
+              </button>
+              <button type="button" className="secondary tasks-soft-btn danger" onClick={() => onDelete(task.id)}>
+                O&apos;chirish
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="tasks-comments-head">
+          <h4>Izohlar va fayllar</h4>
+          <span>{comments.length}</span>
+        </div>
+
+        <div className="tasks-comments" ref={listRef}>
+          {comments.length === 0 && (
+            <p className="tasks-empty-inline">Hali izoh yo&apos;q — birinchi bo&apos;lib yozing.</p>
+          )}
+          {comments.map((c) => (
+            <div key={c.id} className="tasks-comment">
+              <div className="tasks-comment-top">
+                <strong>{c.author_name || "Noma'lum"}</strong>
+                <span>{formatWhen(c.created_at)}</span>
+              </div>
+              {c.content && <p>{c.content}</p>}
+              {c.file_url && isImage(c.file_name) && (
+                <a href={`${API_BASE}${c.file_url}`} target="_blank" rel="noreferrer">
+                  <img className="tasks-comment-img" src={`${API_BASE}${c.file_url}`} alt={c.file_name || "Rasm"} />
+                </a>
+              )}
+              {c.file_url && !isImage(c.file_name) && (
+                <a className="tasks-file-link" href={`${API_BASE}${c.file_url}`} target="_blank" rel="noreferrer">
+                  {c.file_name || "Fayl"}
+                </a>
+              )}
+              {(isPM || String(c.author_id) === String(user?.id)) && (
+                <button
+                  type="button"
+                  className="tasks-comment-del"
+                  onClick={() => handleDeleteComment(c.id)}
+                >
+                  O&apos;chirish
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <form className="tasks-comment-form" onSubmit={handleSend}>
+          {error && <p className="error">{error}</p>}
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Izoh yozing..."
+            rows={3}
+          />
+          <div className="tasks-comment-form-row">
+            <label className="tasks-file-pick">
+              <input
+                ref={fileRef}
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+              {file ? file.name : "Fayl biriktirish"}
+            </label>
+            <button type="submit" disabled={sending || (!text.trim() && !file)}>
+              {sending ? "Yuborilmoqda..." : "Yuborish"}
+            </button>
+          </div>
+        </form>
+      </aside>
+    </div>
+  );
+}
+
+function HistoryPanel({ companyId, onOpenTask }) {
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("");
+  const [sortBy, setSortBy] = useState("completed_at");
+  const [sortDir, setSortDir] = useState("desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [error, setError] = useState(null);
+  const pageSize = 10;
+
+  useEffect(() => {
+    const params = { page, page_size: pageSize, sort_by: sortBy, sort_dir: sortDir };
+    if (search) params.search = search;
+    if (priority) params.priority = priority;
+    if (status) params.status = status;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    api.getTaskHistory(companyId, params)
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch((err) => setError(err.message));
+  }, [companyId, page, search, priority, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  async function handleDownload() {
+    setError(null);
+    try {
+      await api.downloadTaskHistoryExcel(companyId, dateFrom || "2000-01-01", dateTo || isoDate(new Date()));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <section className="tasks-panel">
+      <div className="tasks-filter-bar">
+        <input placeholder="Qidirish..." value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+        <select value={priority} onChange={(e) => { setPage(1); setPriority(e.target.value); }}>
+          <option value="">Barcha darajalar</option>
+          <option value="hard">Qiyin</option>
+          <option value="medium">O&apos;rtacha</option>
+          <option value="easy">Oson</option>
+        </select>
+        <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
+          <option value="">Barcha holatlar</option>
+          <option value="accepted">Bajarilgan</option>
+          <option value="rejected">Qabul qilinmagan</option>
+          <option value="failed">Bajarilmagan</option>
+        </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <option value="completed_at">Tugatilgan sana</option>
+          <option value="due_date">Muddat</option>
+          <option value="priority">Daraja</option>
+          <option value="title">Nomi</option>
+        </select>
+        <select value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
+          <option value="desc">Kamayish</option>
+          <option value="asc">O&apos;sish</option>
+        </select>
+        <input type="date" value={dateFrom} onChange={(e) => { setPage(1); setDateFrom(e.target.value); }} />
+        <input type="date" value={dateTo} onChange={(e) => { setPage(1); setDateTo(e.target.value); }} />
+        <button type="button" className="secondary tasks-soft-btn" onClick={handleDownload}>
+          Excel
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <div className="tasks-history-list">
+        {items.map((t) => (
+          <button key={t.id} type="button" className="tasks-history-row" onClick={() => onOpenTask(t)}>
+            <div>
+              <strong>{t.title}</strong>
+              <span>
+                {t.assignee_name} · {PRIORITY_LABELS[t.priority]} · {t.completed_at}
+              </span>
+            </div>
+            <div className="tasks-history-right">
+              <span
+                className="tasks-status-badge"
+                style={{
+                  background: `${STATUS_BADGE[t.status]?.color}22`,
+                  color: STATUS_BADGE[t.status]?.color,
+                }}
+              >
+                {STATUS_BADGE[t.status]?.label}
+              </span>
+              <span style={{ color: t.points >= 0 ? "var(--green)" : "#f87171" }}>
+                {t.points > 0 ? `+${t.points}` : t.points}
+              </span>
+            </div>
+          </button>
+        ))}
+        {items.length === 0 && <p className="tasks-empty-inline">Yozuv topilmadi</p>}
+      </div>
+      <div className="tasks-pagination">
+        <button type="button" className="secondary tasks-soft-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          Oldingi
+        </button>
+        <span>{page} / {totalPages} ({total})</span>
+        <button type="button" className="secondary tasks-soft-btn" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          Keyingi
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function RatingPanel({ companyId }) {
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    api.getTaskLeaderboard(companyId).then(setRows).catch((err) => setError(err.message));
+  }, [companyId]);
+
+  return (
+    <section className="tasks-panel tasks-rating">
+      {error && <p className="error">{error}</p>}
+      {!rows && !error && <p className="tasks-empty-inline">Yuklanmoqda...</p>}
+      {rows && rows.length === 0 && <p className="tasks-empty-inline">Hali reyting yo&apos;q</p>}
+      {rows && rows.map((r, i) => (
+        <div key={r.user_id} className={`tasks-rating-row ${i < 3 ? `top${i + 1}` : ""}`}>
+          <div className="tasks-rating-rank">{i + 1}</div>
+          <div className="tasks-rating-copy">
+            <strong>{r.full_name}</strong>
+            <span>{r.accepted} bajarilgan · {r.rejected} rad etilgan</span>
+          </div>
+          <div className="tasks-rating-score" style={{ color: r.score >= 0 ? "var(--green)" : "#f87171" }}>
+            {r.score > 0 ? `+${r.score}` : r.score}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export default function Tasks() {
   const { user } = useAuth();
   const [company, setCompany] = useState(null);
@@ -378,19 +599,32 @@ export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [view, setView] = useState("board");
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
+  const [liveTick, setLiveTick] = useState(0);
+  const refreshTimer = useRef(null);
 
   useEffect(() => {
     api.getMyCompanies().then((list) => setCompany(pickActiveCompany(list))).catch(() => {});
   }, []);
 
+  function refreshTasks() {
+    if (!company) return;
+    return api.getTasks(company.id)
+      .then(setTasks)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }
+
   useEffect(() => {
     if (!company) return;
+    setLoading(true);
     api.getMyPermissions(company.id).then(setPerms).catch(() => {});
     api.getMembers(company.id).then((list) => setMembers(list.filter((m) => m.user_id !== user?.id))).catch(() => {});
     api.getRoles(company.id).then(setRoles).catch(() => {});
@@ -398,10 +632,51 @@ export default function Tasks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company]);
 
-  function refreshTasks() {
-    if (!company) return;
-    api.getTasks(company.id).then(setTasks).catch(() => {});
-  }
+  useEffect(() => {
+    if (!company) return undefined;
+    let socket;
+    let closed = false;
+    let retry;
+
+    function connect() {
+      socket = new WebSocket(wsUrl(`/ws/tasks/${company.id}`));
+      socket.onopen = () => setLive(true);
+      socket.onclose = () => {
+        setLive(false);
+        if (!closed) retry = setTimeout(connect, 2500);
+      };
+      socket.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          if (data.type === "tasks_changed" || data.type === "task_comment") {
+            if (refreshTimer.current) clearTimeout(refreshTimer.current);
+            refreshTimer.current = setTimeout(() => {
+              refreshTasks();
+              setLiveTick((n) => n + 1);
+            }, 120);
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+    }
+
+    connect();
+    return () => {
+      closed = true;
+      setLive(false);
+      if (retry) clearTimeout(retry);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      if (socket) socket.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company?.id]);
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    const fresh = tasks.find((t) => String(t.id) === String(selectedTask.id));
+    if (fresh) setSelectedTask(fresh);
+  }, [tasks, selectedTask?.id]);
 
   const isPM = perms && (perms.is_owner || perms.permissions?.manage_tasks);
 
@@ -427,6 +702,7 @@ export default function Tasks() {
     try {
       await api.updateTask(company.id, taskId, { status });
       refreshTasks();
+      if (selectedTask && String(selectedTask.id) === String(taskId)) setSelectedTask(null);
     } catch (err) {
       setError(err.message);
     }
@@ -443,8 +719,10 @@ export default function Tasks() {
   }
 
   async function handleDelete(taskId) {
+    if (!window.confirm("Bu vazifani o'chirishni tasdiqlaysizmi?")) return;
     try {
       await api.deleteTask(company.id, taskId);
+      if (selectedTask && String(selectedTask.id) === String(taskId)) setSelectedTask(null);
       refreshTasks();
     } catch (err) {
       setError(err.message);
@@ -454,57 +732,88 @@ export default function Tasks() {
   if (!company) {
     return (
       <AppShell>
-        <div className="page-header"><h1>Vazifalar</h1></div>
+        <TasksHeading />
+        <p className="tasks-empty-inline">Kompaniya yuklanmoqda...</p>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <h1>Vazifalar — {company.name}</h1>
-          <p>{isPM ? "Loyiha menejeri sifatida barcha vazifalarni boshqarasiz." : "Sizga tayinlangan vazifalar."}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="secondary" style={{ width: "auto", padding: "10px 16px" }} onClick={() => setShowLeaderboard(true)}>
-            🏆 Reyting
-          </button>
-          <button className="secondary" style={{ width: "auto", padding: "10px 16px" }} onClick={() => setShowHistory(true)}>
-            🕘 Tarix
-          </button>
-          {isPM && (
-            <button style={{ width: "auto", padding: "10px 18px" }} onClick={() => setShowModal(true)}>
-              + Vazifa qo'shish
-            </button>
-          )}
-        </div>
-      </div>
+      <div className="tasks-page">
+        <TasksHeading companyName={company.name} />
 
-      {error && <p className="error">{error}</p>}
+        <div className="tasks-toolbar">
+          <div className="tasks-view-tabs" role="tablist">
+            {VIEWS.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                role="tab"
+                aria-selected={view === v.key}
+                className={view === v.key ? "active" : ""}
+                onClick={() => setView(v.key)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <div className="tasks-toolbar-right">
+            <span className={`tasks-live ${live ? "on" : ""}`}>{live ? "Jonli" : "Ulanmoqda"}</span>
+            {isPM && view === "board" && (
+              <button type="button" className="tasks-cta" onClick={() => setShowModal(true)}>
+                Vazifa qo&apos;shish
+              </button>
+            )}
+          </div>
+        </div>
 
-      <div className="kanban-board">
-        {COLUMNS.map((col) => {
-          const colTasks = tasks.filter((t) => t.status === col.key);
-          return (
-            <div
-              key={col.key}
-              className={`kanban-column ${dragOverCol === col.key ? "drag-over" : ""}`}
-              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCol(col.key); }}
-              onDragLeave={() => setDragOverCol(null)}
-              onDrop={(e) => handleDrop(e, col.key)}
-            >
-              <div className="kanban-column-header">
-                {col.label}
-                <span className="kanban-count">{colTasks.length}</span>
-              </div>
-              {colTasks.map((t) => (
-                <TaskCard key={t.id} task={t} isPM={isPM} onDragStart={handleDragStart} onEdit={(task) => setEditingTask(task)} onDelete={handleDelete} onReview={handleReview} />
-              ))}
-              {colTasks.length === 0 && <p style={{ fontSize: 12, color: "var(--text-dim)", textAlign: "center", padding: "10px 0" }}>Bo'sh</p>}
-            </div>
-          );
-        })}
+        {error && <p className="error">{error}</p>}
+
+        {view === "board" && (
+          <div className="tasks-board">
+            {COLUMNS.map((col) => {
+              const colTasks = tasks.filter((t) => t.status === col.key);
+              return (
+                <section
+                  key={col.key}
+                  className={`tasks-column ${dragOverCol === col.key ? "drag-over" : ""}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverCol(col.key);
+                  }}
+                  onDragLeave={() => setDragOverCol(null)}
+                  onDrop={(e) => handleDrop(e, col.key)}
+                >
+                  <div className="tasks-column-header">
+                    <h3>{col.label}</h3>
+                    <span>{colTasks.length}</span>
+                  </div>
+                  {loading && <p className="tasks-empty-inline">Yuklanmoqda...</p>}
+                  {!loading && colTasks.map((t) => (
+                    <TaskCard
+                      key={t.id}
+                      task={t}
+                      isPM={isPM}
+                      onDragStart={handleDragStart}
+                      onOpen={setSelectedTask}
+                      onReview={handleReview}
+                    />
+                  ))}
+                  {!loading && colTasks.length === 0 && (
+                    <p className="tasks-empty-inline">Bo&apos;sh</p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "rating" && <RatingPanel companyId={company.id} />}
+        {view === "history" && (
+          <HistoryPanel companyId={company.id} onOpenTask={setSelectedTask} />
+        )}
       </div>
 
       {showModal && (
@@ -513,8 +822,21 @@ export default function Tasks() {
       {editingTask && (
         <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} onSave={handleUpdateTask} />
       )}
-      {showHistory && <HistoryModal companyId={company.id} onClose={() => setShowHistory(false)} />}
-      {showLeaderboard && <LeaderboardModal companyId={company.id} onClose={() => setShowLeaderboard(false)} />}
+      {selectedTask && (
+        <TaskDetailDrawer
+          companyId={company.id}
+          task={selectedTask}
+          user={user}
+          isPM={isPM}
+          liveTick={liveTick}
+          onClose={() => setSelectedTask(null)}
+          onEdit={(task) => {
+            setEditingTask(task);
+          }}
+          onDelete={handleDelete}
+          onReview={handleReview}
+        />
+      )}
     </AppShell>
   );
 }

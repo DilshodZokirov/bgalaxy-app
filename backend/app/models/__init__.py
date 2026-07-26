@@ -11,6 +11,6 @@ from app.models.notification import Notification  # noqa: F401
 from app.models.rafiq import RafiqMessage  # noqa: F401
 from app.models.scheduled_meeting import ScheduledMeeting  # noqa: F401
 from app.models.role import Role  # noqa: F401
-from app.models.task import Task  # noqa: F401
+from app.models.task import Task, TaskComment  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.warehouse import WarehouseProduct, StockMovement, WarehouseOrder  # noqa: F401

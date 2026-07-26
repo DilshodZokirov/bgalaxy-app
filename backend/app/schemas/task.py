@@ -37,8 +37,24 @@ class TaskOut(BaseModel):
     due_date: date
     completed_at: date | None
     points: int = 0
+    comment_count: int = 0
+    file_count: int = 0
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TaskCommentOut(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    author_id: uuid.UUID
+    author_name: str | None = None
+    content: str | None = None
+    file_url: str | None = None
+    file_name: str | None = None
+    created_at: datetime
 
     class Config:
         from_attributes = True

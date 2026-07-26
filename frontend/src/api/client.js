@@ -204,6 +204,26 @@ export const api = {
     request(`/companies/${companyId}/tasks/${taskId}`, { method: "PATCH", body: data }),
   deleteTask: (companyId, taskId) =>
     request(`/companies/${companyId}/tasks/${taskId}`, { method: "DELETE" }),
+  getTaskComments: (companyId, taskId) =>
+    request(`/companies/${companyId}/tasks/${taskId}/comments`),
+  addTaskComment: async (companyId, taskId, content, file) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("content", content || "");
+    if (file) formData.append("file", file);
+    const res = await fetch(`${API_BASE}/companies/${companyId}/tasks/${taskId}/comments`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  },
+  deleteTaskComment: (companyId, taskId, commentId) =>
+    request(`/companies/${companyId}/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
   getTaskHistory: (companyId, params = {}) =>
     request(`/companies/${companyId}/tasks/history?${new URLSearchParams(params)}`),
   getTaskLeaderboard: (companyId) => request(`/companies/${companyId}/tasks/leaderboard`),
