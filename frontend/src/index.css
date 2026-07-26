@@ -3723,6 +3723,389 @@ video {
   min-height: auto;
 }
 
+
+/* ---------- Shared galaxy page heading ---------- */
+.galaxy-page-heading h1 {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: clamp(1.35rem, 2.2vw, 1.8rem);
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.galaxy-page-heading p {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  max-width: 34rem;
+}
+
+.galaxy-page-kicker {
+  margin: 0 0 4px !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a5b4fc !important;
+  font-weight: 700;
+}
+
+.galaxy-shell-day .galaxy-page-heading h1 {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .galaxy-page-heading p {
+  color: #475569;
+}
+
+.galaxy-shell-day .galaxy-page-kicker {
+  color: #0369a1 !important;
+}
+
+/* ---------- Companies page (galaxy atmosphere) ---------- */
+.companies-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 760px;
+}
+
+.companies-loading {
+  color: #94a3b8;
+  margin: 24px 0;
+}
+
+.companies-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.companies-toolbar h2 {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.15rem;
+  color: #f8fafc;
+}
+
+.companies-toolbar p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 0.88rem;
+}
+
+.companies-cta {
+  width: auto !important;
+  padding: 10px 18px !important;
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.35);
+}
+
+.companies-create {
+  max-width: 520px;
+}
+
+.companies-create-head h3 {
+  margin: 0 0 4px;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.05rem;
+}
+
+.companies-create-head p {
+  margin: 0 0 14px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.companies-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.companies-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.companies-type-card:hover {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.companies-type-card.active {
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(37, 99, 235, 0.16);
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.22);
+}
+
+.companies-type-icon { font-size: 1.35rem; }
+.companies-type-label { font-size: 12px; font-weight: 700; }
+.companies-type-desc { font-size: 10px; color: #94a3b8; text-align: center; line-height: 1.25; }
+
+.companies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.companies-card {
+  max-width: 640px;
+}
+
+.companies-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.companies-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(145deg, #2563eb, #7c3aed);
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.4);
+  flex-shrink: 0;
+}
+
+.companies-card-meta { flex: 1; min-width: 0; }
+
+.companies-card-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.companies-card-title strong {
+  font-family: "Syne", "Poppins", sans-serif;
+  color: #f8fafc;
+}
+
+.companies-type-pill {
+  font-size: 10.5px;
+  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.companies-slug {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.companies-active-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.companies-soft-btn {
+  width: auto !important;
+  padding: 7px 12px !important;
+  font-size: 12.5px !important;
+}
+
+.companies-danger {
+  color: #f87171 !important;
+}
+
+.companies-actions .quick-action {
+  background: rgba(15, 23, 42, 0.4);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.companies-actions .quick-action:hover {
+  border-color: rgba(167, 139, 250, 0.45);
+  transform: translateY(-1px);
+}
+
+.companies-switcher h3 {
+  margin: 0 0 10px;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 0.98rem;
+  color: #e2e8f0;
+}
+
+.companies-switcher-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.companies-switch-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  color: #f8fafc;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.companies-switch-chip em {
+  font-style: normal;
+  font-size: 11px;
+  color: #a5b4fc;
+}
+
+.companies-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.companies-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.companies-modal-sm { max-width: 380px; }
+
+.companies-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.companies-modal-head h3 {
+  margin: 0;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1rem;
+}
+
+.companies-invite-result {
+  margin-top: 12px;
+}
+
+.companies-invite-result p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: #34d399;
+}
+
+.companies-invite-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.companies-invite-link span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.companies-delete {
+  text-align: center;
+}
+
+.companies-delete-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.companies-danger-btn {
+  background: #dc2626 !important;
+}
+
+.galaxy-shell-day .companies-toolbar h2,
+.galaxy-shell-day .companies-card-title strong,
+.galaxy-shell-day .companies-switcher h3,
+.galaxy-shell-day .companies-modal-head h3 {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .companies-toolbar p,
+.galaxy-shell-day .companies-create-head p,
+.galaxy-shell-day .companies-slug,
+.galaxy-shell-day .companies-type-desc {
+  color: #475569;
+}
+
+.galaxy-shell-day .companies-type-card,
+.galaxy-shell-day .companies-switch-chip,
+.galaxy-shell-day .companies-invite-link {
+  background: rgba(255, 255, 255, 0.62);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .companies-type-pill {
+  color: #5b21b6;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.galaxy-shell-day .companies-actions .quick-action {
+  background: rgba(255, 255, 255, 0.55);
+  color: #0f172a;
+}
+
+@media (max-width: 720px) {
+  .companies-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .companies-type-grid {
+    grid-template-columns: 1fr;
+  }
+  .companies-card-top {
+    flex-wrap: wrap;
+  }
+}
+
 /* ---------- Galaxy Hub 3D demo ---------- */
 .galaxy-demo {
   position: relative;
