@@ -9,6 +9,111 @@ const ROOM_SIZE = 28;
 const MOVE_SPEED = 5.5;
 const HALF = ROOM_SIZE / 2 - 1.2;
 const EYE_HEIGHT = 1.65;
+const PLAYER_RADIUS = 0.42;
+
+/** Furniture layout — visuals and collision share the same positions. */
+const DESKS = [
+  { position: [-7.5, 0, 2], rotation: 0 },
+  { position: [-5.2, 0, 2], rotation: 0 },
+  { position: [5.2, 0, 2], rotation: 0 },
+  { position: [7.5, 0, 2], rotation: 0 },
+  { position: [-7.5, 0, -3], rotation: Math.PI },
+  { position: [-5.2, 0, -3], rotation: Math.PI },
+  { position: [5.2, 0, -3], rotation: Math.PI },
+  { position: [7.5, 0, -3], rotation: Math.PI },
+];
+
+const GLASS_PANELS = [
+  { position: [-3.5, 1.4, -1], args: [0.08, 2.6, 5.5] },
+  { position: [3.5, 1.4, -1], args: [0.08, 2.6, 5.5] },
+  { position: [0, 1.4, -6.5], args: [7.2, 2.6, 0.08] },
+];
+
+const PLANTS = [
+  [-10, 0, 8],
+  [10, 0, 8],
+  [-10, 0, -8],
+  [10, 0, -8],
+  [0, 0, -10],
+];
+
+const LOUNGE_POS = [0, 0, 4.5];
+
+function aabb(minX, maxX, minZ, maxZ) {
+  return { minX, maxX, minZ, maxZ };
+}
+
+function buildColliders() {
+  const boxes = [];
+
+  for (const desk of DESKS) {
+    const [x, , z] = desk.position;
+    const halfW = 1.0;
+    // Chair sits on +Z when rotation=0, on -Z when rotated 180°
+    if (desk.rotation === 0) {
+      boxes.push(aabb(x - halfW, x + halfW, z - 0.5, z + 0.95));
+    } else {
+      boxes.push(aabb(x - halfW, x + halfW, z - 0.95, z + 0.5));
+    }
+  }
+
+  for (const panel of GLASS_PANELS) {
+    const [x, , z] = panel.position;
+    const [sx, , sz] = panel.args;
+    const pad = 0.06;
+    boxes.push(aabb(x - sx / 2 - pad, x + sx / 2 + pad, z - sz / 2 - pad, z + sz / 2 + pad));
+  }
+
+  {
+    const [x, , z] = LOUNGE_POS;
+    boxes.push(aabb(x - 1.25, x + 1.25, z - 0.65, z + 0.65)); // sofa
+    boxes.push(aabb(x - 0.55, x + 0.55, z + 0.45, z + 1.35)); // coffee table
+  }
+
+  for (const [x, , z] of PLANTS) {
+    boxes.push(aabb(x - 0.4, x + 0.4, z - 0.4, z + 0.4));
+  }
+
+  return boxes;
+}
+
+const COLLIDERS = buildColliders();
+
+function hitsCollider(x, z) {
+  for (const c of COLLIDERS) {
+    if (
+      x > c.minX - PLAYER_RADIUS &&
+      x < c.maxX + PLAYER_RADIUS &&
+      z > c.minZ - PLAYER_RADIUS &&
+      z < c.maxZ + PLAYER_RADIUS
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function tryMove(fromX, fromZ, dx, dz) {
+  let nx = THREE.MathUtils.clamp(fromX + dx, -HALF, HALF);
+  let nz = THREE.MathUtils.clamp(fromZ + dz, -HALF, HALF);
+
+  if (!hitsCollider(nx, nz)) {
+    return { x: nx, z: nz };
+  }
+
+  // Slide along axes so corners don't fully stop the player
+  const slideX = THREE.MathUtils.clamp(fromX + dx, -HALF, HALF);
+  if (!hitsCollider(slideX, fromZ)) {
+    return { x: slideX, z: fromZ };
+  }
+
+  const slideZ = THREE.MathUtils.clamp(fromZ + dz, -HALF, HALF);
+  if (!hitsCollider(fromX, slideZ)) {
+    return { x: fromX, z: slideZ };
+  }
+
+  return { x: fromX, z: fromZ };
+}
 
 /** Warm natural ceramic tile floor (procedural, no external assets). */
 function createTileFloorTexture() {
@@ -108,8 +213,9 @@ function Player({ camDistance, onMove, paused }) {
 
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(MOVE_SPEED * delta);
-      group.position.x = THREE.MathUtils.clamp(group.position.x + move.x, -HALF, HALF);
-      group.position.z = THREE.MathUtils.clamp(group.position.z + move.z, -HALF, HALF);
+      const next = tryMove(group.position.x, group.position.z, move.x, move.z);
+      group.position.x = next.x;
+      group.position.z = next.z;
       group.rotation.y = Math.atan2(move.x, move.z);
     }
 
@@ -122,7 +228,7 @@ function Player({ camDistance, onMove, paused }) {
     }
   });
 
-  return <group ref={groupRef} position={[0, 0, 6]} />;
+  return <group ref={groupRef} position={[0, 0, 8]} />;
 }
 
 function RemotePlayer({ name, x, z, rot }) {
@@ -311,27 +417,20 @@ function Room() {
       </Billboard>
 
       {/* Glass dividers */}
-      <GlassPanel position={[-3.5, 1.4, -1]} args={[0.08, 2.6, 5.5]} />
-      <GlassPanel position={[3.5, 1.4, -1]} args={[0.08, 2.6, 5.5]} />
-      <GlassPanel position={[0, 1.4, -6.5]} args={[7.2, 2.6, 0.08]} />
+      {GLASS_PANELS.map((panel, i) => (
+        <GlassPanel key={`glass-${i}`} position={panel.position} args={panel.args} />
+      ))}
 
       {/* Workstations */}
-      <ModernDesk position={[-7.5, 0, 2]} />
-      <ModernDesk position={[-5.2, 0, 2]} />
-      <ModernDesk position={[5.2, 0, 2]} />
-      <ModernDesk position={[7.5, 0, 2]} />
-      <ModernDesk position={[-7.5, 0, -3]} rotation={Math.PI} />
-      <ModernDesk position={[-5.2, 0, -3]} rotation={Math.PI} />
-      <ModernDesk position={[5.2, 0, -3]} rotation={Math.PI} />
-      <ModernDesk position={[7.5, 0, -3]} rotation={Math.PI} />
+      {DESKS.map((desk, i) => (
+        <ModernDesk key={`desk-${i}`} position={desk.position} rotation={desk.rotation} />
+      ))}
 
       {/* Meeting / lounge */}
-      <Lounge position={[0, 0, 4.5]} />
-      <Plant position={[-10, 0, 8]} />
-      <Plant position={[10, 0, 8]} />
-      <Plant position={[-10, 0, -8]} />
-      <Plant position={[10, 0, -8]} />
-      <Plant position={[0, 0, -10]} />
+      <Lounge position={LOUNGE_POS} />
+      {PLANTS.map((pos, i) => (
+        <Plant key={`plant-${i}`} position={pos} />
+      ))}
 
       <PendantLight position={[-6, 4.6, 0]} />
       <PendantLight position={[6, 4.6, 0]} />
