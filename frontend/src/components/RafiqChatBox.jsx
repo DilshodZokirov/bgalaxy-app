@@ -152,21 +152,14 @@ export default function RafiqChatBox({ compact = false, onClose }) {
     <div className={`ziyo-page ${showHero ? "is-hero" : "is-chat"}`}>
       <div className="ziyo-brand-row">
         <p className="ziyo-brand">AI Ziyo</p>
-        {!showHero && (
-          <div className="ziyo-online">
-            <span className="dot" />
-            Onlayn
-          </div>
-        )}
+        <div className="ziyo-online">
+          <span className="dot" />
+          Onlayn
+        </div>
       </div>
 
       {showHero ? (
         <section className="ziyo-hero" aria-label="Ziyo salomlashuvi">
-          <div className="ziyo-hero-visual">
-            <span className="ziyo-wave" aria-hidden />
-            <span className="ziyo-wave delay" aria-hidden />
-            <img className="ziyo-hero-img" src="/ziyo-hero.jpg" alt="Ziyo" draggable={false} />
-          </div>
           <h1>Salom! Men Ziyo.</h1>
           <p>Sizga qanday yordam bera olaman?</p>
           <div className="ziyo-chips">
@@ -233,6 +226,11 @@ export default function RafiqChatBox({ compact = false, onClose }) {
           </svg>
         </button>
       </form>
+
+      <aside className={`ziyo-corner-bot ${loading ? "is-thinking" : ""}`} aria-hidden>
+        <span className="ziyo-corner-glow" />
+        <img src="/ziyo-hero.jpg" alt="" draggable={false} />
+      </aside>
     </div>
   );
 }
