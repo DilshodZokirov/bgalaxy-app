@@ -4,6 +4,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
+import Wh3DBarChart from "../components/Wh3DBarChart";
 
 const TYPE_LABELS = { technology: "Texnologiya", clothing: "Kiyim-kechak", food: "Oziq-ovqat" };
 const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
@@ -83,9 +84,13 @@ function ChartBlock({ title, period, setPeriod, chartType, setChartType, childre
       <div className="wh-panel-head">
         <h3>{title}</h3>
         <div className="wh-seg">
-          {["line", "bar"].map((t) => (
+          {[
+            ["line", "Chiziq"],
+            ["bar", "Ustun"],
+            ["3d", "3D"],
+          ].map(([t, label]) => (
             <button key={t} type="button" className={chartType === t ? "active" : ""} onClick={() => setChartType(t)}>
-              {t === "line" ? "Chiziq" : "Ustun"}
+              {label}
             </button>
           ))}
         </div>
@@ -371,7 +376,7 @@ function StockModal({ company, product, onClose, onSaved }) {
 
 function WarehouseDashboard({ company }) {
   const [period, setPeriod] = useState("month");
-  const [chartType, setChartType] = useState("line");
+  const [chartType, setChartType] = useState("3d");
   const [view, setView] = useState("current");
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -439,25 +444,29 @@ function WarehouseDashboard({ company }) {
             setChartType={setChartType}
             hint="Turli birlikdagi mahsulotlar bitta songa qo‘shilmaydi — faqat kirim soni ko‘rsatiladi."
           >
-            <ResponsiveContainer width="100%" height={220}>
-              {chartType === "line" ? (
-                <LineChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="events" name="Kirim soni" stroke="#38bdf8" strokeWidth={2} />
-                </LineChart>
-              ) : (
-                <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="events" name="Kirim soni" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              )}
-            </ResponsiveContainer>
+            {chartType === "3d" ? (
+              <Wh3DBarChart data={data.trend} dataKey="events" color="#38bdf8" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                {chartType === "line" ? (
+                  <LineChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line type="monotone" dataKey="events" name="Kirim soni" stroke="#38bdf8" strokeWidth={2} />
+                  </LineChart>
+                ) : (
+                  <BarChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="events" name="Kirim soni" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </ChartBlock>
 
           <section className="wh-panel">
@@ -491,25 +500,29 @@ function WarehouseDashboard({ company }) {
             <p>Narx × soni — turli birliklarni bitta qiymatda solishtirish mumkin.</p>
           </article>
           <ChartBlock title="Qabul qilingan zaxira qiymati" period={period} setPeriod={setPeriod} chartType={chartType} setChartType={setChartType}>
-            <ResponsiveContainer width="100%" height={220}>
-              {chartType === "line" ? (
-                <LineChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                  <Line type="monotone" dataKey="received_value" name="Qiymat" stroke="#2dd4bf" strokeWidth={2} />
-                </LineChart>
-              ) : (
-                <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                  <Bar dataKey="received_value" name="Qiymat" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              )}
-            </ResponsiveContainer>
+            {chartType === "3d" ? (
+              <Wh3DBarChart data={data.trend} dataKey="received_value" color="#2dd4bf" valueFormatter={money} />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                {chartType === "line" ? (
+                  <LineChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                    <Line type="monotone" dataKey="received_value" name="Qiymat" stroke="#2dd4bf" strokeWidth={2} />
+                  </LineChart>
+                ) : (
+                  <BarChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                    <Bar dataKey="received_value" name="Qiymat" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </ChartBlock>
           <section className="wh-panel">
             <div className="wh-panel-head"><h3>Mahsulotlar bo‘yicha byudjet</h3></div>
@@ -542,25 +555,29 @@ function WarehouseDashboard({ company }) {
             <p>Distributiv savdo ulanganda aylanma real vaqtda yangilanadi.</p>
           </article>
           <ChartBlock title="Sotuv aylanmasi" period={period} setPeriod={setPeriod} chartType={chartType} setChartType={setChartType}>
-            <ResponsiveContainer width="100%" height={220}>
-              {chartType === "line" ? (
-                <LineChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                  <Line type="monotone" dataKey="sold_value" name="Sotuv" stroke="#fb7185" strokeWidth={2} />
-                </LineChart>
-              ) : (
-                <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                  <Bar dataKey="sold_value" name="Sotuv" fill="#fb7185" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              )}
-            </ResponsiveContainer>
+            {chartType === "3d" ? (
+              <Wh3DBarChart data={data.trend} dataKey="sold_value" color="#fb7185" valueFormatter={money} />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                {chartType === "line" ? (
+                  <LineChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                    <Line type="monotone" dataKey="sold_value" name="Sotuv" stroke="#fb7185" strokeWidth={2} />
+                  </LineChart>
+                ) : (
+                  <BarChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
+                    <Bar dataKey="sold_value" name="Sotuv" fill="#fb7185" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            )}
           </ChartBlock>
         </>
       )}
