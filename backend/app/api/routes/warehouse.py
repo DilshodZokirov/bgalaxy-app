@@ -646,7 +646,12 @@ async def adjust_stock(
     """Kirim (positive change) or chiqim (negative change) — logged as a
     StockMovement and reflected immediately in the product's quantity."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
-    await _require_warehouse_enabled(db, company_id)
+    company, _warehouses = await _require_warehouse_enabled(db, company_id)
+    if company.company_type == "distributor":
+        raise HTTPException(
+            status_code=400,
+            detail="Distributiv firma zaxirani qo'lda o'zgartira olmaydi — Bozor orqali qayta buyurtma bering.",
+        )
 
     if payload.change == 0:
         raise HTTPException(status_code=400, detail="O'zgarish 0 bo'lishi mumkin emas")
