@@ -24,12 +24,33 @@ def _company_out(company: Company, warehouses: list[Warehouse] | None = None) ->
         slug=company.slug,
         owner_id=company.owner_id,
         logo_url=company.logo_url,
+        location_region=getattr(company, "location_region", None),
+        location_address=getattr(company, "location_address", None),
         company_type=company.company_type,
         has_warehouse=bool(whs) or bool(company.has_warehouse),
         warehouse_type=company.warehouse_type,
         warehouses=[WarehouseOut.model_validate(w) for w in whs],
         created_at=company.created_at,
     )
+
+
+# Allowed regions in fixed display order (locatsiya tartibi).
+UZ_REGIONS = [
+    "Toshkent shahri",
+    "Toshkent viloyati",
+    "Andijon viloyati",
+    "Buxoro viloyati",
+    "Farg'ona viloyati",
+    "Jizzax viloyati",
+    "Xorazm viloyati",
+    "Namangan viloyati",
+    "Navoiy viloyati",
+    "Qashqadaryo viloyati",
+    "Samarqand viloyati",
+    "Sirdaryo viloyati",
+    "Surxondaryo viloyati",
+    "Qoraqalpog'iston Respublikasi",
+]
 
 
 @router.post("", response_model=CompanyOut, status_code=201)
@@ -45,7 +66,25 @@ async def create_company(
     if payload.company_type not in ("kompaniya", "distributor", "market"):
         raise HTTPException(status_code=400, detail="Noto'g'ri kompaniya turi")
 
-    company = Company(name=payload.name, slug=payload.slug, owner_id=current_user.id, company_type=payload.company_type)
+    region = (payload.location_region or "").strip() or None
+    if region and region not in UZ_REGIONS:
+        raise HTTPException(status_code=400, detail="Noto'g'ri joylashuv (viloyat/shahar)")
+    address = (payload.location_address or "").strip() or None
+    if address and len(address) > 255:
+        raise HTTPException(status_code=400, detail="Manzil juda uzun")
+    logo = (payload.logo_url or "").strip() or None
+    if logo and not (logo.startswith("data:image/") or logo.startswith("http://") or logo.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Brand rasm formati noto'g'ri")
+
+    company = Company(
+        name=payload.name,
+        slug=payload.slug,
+        owner_id=current_user.id,
+        company_type=payload.company_type,
+        logo_url=logo,
+        location_region=region,
+        location_address=address,
+    )
     db.add(company)
     await db.flush()
 

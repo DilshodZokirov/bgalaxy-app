@@ -31,6 +31,42 @@ const COMPANY_TYPES = [
   { key: "market", mark: "M", label: "Market", industry: "Chakana savdo" },
 ];
 
+/** Joylashuv — tartib bo‘yicha viloyat/shahar ro‘yxati */
+const UZ_REGIONS = [
+  "Toshkent shahri",
+  "Toshkent viloyati",
+  "Andijon viloyati",
+  "Buxoro viloyati",
+  "Farg'ona viloyati",
+  "Jizzax viloyati",
+  "Xorazm viloyati",
+  "Namangan viloyati",
+  "Navoiy viloyati",
+  "Qashqadaryo viloyati",
+  "Samarqand viloyati",
+  "Sirdaryo viloyati",
+  "Surxondaryo viloyati",
+  "Qoraqalpog'iston Respublikasi",
+];
+
+function resizeLogoToDataUrl(file, maxSize = 512) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 const TABS = [
   { key: "overview", label: "Umumiy" },
   { key: "team", label: "Jamoa" },
@@ -110,6 +146,10 @@ export default function Companies() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState("");
   const [companyType, setCompanyType] = useState("kompaniya");
+  const [locationRegion, setLocationRegion] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [logoUrl, setLogoUrl] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [permMap, setPermMap] = useState({});
@@ -232,15 +272,45 @@ export default function Companies() {
     [activitySeries]
   );
 
+  async function handleLogoFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    setError(null);
+    try {
+      const dataUrl = await resizeLogoToDataUrl(file);
+      setLogoUrl(dataUrl);
+    } catch {
+      setError("Brand rasmni yuklab bo‘lmadi");
+    } finally {
+      setLogoUploading(false);
+      e.target.value = "";
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    if (!locationRegion) {
+      setError("Joylashuv (viloyat/shahar) tanlang");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await api.createCompany({ name, slug: slugify(name), company_type: companyType });
+      const res = await api.createCompany({
+        name,
+        slug: slugify(name),
+        company_type: companyType,
+        location_region: locationRegion,
+        location_address: locationAddress.trim() || null,
+        logo_url: logoUrl || null,
+      });
       setActiveCompanyId(res.id);
       setName("");
       setCompanyType("kompaniya");
+      setLocationRegion("");
+      setLocationAddress("");
+      setLogoUrl(null);
       setShowCreateForm(false);
       setTab("overview");
       refreshCompanies();
@@ -345,7 +415,7 @@ export default function Companies() {
         {(showCreateForm || companies.length === 0) && (
           <section className="os-create">
             <h3>Yangi kompaniya yaratish</h3>
-            <p>Nomini kiriting — siz avtomatik egasi bo‘lasiz.</p>
+            <p>Nom, joylashuv va brand rasm — siz avtomatik egasi bo‘lasiz.</p>
             <form onSubmit={handleSubmit}>
               <label>Kompaniya nomi</label>
               <input
@@ -355,6 +425,44 @@ export default function Companies() {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+
+              <label>Joylashuv (viloyat / shahar)</label>
+              <select
+                value={locationRegion}
+                onChange={(e) => setLocationRegion(e.target.value)}
+                required
+              >
+                <option value="">Tanlang...</option>
+                {UZ_REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+
+              <label>Manzil (ixtiyoriy)</label>
+              <input
+                type="text"
+                placeholder="Ko‘cha, uy, ofis..."
+                value={locationAddress}
+                onChange={(e) => setLocationAddress(e.target.value)}
+                maxLength={255}
+              />
+
+              <label>Brand rasm (logo)</label>
+              <div className="os-logo-upload">
+                <div className="os-logo os-logo-preview" aria-hidden>
+                  {logoUrl ? <img src={logoUrl} alt="" /> : <span>{(name || "?").slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <div>
+                  <input type="file" accept="image/*" onChange={handleLogoFile} disabled={logoUploading} />
+                  <p className="os-muted">JPG/PNG — kvadratga yaqin rasm tavsiya etiladi.</p>
+                  {logoUrl && (
+                    <button type="button" className="os-text-danger" onClick={() => setLogoUrl(null)}>
+                      Rasmni olib tashlash
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <label>Kompaniya turi</label>
               <div className="os-type-grid">
                 {COMPANY_TYPES.map((t) => (
@@ -370,7 +478,7 @@ export default function Companies() {
                 ))}
               </div>
               {error && <p className="error">{error}</p>}
-              <button type="submit" className="os-btn-primary" disabled={loading}>
+              <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
                 {loading ? "Yaratilmoqda..." : "Yaratish"}
               </button>
             </form>
@@ -395,6 +503,11 @@ export default function Companies() {
                   </div>
                   <p className="os-brand-sub">
                     /{activeCompany.slug} · {meta.label}
+                    {activeCompany.location_region
+                      ? ` · ${activeCompany.location_region}${
+                          activeCompany.location_address ? `, ${activeCompany.location_address}` : ""
+                        }`
+                      : ""}
                   </p>
                 </div>
               </div>

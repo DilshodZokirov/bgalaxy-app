@@ -8002,6 +8002,34 @@ html[data-custom-bg="1"] .galaxy-sky {
   font-size: 0.9rem;
 }
 
+.os-create label {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 12.5px;
+  color: #94a3b8;
+}
+
+.os-create select {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.os-logo-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.os-logo-preview {
+  flex-shrink: 0;
+}
+
+.os-logo-upload .os-muted {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
 .os-type-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
