@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.company import MemberRole
+from app.schemas.warehouse import WarehouseOut
 
 
 class CompanyCreate(BaseModel):
@@ -21,6 +22,7 @@ class CompanyOut(BaseModel):
     company_type: str = "kompaniya"
     has_warehouse: bool = False
     warehouse_type: str | None = None
+    warehouses: list[WarehouseOut] = []
     created_at: datetime | None = None
 
     class Config:

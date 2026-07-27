@@ -1,11 +1,28 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
+
+
+class Warehouse(Base):
+    """One production-type warehouse under a company.
+
+    A company may have at most 3 warehouses and at most one of each type
+    (technology / clothing / food).
+    """
+
+    __tablename__ = "warehouses"
+    __table_args__ = (UniqueConstraint("company_id", "warehouse_type", name="uq_warehouses_company_type"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"), index=True)
+    warehouse_type: Mapped[str] = mapped_column(String(30))  # "technology" | "clothing" | "food"
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class WarehouseProduct(Base):
@@ -13,6 +30,9 @@ class WarehouseProduct(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
+    warehouse_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("warehouses.id"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255))
     price: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
@@ -24,7 +44,7 @@ class WarehouseProduct(Base):
     source_company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
     source_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Type-specific fields — left null when they don't apply to the
-    # company's warehouse_type (e.g. size stays null for a food warehouse).
+    # warehouse's type (e.g. size stays null for a food warehouse).
     size: Mapped[str | None] = mapped_column(String(50), nullable=True)  # clothing
     color: Mapped[str | None] = mapped_column(String(50), nullable=True)  # clothing
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # food

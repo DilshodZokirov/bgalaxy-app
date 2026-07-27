@@ -9417,6 +9417,16 @@ html[data-custom-bg="1"] .galaxy-sky {
   flex-wrap: wrap;
 }
 
+.wh-warehouse-select {
+  min-width: 220px;
+  background: rgba(8, 16, 36, 0.72);
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
 .wh-tabs,
 .wh-view-tabs,
 .wh-seg,
