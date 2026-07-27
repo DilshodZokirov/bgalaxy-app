@@ -27,6 +27,7 @@ import Analytics from "./pages/Analytics";
 import Warehouse from "./pages/Warehouse";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ResetPin from "./pages/ResetPin";
 import GalaxyDemo from "./pages/GalaxyDemo";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/reset-pin/:token" element={<ResetPin />} />
         <Route
           path="/dashboard"
           element={

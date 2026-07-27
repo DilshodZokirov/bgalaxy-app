@@ -51,6 +51,11 @@ class VerifyPinRequest(BaseModel):
     pin: str
 
 
+class ResetPinRequest(BaseModel):
+    token: str
+    new_pin: str
+
+
 class AutoLockRequest(BaseModel):
     auto_lock_minutes: int
 
