@@ -4017,6 +4017,33 @@ video {
   color: #0f172a;
 }
 
+/* Custom UI presets must win over the fixed galaxy sky paints */
+html[data-custom-bg="1"] .galaxy-shell,
+html[data-custom-bg="1"] .galaxy-shell-night,
+html[data-custom-bg="1"] .galaxy-shell-day,
+html[data-custom-bg="1"] .office-immersive-shell,
+.galaxy-shell.has-custom-ui {
+  background: var(--custom-shell-bg, var(--gradient)) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+html[data-custom-bg="1"][data-theme="dark"] .galaxy-shell,
+html[data-custom-bg="1"][data-theme="dark"] .galaxy-shell-day {
+  color: #f8fafc;
+}
+
+html[data-custom-bg="1"][data-theme="light"] .galaxy-shell,
+html[data-custom-bg="1"][data-theme="light"] .galaxy-shell-day {
+  color: #0f172a;
+}
+
+html[data-custom-bg="1"] .galaxy-sky {
+  display: none !important;
+}
+
 .galaxy-shell .sidebar {
   background: rgba(10, 16, 32, 0.62);
   border-right: 1px solid rgba(167, 139, 250, 0.28);
@@ -4036,9 +4063,9 @@ video {
 }
 
 .galaxy-shell .sidebar-link.active {
-  background: linear-gradient(135deg, rgba(91, 33, 182, 0.95), rgba(37, 99, 235, 0.9));
-  box-shadow: 0 0 22px rgba(139, 92, 246, 0.45);
-  border-color: rgba(196, 181, 253, 0.25);
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--cyan) 45%, transparent);
+  border-color: color-mix(in srgb, var(--cyan) 35%, transparent);
 }
 
 
@@ -4175,8 +4202,8 @@ video {
 }
 
 .galaxy-shell-day .sidebar-link.active {
-  background: linear-gradient(135deg, #0284c7, #2563eb);
-  box-shadow: 0 0 18px rgba(14, 165, 233, 0.35);
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 40%, transparent);
 }
 
 .galaxy-shell-day .sidebar-footer .name { color: #0f172a; }
