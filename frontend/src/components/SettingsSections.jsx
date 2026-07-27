@@ -532,10 +532,28 @@ export function DashboardUiSection({ user, onSaved }) {
 }
 
 // ---------- 5. Ombor (korxonada 3 tagacha, har turdan bittadan) ----------
-const WAREHOUSE_TYPE_LABELS = {
-  technology: "Texnologiya",
-  clothing: "Kiyim-kechak",
-  food: "Oziq-ovqat",
+const WAREHOUSE_TYPE_META = {
+  technology: {
+    label: "Texnologiya",
+    blurb: "Gadget, qurilma, SKU",
+    accent: "#38bdf8",
+    glow: "rgba(56,189,248,0.35)",
+    icon: "◈",
+  },
+  clothing: {
+    label: "Kiyim-kechak",
+    blurb: "O‘lcham, rang, kolleksiya",
+    accent: "#2dd4bf",
+    glow: "rgba(45,212,191,0.35)",
+    icon: "◇",
+  },
+  food: {
+    label: "Oziq-ovqat",
+    blurb: "Muddat, zaxira, oqim",
+    accent: "#fbbf24",
+    glow: "rgba(251,191,36,0.3)",
+    icon: "✦",
+  },
 };
 
 export function WarehouseSection() {
@@ -545,48 +563,56 @@ export function WarehouseSection() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function reload() {
-    const list = await api.getMyCompanies();
-    const active = pickActiveCompany(list);
-    setCompany(active);
-    if (active) {
-      let rows = active.warehouses?.length ? active.warehouses : [];
-      if (!rows.length) {
-        rows = await api.getWarehouses(active.id).catch(() => []);
-      }
-      // Legacy: company still has food/tech/clothing flag but warehouses row missing
-      if (!rows.length && active.has_warehouse && active.warehouse_type) {
-        try {
-          rows = [await api.createWarehouse(active.id, active.warehouse_type)];
-        } catch {
+    setLoading(true);
+    try {
+      const list = await api.getMyCompanies();
+      const active = pickActiveCompany(list);
+      setCompany(active);
+      if (active) {
+        let rows = active.warehouses?.length ? active.warehouses : [];
+        if (!rows.length) {
           rows = await api.getWarehouses(active.id).catch(() => []);
         }
+        if (!rows.length && active.has_warehouse && active.warehouse_type) {
+          try {
+            rows = [await api.createWarehouse(active.id, active.warehouse_type)];
+          } catch {
+            rows = await api.getWarehouses(active.id).catch(() => []);
+          }
+        }
+        setWarehouses(rows || []);
+        const used = new Set((rows || []).map((w) => w.warehouse_type));
+        const next = Object.keys(WAREHOUSE_TYPE_META).find((k) => !used.has(k));
+        setAddType(next || "technology");
+      } else {
+        setWarehouses([]);
       }
-      setWarehouses(rows || []);
-      const used = new Set((rows || []).map((w) => w.warehouse_type));
-      const next = Object.keys(WAREHOUSE_TYPE_LABELS).find((k) => !used.has(k));
-      setAddType(next || "technology");
-    } else {
-      setWarehouses([]);
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    reload().catch(() => {});
+    reload().catch(() => setLoading(false));
   }, []);
 
   const usedTypes = new Set(warehouses.map((w) => w.warehouse_type));
-  const availableTypes = Object.entries(WAREHOUSE_TYPE_LABELS).filter(([key]) => !usedTypes.has(key));
+  const availableTypes = Object.keys(WAREHOUSE_TYPE_META).filter((key) => !usedTypes.has(key));
   const canAdd = warehouses.length < 3 && availableTypes.length > 0;
+  const slots = [0, 1, 2].map((i) => warehouses[i] || null);
 
-  async function handleAdd() {
+  async function handleAdd(typeKey = addType) {
     if (!company || !canAdd) return;
+    const type = availableTypes.includes(typeKey) ? typeKey : availableTypes[0];
+    if (!type) return;
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await api.createWarehouse(company.id, addType);
+      await api.createWarehouse(company.id, type);
       setSaved(true);
       await reload();
     } catch (err) {
@@ -598,7 +624,7 @@ export function WarehouseSection() {
 
   async function handleRemove(warehouse) {
     if (!company) return;
-    const label = WAREHOUSE_TYPE_LABELS[warehouse.warehouse_type] || warehouse.warehouse_type;
+    const label = WAREHOUSE_TYPE_META[warehouse.warehouse_type]?.label || warehouse.warehouse_type;
     if (!window.confirm(`"${label}" omborini o'chirasizmi? Ichidagi mahsulotlar ham o'chadi.`)) return;
     setSaving(true);
     setError(null);
@@ -614,87 +640,116 @@ export function WarehouseSection() {
     }
   }
 
+  if (loading) {
+    return <p className="wh-set-hint">Ombor orbitasi yuklanmoqda...</p>;
+  }
+
   if (!company) {
-    return <p style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Avval kompaniya tanlang.</p>;
+    return <p className="wh-set-hint">Avval kompaniya tanlang.</p>;
   }
 
   return (
-    <div>
-      <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 14px" }}>
-        <strong style={{ color: "var(--text)" }}>{company.name}</strong> uchun 3 tagacha ombor
-        ochishingiz mumkin — har bir turdan faqat bittadan (kiyim, texnologiya, oziq-ovqat).
-      </p>
-
-      {warehouses.length === 0 ? (
-        <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 14px" }}>
-          {company.has_warehouse || company.warehouse_type
-            ? `Eski ombor tiklanmoqda / qayta qo'shing${
-                company.warehouse_type ? ` (oldingi tur: ${WAREHOUSE_TYPE_LABELS[company.warehouse_type] || company.warehouse_type})` : ""
-              }. Sahifani yangilab ko'ring yoki pastdan qayta qo'shing — mahsulotlar o'chmagan.`
-            : "Hali ombor yo'q. Pastdan tur tanlab qo'shing."}
-        </p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-          {warehouses.map((w) => (
-            <div
-              key={w.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                background: "var(--panel-2)",
-              }}
-            >
-              <div>
-                <strong style={{ fontSize: 13.5 }}>
-                  {w.name || WAREHOUSE_TYPE_LABELS[w.warehouse_type] || w.warehouse_type}
-                </strong>
-                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
-                  {WAREHOUSE_TYPE_LABELS[w.warehouse_type] || w.warehouse_type}
-                </div>
-              </div>
-              <button type="button" className="secondary" disabled={saving} onClick={() => handleRemove(w)}>
-                O'chirish
-              </button>
-            </div>
-          ))}
+    <div className="wh-set">
+      <div className="wh-set-hero">
+        <div className="wh-set-hero-copy">
+          <p className="wh-set-kicker">Warehouse Orbit</p>
+          <h4>{company.name}</h4>
+          <p>
+            Bitta korxonada 3 tagacha ishlab chiqarish ombori — har turdan faqat bittadan.
+            Kiyim, texnologiya va oziq-ovqat birgalikda ishlashi mumkin.
+          </p>
         </div>
-      )}
+        <div className="wh-set-meter" aria-label={`Omborlar ${warehouses.length} dan 3`}>
+          <strong>{warehouses.length}</strong>
+          <span>/ 3</span>
+          <em>slot</em>
+        </div>
+      </div>
+
+      <div className="wh-set-slots">
+        {slots.map((w, i) => {
+          if (!w) {
+            return (
+              <div key={`empty-${i}`} className="wh-set-slot is-empty">
+                <span className="wh-set-slot-ring" aria-hidden />
+                <strong>Bo‘sh orbit</strong>
+                <em>Slot {i + 1}</em>
+              </div>
+            );
+          }
+          const meta = WAREHOUSE_TYPE_META[w.warehouse_type] || {
+            label: w.warehouse_type,
+            blurb: "Ombor",
+            accent: "#67e8f9",
+            glow: "rgba(103,232,249,0.3)",
+            icon: "○",
+          };
+          return (
+            <article
+              key={w.id}
+              className="wh-set-slot is-live"
+              style={{ "--wh-accent": meta.accent, "--wh-glow": meta.glow }}
+            >
+              <span className="wh-set-slot-ring" aria-hidden />
+              <div className="wh-set-slot-icon" aria-hidden>{meta.icon}</div>
+              <strong>{w.name || meta.label}</strong>
+              <em>{meta.blurb}</em>
+              <button
+                type="button"
+                className="wh-set-remove"
+                disabled={saving}
+                onClick={() => handleRemove(w)}
+              >
+                O‘chirish
+              </button>
+            </article>
+          );
+        })}
+      </div>
 
       {canAdd ? (
-        <div style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 8px" }}>
-            Yangi ombor turi ({warehouses.length}/3)
-          </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select
-              value={addType}
-              onChange={(e) => setAddType(e.target.value)}
-              style={{ minWidth: 180 }}
-            >
-              {availableTypes.map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-            <button type="button" disabled={saving} onClick={handleAdd}>
-              {saving ? "Saqlanmoqda..." : "Ombor qo'shish"}
-            </button>
+        <div className="wh-set-add">
+          <div className="wh-set-add-head">
+            <p className="wh-set-label">Yangi ombor turi</p>
+            <span>{warehouses.length}/3 band</span>
           </div>
+          <div className="wh-set-type-grid">
+            {availableTypes.map((key) => {
+              const meta = WAREHOUSE_TYPE_META[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`wh-set-type ${addType === key ? "active" : ""}`}
+                  style={{ "--wh-accent": meta.accent, "--wh-glow": meta.glow }}
+                  onClick={() => setAddType(key)}
+                >
+                  <span className="wh-set-type-icon" aria-hidden>{meta.icon}</span>
+                  <strong>{meta.label}</strong>
+                  <em>{meta.blurb}</em>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="wh-set-cta"
+            disabled={saving || !addType}
+            onClick={() => handleAdd(addType)}
+          >
+            {saving ? "Ulanmoqda..." : `${WAREHOUSE_TYPE_META[addType]?.label || "Ombor"} qo‘shish`}
+          </button>
         </div>
       ) : (
-        <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
+        <p className="wh-set-hint">
           {warehouses.length >= 3
-            ? "Maksimal 3 ta ombor ulangan."
+            ? "Uchala orbit to‘ldi — maksimal quvvat."
             : "Barcha turlar allaqachon ochilgan."}
         </p>
       )}
 
       {error && <p className="error">{error}</p>}
-      {saved && <p style={{ color: "var(--green)", fontSize: 12.5, margin: "0 0 12px" }}>✓ Saqlandi</p>}
+      {saved && <p className="settings-success">✓ Ombor orbitasi yangilandi</p>}
     </div>
   );
 }
