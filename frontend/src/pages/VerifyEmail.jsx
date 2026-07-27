@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api/client";
-import Logo from "../components/Logo";
+import AuthOrbitShell from "../components/AuthOrbitShell";
 
 export default function VerifyEmail() {
   const { token } = useParams();
@@ -14,26 +14,46 @@ export default function VerifyEmail() {
       .catch(() => setStatus("error"));
   }, [token]);
 
+  if (status === "loading") {
+    return (
+      <AuthOrbitShell
+        kicker="Verifying"
+        title="Signal tekshirilmoqda"
+        subtitle="Email tasdiqlash bir necha soniya olishi mumkin."
+      >
+        <h2>Tekshirilmoqda...</h2>
+        <p className="subtitle">Iltimos, kuting.</p>
+      </AuthOrbitShell>
+    );
+  }
+
+  if (status === "success") {
+    return (
+      <AuthOrbitShell
+        kicker="Orbit open"
+        title="Tasdiqlandi!"
+        subtitle="Emailingiz muvaffaqiyatli tasdiqlandi — endi tizimga kira olasiz."
+      >
+        <h2>Xush kelibsiz</h2>
+        <p className="subtitle">Galaktikangiz tayyor. Kirish tugmasini bosing.</p>
+        <Link to="/login">
+          <button type="button">Kirish</button>
+        </Link>
+      </AuthOrbitShell>
+    );
+  }
+
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <Logo withTagline />
-        {status === "loading" && <p className="subtitle">Tekshirilmoqda...</p>}
-        {status === "success" && (
-          <>
-            <h1>✓ Tasdiqlandi!</h1>
-            <p className="subtitle">Emailingiz muvaffaqiyatli tasdiqlandi — endi tizimga kira olasiz.</p>
-            <Link to="/login"><button style={{ marginTop: 12 }}>Kirish</button></Link>
-          </>
-        )}
-        {status === "error" && (
-          <>
-            <h1>Havola yaroqsiz</h1>
-            <p className="subtitle">Bu tasdiqlash havolasi noto'g'ri yoki eskirgan bo'lishi mumkin.</p>
-            <Link to="/login"><button style={{ marginTop: 12 }}>Kirish sahifasiga o'tish</button></Link>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthOrbitShell
+      kicker="Signal lost"
+      title="Havola yaroqsiz"
+      subtitle="Bu tasdiqlash havolasi noto'g'ri yoki eskirgan bo'lishi mumkin."
+    >
+      <h2>Qayta urinib ko'ring</h2>
+      <p className="subtitle">Kirish sahifasidan tasdiqlash xatini qayta so'rashingiz mumkin.</p>
+      <Link to="/login">
+        <button type="button">Kirish sahifasiga o'tish</button>
+      </Link>
+    </AuthOrbitShell>
   );
 }

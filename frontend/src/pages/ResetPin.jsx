@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import Logo from "../components/Logo";
+import AuthOrbitShell from "../components/AuthOrbitShell";
 
 export default function ResetPin() {
   const { token } = useParams();
@@ -43,53 +43,60 @@ export default function ResetPin() {
     }
   }
 
+  if (done) {
+    return (
+      <AuthOrbitShell
+        kicker="Unlocked"
+        title="Tayyor!"
+        subtitle="PIN-kodingiz yangilandi — stansiyaga qaytishingiz mumkin."
+      >
+        <h2>PIN yangilandi</h2>
+        <p className="subtitle">Ekran qulfi endi yangi kod bilan ochiladi.</p>
+      </AuthOrbitShell>
+    );
+  }
+
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <Logo withTagline />
-        {done ? (
-          <>
-            <h1>✓ Tayyor!</h1>
-            <p className="subtitle">PIN-kodingiz yangilandi.</p>
-          </>
-        ) : (
-          <>
-            <h1>Yangi PIN o'rnatish</h1>
-            <p className="subtitle">Email orqali kelgan havola orqali yangi PIN kiriting.</p>
-            <form onSubmit={handleSubmit}>
-              <label>Yangi PIN (4–6 raqam)</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="••••"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                required
-                style={{ letterSpacing: 6, textAlign: "center", fontSize: 20 }}
-              />
-              <label>PINni takrorlang</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="••••"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))}
-                required
-                style={{ letterSpacing: 6, textAlign: "center", fontSize: 20 }}
-              />
-              {error && <p className="error">{error}</p>}
-              <button type="submit" disabled={loading || pin.length < 4}>
-                {loading ? "Saqlanmoqda..." : "PIN o'rnatish"}
-              </button>
-            </form>
-            <p className="auth-footer">
-              <Link to="/dashboard">← Ilovaga qaytish</Link>
-            </p>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthOrbitShell
+      kicker="Secure dock"
+      title="Yangi PIN o'rnatish"
+      subtitle="Email orqali kelgan havola orqali yangi PIN kiriting."
+      footer={
+        <p className="auth-footer">
+          <Link to="/dashboard">← Ilovaga qaytish</Link>
+        </p>
+      }
+    >
+      <h2>Yangi PIN</h2>
+      <p className="subtitle">4–6 ta raqamdan iborat yangi PIN yarating.</p>
+      <form onSubmit={handleSubmit}>
+        <label>Yangi PIN (4–6 raqam)</label>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          placeholder="••••"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          required
+          style={{ letterSpacing: 6, textAlign: "center", fontSize: 20 }}
+        />
+        <label>PINni takrorlang</label>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          placeholder="••••"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value.replace(/\D/g, ""))}
+          required
+          style={{ letterSpacing: 6, textAlign: "center", fontSize: 20 }}
+        />
+        {error && <p className="error">{error}</p>}
+        <button type="submit" disabled={loading || pin.length < 4}>
+          {loading ? "Saqlanmoqda..." : "PIN o'rnatish"}
+        </button>
+      </form>
+    </AuthOrbitShell>
   );
 }

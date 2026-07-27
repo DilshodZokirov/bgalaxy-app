@@ -532,8 +532,11 @@ async def monthly_champion(
     current_user: User = Depends(get_current_user),
 ):
     """Top scorer for the *previous* calendar month — Statistika → Jamoa
-    "O'tgan oyning eng faol ishchisi". Returns null if nobody completed
-    (accepted/rejected) tasks in that month."""
+    "O'tgan oyning eng faol ishchisi".
+
+    Goes live from August 2026 (when August opens, July is scored). Until
+    then always returns null. Also null if nobody completed
+    (accepted/rejected) tasks in that previous month."""
     result = await db.execute(
         select(TeamMembership.user_id).where(TeamMembership.company_id == company_id)
     )
@@ -542,6 +545,10 @@ async def monthly_champion(
         raise HTTPException(status_code=403, detail="Siz bu kompaniya a'zosi emassiz")
 
     today = date.today()
+    # Launch: August 2026 → first visible champion month is July 2026.
+    if today < date(2026, 8, 1):
+        return None
+
     this_month_start = today.replace(day=1)
     prev_month_end = this_month_start - timedelta(days=1)
     prev_month_start = prev_month_end.replace(day=1)

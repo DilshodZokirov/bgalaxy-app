@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { getPendingInvite } from "../hooks/usePendingInvite";
-import Logo from "../components/Logo";
+import AuthOrbitShell from "../components/AuthOrbitShell";
 import GoogleAuthButton from "../components/GoogleAuthButton";
 
 export default function Login() {
@@ -51,52 +51,55 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <Logo withTagline />
-        <h1>Kirish</h1>
-        <p className="subtitle">Virtual ofisingizga xush kelibsiz.</p>
-        <form onSubmit={handleSubmit}>
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="sizning@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <label>Parol</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <p style={{ textAlign: "right", margin: "-6px 0 14px" }}>
-            <Link to="/forgot-password" style={{ fontSize: 12.5 }}>Parolni unutdingizmi?</Link>
-          </p>
-          {error && <p className="error">{error}</p>}
-          {needsVerify && (
-            <p style={{ fontSize: 12.5, marginTop: -8, marginBottom: 12 }}>
-              {resendSent ? (
-                <span style={{ color: "var(--green)" }}>✓ Tasdiqlash havolasi qayta yuborildi!</span>
-              ) : (
-                <button type="button" className="secondary" style={{ width: "auto", padding: "6px 12px", fontSize: 12 }} onClick={handleResend}>
-                  Tasdiqlash havolasini qayta yuborish
-                </button>
-              )}
-            </p>
-          )}
-          <button type="submit" disabled={loading}>
-            {loading ? "Kirilmoqda..." : "Kirish"}
-          </button>
-        </form>
-        <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={setError} />
+    <AuthOrbitShell
+      kicker="Orbit Gate"
+      title="Galaktikangizga qayting"
+      subtitle="Ziyo kutmoqda — virtual ofis, jamoa va AI bitta stansiyada."
+      footer={
         <p className="auth-footer">
           Hisobingiz yo'qmi? <Link to="/register">Ro'yxatdan o'ting</Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      <h2>Kirish</h2>
+      <p className="subtitle">Email yoki Google orqali davom eting.</p>
+      <form onSubmit={handleSubmit}>
+        <label>Email</label>
+        <input
+          type="email"
+          placeholder="sizning@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <label>Parol</label>
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <p className="auth-forgot">
+          <Link to="/forgot-password">Parolni unutdingizmi?</Link>
+        </p>
+        {error && <p className="error">{error}</p>}
+        {needsVerify && (
+          <p className="auth-verify-row">
+            {resendSent ? (
+              <span className="settings-success">✓ Tasdiqlash havolasi qayta yuborildi!</span>
+            ) : (
+              <button type="button" className="secondary auth-resend" onClick={handleResend}>
+                Tasdiqlash havolasini qayta yuborish
+              </button>
+            )}
+          </p>
+        )}
+        <button type="submit" disabled={loading}>
+          {loading ? "Kirilmoqda..." : "Kirish"}
+        </button>
+      </form>
+      <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={setError} />
+    </AuthOrbitShell>
   );
 }
