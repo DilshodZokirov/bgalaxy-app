@@ -1,5 +1,5 @@
-export default function Logo({ withTagline = false, compact = false, variant = "default" }) {
-  if (variant === "galaxy") {
+export default function Logo({ withTagline = false, compact = false, variant = "galaxy" }) {
+  if (variant === "galaxy" || variant === "default") {
     return (
       <div className={`logo logo-galaxy ${compact ? "compact" : ""}`}>
         <span className="logo-galaxy-mark" aria-hidden>

@@ -54,6 +54,11 @@ def _send_email(to_email: str, subject: str, html: str) -> bool:
         return False
 
 
+def _asset_url(path: str) -> str:
+    base = settings.frontend_url.rstrip("/")
+    return f"{base}/{path.lstrip('/')}"
+
+
 def _email_shell(
     *,
     title: str,
@@ -62,20 +67,28 @@ def _email_shell(
     cta_link: str | None = None,
     footer_note: str | None = None,
 ) -> str:
-    """Shared BG / cyan-galaxy HTML wrapper for transactional mail."""
+    """Shared BG galaxy HTML wrapper — new logo mark + small Ziyo avatar."""
     safe_title = escape(title)
+    home = escape(settings.frontend_url.rstrip("/"), quote=True)
+    logo_src = escape(_asset_url("bg-logo-mark.png"), quote=True)
+    ziyo_src = escape(_asset_url("ziyo-avatar-email.jpg"), quote=True)
+
     cta_block = ""
     if cta_label and cta_link:
         safe_label = escape(cta_label)
         safe_link = escape(cta_link, quote=True)
         cta_block = f"""
-        <a href="{safe_link}"
-           style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#2563eb 55%,#4f46e5);
-                  color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:12px;
-                  font-weight:700;font-size:14px;letter-spacing:0.01em;
-                  box-shadow:0 10px 28px rgba(37,99,235,0.35);">
-          {safe_label}
-        </a>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+          <tr>
+            <td style="border-radius:12px;background:linear-gradient(135deg,#06b6d4,#2563eb 55%,#0ea5e9);">
+              <a href="{safe_link}"
+                 style="display:inline-block;color:#ffffff;text-decoration:none;padding:14px 26px;
+                        font-weight:700;font-size:14px;letter-spacing:0.01em;">
+                {safe_label}
+              </a>
+            </td>
+          </tr>
+        </table>
         <p style="color:#64748b;font-size:12px;line-height:1.55;margin:22px 0 0;">
           Agar tugma ishlamasa, quyidagi havolani brauzeringizga nusxalang:<br/>
           <span style="color:#94a3b8;word-break:break-all;">{escape(cta_link)}</span>
@@ -90,55 +103,77 @@ def _email_shell(
         </p>
         """
 
-    home = escape(settings.frontend_url.rstrip("/"), quote=True)
-
     return f"""
 <!DOCTYPE html>
 <html lang="uz">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
   <title>{safe_title}</title>
 </head>
 <body style="margin:0;padding:0;background:#030712;">
   <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#030712;padding:40px 16px;">
-    <div style="max-width:520px;margin:0 auto;">
-      <a href="{home}" style="display:inline-flex;align-items:center;gap:12px;text-decoration:none;margin:0 0 22px;">
-        <span style="width:40px;height:40px;border-radius:12px;
-                     background:radial-gradient(circle at 30% 30%,#67e8f9,#2563eb 55%,#0f172a);
-                     display:inline-block;text-align:center;line-height:40px;
-                     color:#ffffff;font-weight:800;font-size:18px;
-                     box-shadow:0 0 24px rgba(34,211,238,0.35);">B</span>
-        <span>
-          <span style="display:block;color:#f8fafc;font-size:20px;font-weight:800;letter-spacing:-0.03em;line-height:1.1;">BG</span>
-          <span style="display:block;color:#67e8f9;font-size:11px;font-weight:600;letter-spacing:0.04em;">
-            One Galaxy. Endless Business.
-          </span>
-        </span>
-      </a>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;margin:0 auto;">
+      <tr>
+        <td style="padding:0 0 20px;">
+          <a href="{home}" style="text-decoration:none;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="vertical-align:middle;padding-right:12px;">
+                  <img src="{logo_src}" width="44" height="44" alt="BG"
+                       style="display:block;border:0;border-radius:12px;" />
+                </td>
+                <td style="vertical-align:middle;">
+                  <div style="color:#f8fafc;font-size:22px;font-weight:800;letter-spacing:-0.03em;line-height:1.1;">BG</div>
+                  <div style="color:#67e8f9;font-size:11px;font-weight:600;letter-spacing:0.03em;margin-top:2px;">
+                    One Galaxy. Endless Business.
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:linear-gradient(165deg,#0b1224,#07101f);
+                   border:1px solid rgba(34,211,238,0.28);border-radius:20px;padding:28px 26px;
+                   box-shadow:0 24px 60px rgba(0,0,0,0.45);">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;">
+            <tr>
+              <td style="vertical-align:middle;width:56px;">
+                <img src="{ziyo_src}" width="52" height="52" alt="AI Ziyo"
+                     style="display:block;border:0;border-radius:50%;
+                            border:2px solid rgba(34,211,238,0.45);" />
+              </td>
+              <td style="vertical-align:middle;padding-left:12px;">
+                <div style="color:#f8fafc;font-size:15px;font-weight:700;">AI Ziyo</div>
+                <div style="color:#34d399;font-size:12px;font-weight:600;margin-top:2px;">● Onlayn</div>
+              </td>
+            </tr>
+          </table>
 
-      <div style="background:linear-gradient(165deg,#0b1224,#07101f);
-                  border:1px solid rgba(34,211,238,0.22);border-radius:20px;
-                  padding:32px 28px;
-                  box-shadow:0 24px 60px rgba(0,0,0,0.45),0 0 40px rgba(34,211,238,0.08);">
-        <div style="height:3px;width:72px;border-radius:999px;
-                    background:linear-gradient(90deg,#22d3ee,#2563eb);margin:0 0 20px;"></div>
-        <h2 style="color:#f8fafc;font-size:22px;font-weight:800;letter-spacing:-0.02em;margin:0 0 12px;">
-          {safe_title}
-        </h2>
-        <div style="color:#94a3b8;font-size:14px;line-height:1.65;">
-          {body_html}
-        </div>
-        <div style="margin-top:26px;">
-          {cta_block}
-          {note_block}
-        </div>
-      </div>
+          <div style="height:3px;width:72px;border-radius:999px;
+                      background:linear-gradient(90deg,#22d3ee,#2563eb);margin:0 0 18px;"></div>
 
-      <p style="color:#475569;font-size:11px;text-align:center;margin:22px 0 0;line-height:1.5;">
-        BG (Business Galaxy) · Virtual ofis · AI Ziyo · Hamkorlik
-      </p>
-    </div>
+          <h2 style="color:#f8fafc;font-size:22px;font-weight:800;letter-spacing:-0.02em;margin:0 0 12px;">
+            {safe_title}
+          </h2>
+          <div style="color:#94a3b8;font-size:14px;line-height:1.65;">
+            {body_html}
+          </div>
+          <div style="margin-top:24px;">
+            {cta_block}
+            {note_block}
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="color:#475569;font-size:11px;text-align:center;padding:22px 8px 0;line-height:1.5;">
+          BG (Business Galaxy) · Virtual ofis · AI Ziyo · Hamkorlik
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>
