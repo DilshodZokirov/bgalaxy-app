@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
-import { BACKGROUND_PRESETS } from "../data/backgrounds";
 import { UI_THEMES } from "../data/uiThemes";
 
 const AVATAR_SIZE = 256;
@@ -29,24 +28,6 @@ function cropToSquareDataUrl(file) {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
       resolve(canvas.toDataURL("image/jpeg", 0.88));
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-function resizeToDataUrl(file, maxWidth = 1600) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxWidth / img.width);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.82));
       URL.revokeObjectURL(img.src);
     };
     img.onerror = reject;
@@ -369,14 +350,9 @@ export function AutoLockSection({ user, onSaved }) {
 export function DashboardUiSection({ user, onSaved }) {
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [uiTheme, setUiTheme] = useState(user?.ui_theme || "default");
-  const [darkBg, setDarkBg] = useState(user?.dark_background || "");
-  const [lightBg, setLightBg] = useState(user?.light_background || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [systemOk, setSystemOk] = useState(false);
-
-  const activeBg = theme === "light" ? lightBg : darkBg;
-  const setActiveBg = theme === "light" ? setLightBg : setDarkBg;
 
   async function persist(updates) {
     setSaving(true);
@@ -399,8 +375,6 @@ export function DashboardUiSection({ user, onSaved }) {
 
   async function handleUiThemeChange(preset) {
     setUiTheme(preset.id);
-    setDarkBg(preset.dark_background || "");
-    setLightBg(preset.light_background || "");
     await persist({
       ui_theme: preset.id,
       dark_background: preset.dark_background || "",
@@ -411,8 +385,6 @@ export function DashboardUiSection({ user, onSaved }) {
   async function handleSystemUi() {
     setTheme("dark");
     setUiTheme("default");
-    setDarkBg("");
-    setLightBg("");
     setSaving(true);
     setError(null);
     try {
@@ -428,23 +400,6 @@ export function DashboardUiSection({ user, onSaved }) {
       setError(err.message);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handlePickPreset(value) {
-    setActiveBg(value);
-    await persist(theme === "light" ? { light_background: value } : { dark_background: value });
-  }
-
-  async function handleFileUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const dataUrl = await resizeToDataUrl(file);
-      setActiveBg(dataUrl);
-      await persist(theme === "light" ? { light_background: dataUrl } : { dark_background: dataUrl });
-    } catch (err) {
-      setError(err.message || "Rasmni yuklashda xatolik");
     }
   }
 
@@ -499,33 +454,6 @@ export function DashboardUiSection({ user, onSaved }) {
           </button>
         ))}
       </div>
-
-      <p className="settings-label">{theme === "light" ? "Yorug‘" : "Qorong‘u"} rejim foni</p>
-      <input type="file" accept="image/*" onChange={handleFileUpload} disabled={saving} style={{ marginBottom: 14 }} />
-      <div className="bg-gallery">
-        {BACKGROUND_PRESETS.map((p) => (
-          <div
-            key={p.id}
-            className={`bg-swatch ${activeBg === p.value ? "selected" : ""}`}
-            style={{ background: p.value }}
-            title={p.label}
-            onClick={() => handlePickPreset(p.value)}
-          />
-        ))}
-      </div>
-      {activeBg && (
-        <button
-          type="button"
-          className="secondary"
-          style={{ marginTop: 14, width: "auto" }}
-          onClick={() => {
-            setActiveBg("");
-            persist(theme === "light" ? { light_background: "" } : { dark_background: "" });
-          }}
-        >
-          Fonni tozalash
-        </button>
-      )}
       {error && <p className="error">{error}</p>}
     </div>
   );
