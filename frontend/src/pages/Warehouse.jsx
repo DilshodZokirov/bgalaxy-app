@@ -1125,7 +1125,7 @@ export default function Warehouse() {
 
   const subtitle =
     company.company_type === "distributor"
-      ? "Distributiv firma — boshqa kompaniyalar omboridan buyurtma qiladi"
+      ? "Distributiv firma — zaxira faqat Bozor buyurtmasi orqali to‘ldiriladi"
       : multi
         ? selectedWarehouseId
           ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
@@ -1302,9 +1302,9 @@ export default function Warehouse() {
                             {p.unit === "dona" && (
                               <button type="button" className="secondary wh-soft-btn" onClick={() => handleQuickAdd(p)}>+1</button>
                             )}
+                            <button type="button" className="secondary wh-soft-btn" onClick={() => setEditProduct(p)}>Tahrir</button>
                           </>
                         )}
-                        <button type="button" className="secondary wh-soft-btn" onClick={() => setEditProduct(p)}>Tahrir</button>
                         <button type="button" className="secondary wh-soft-btn danger" onClick={() => handleDelete(p)}>O‘chirish</button>
                       </div>
                     </div>
@@ -1326,7 +1326,7 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {editProduct && (
+      {editProduct && company.company_type !== "distributor" && (
         <ProductModal
           company={company}
           product={editProduct}
