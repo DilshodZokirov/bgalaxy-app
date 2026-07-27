@@ -95,7 +95,89 @@ async def _list_warehouses(db: AsyncSession, company_id: str) -> list[Warehouse]
     return list(result.scalars().all())
 
 
+async def _ensure_legacy_warehouses(db: AsyncSession, company: Company) -> list[Warehouse]:
+    """Restore the pre-multi-warehouse company ombor if the warehouses
+    table was empty after deploy (legacy has_warehouse + warehouse_type).
+
+    Never deletes existing data — only creates the missing Warehouse row
+    and attaches orphan products (warehouse_id IS NULL).
+    """
+    warehouses = await _list_warehouses(db, str(company.id))
+    if warehouses:
+        if len(warehouses) == 1:
+            await db.execute(
+                WarehouseProduct.__table__.update()
+                .where(
+                    WarehouseProduct.company_id == company.id,
+                    WarehouseProduct.warehouse_id.is_(None),
+                )
+                .values(warehouse_id=warehouses[0].id)
+            )
+            await db.flush()
+        return warehouses
+
+    product_count = (
+        await db.execute(
+            select(func.count()).select_from(WarehouseProduct).where(WarehouseProduct.company_id == company.id)
+        )
+    ).scalar_one()
+
+    wh_type = company.warehouse_type if company.warehouse_type in WAREHOUSE_TYPES else None
+    if not company.has_warehouse and not wh_type and not product_count:
+        return []
+
+    if wh_type is None and product_count:
+        # Infer type from product fields if legacy type was cleared.
+        sample = (
+            await db.execute(
+                select(WarehouseProduct.size, WarehouseProduct.sku, WarehouseProduct.expiry_date)
+                .where(WarehouseProduct.company_id == company.id)
+                .limit(20)
+            )
+        ).all()
+        if any(row[2] is not None for row in sample):
+            wh_type = "food"
+        elif any(row[1] for row in sample):
+            wh_type = "technology"
+        elif any(row[0] for row in sample):
+            wh_type = "clothing"
+        elif company.has_warehouse:
+            wh_type = "food"
+
+    if wh_type is None:
+        if company.has_warehouse:
+            wh_type = "food"
+        else:
+            return []
+
+    if wh_type not in WAREHOUSE_TYPES:
+        return []
+
+    warehouse = Warehouse(
+        id=uuid_lib.uuid4(),
+        company_id=company.id,
+        warehouse_type=wh_type,
+        name=WAREHOUSE_TYPE_NAMES[wh_type],
+    )
+    db.add(warehouse)
+    await db.flush()
+    await db.execute(
+        WarehouseProduct.__table__.update()
+        .where(
+            WarehouseProduct.company_id == company.id,
+            WarehouseProduct.warehouse_id.is_(None),
+        )
+        .values(warehouse_id=warehouse.id)
+    )
+    company.has_warehouse = True
+    company.warehouse_type = wh_type
+    await db.flush()
+    return [warehouse]
+
+
 async def _sync_company_flags(db: AsyncSession, company: Company) -> list[Warehouse]:
+    """Update company.has_warehouse / warehouse_type from the warehouses table.
+    Does NOT auto-create rows (that would undo intentional deletes)."""
     warehouses = await _list_warehouses(db, str(company.id))
     company.has_warehouse = len(warehouses) > 0
     if len(warehouses) == 1:
@@ -103,7 +185,6 @@ async def _sync_company_flags(db: AsyncSession, company: Company) -> list[Wareho
     elif len(warehouses) == 0:
         company.warehouse_type = None
     else:
-        # Multi-warehouse: legacy single field is intentionally cleared.
         company.warehouse_type = None
     return warehouses
 
@@ -117,7 +198,8 @@ def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
         logo_url=company.logo_url,
         company_type=company.company_type,
         has_warehouse=bool(warehouses) or bool(company.has_warehouse),
-        warehouse_type=company.warehouse_type,
+        warehouse_type=company.warehouse_type
+        or (warehouses[0].warehouse_type if len(warehouses) == 1 else None),
         warehouses=[WarehouseOut.model_validate(w) for w in warehouses],
         created_at=company.created_at,
     )
@@ -125,7 +207,10 @@ def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
 
 async def _require_warehouse_enabled(db: AsyncSession, company_id: str) -> tuple[Company, list[Warehouse]]:
     company = await _get_company(db, company_id)
-    warehouses = await _list_warehouses(db, company_id)
+    warehouses = await _ensure_legacy_warehouses(db, company)
+    if warehouses:
+        company.has_warehouse = True
+        await db.commit()
     if not warehouses and not company.has_warehouse:
         raise HTTPException(status_code=400, detail="Ombor bo'limi bu kompaniyada yoqilmagan")
     return company, warehouses
@@ -171,7 +256,11 @@ def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) 
 
 
 async def _warehouse_map(db: AsyncSession, company_id: str) -> dict[str, Warehouse]:
-    warehouses = await _list_warehouses(db, company_id)
+    company = await _get_company(db, company_id)
+    warehouses = await _ensure_legacy_warehouses(db, company)
+    if warehouses and not company.has_warehouse:
+        company.has_warehouse = True
+        await db.commit()
     return {str(w.id): w for w in warehouses}
 
 
@@ -182,7 +271,14 @@ async def list_warehouses(
     current_user: User = Depends(get_current_user),
 ):
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS + ["edit_company_settings"])
-    return await _list_warehouses(db, company_id)
+    company = await _get_company(db, company_id)
+    warehouses = await _ensure_legacy_warehouses(db, company)
+    if warehouses:
+        company.has_warehouse = True
+        if len(warehouses) == 1:
+            company.warehouse_type = warehouses[0].warehouse_type
+        await db.commit()
+    return warehouses
 
 
 @router.post("/list", response_model=WarehouseOut, status_code=201)

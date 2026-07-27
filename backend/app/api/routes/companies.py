@@ -73,6 +73,9 @@ async def my_companies(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Lazy import avoids circular import with warehouse route helpers at module load.
+    from app.api.routes.warehouse import _ensure_legacy_warehouses
+
     result = await db.execute(
         select(Company)
         .join(TeamMembership, TeamMembership.company_id == Company.id)
@@ -85,15 +88,19 @@ async def my_companies(
     if not companies:
         return []
 
-    company_ids = [c.id for c in companies]
-    wh_result = await db.execute(
-        select(Warehouse)
-        .where(Warehouse.company_id.in_(company_ids))
-        .order_by(Warehouse.created_at.asc())
-    )
-    by_company: dict[str, list[Warehouse]] = {str(cid): [] for cid in company_ids}
-    for wh in wh_result.scalars().all():
-        by_company.setdefault(str(wh.company_id), []).append(wh)
+    by_company: dict[str, list[Warehouse]] = {}
+    dirty = False
+    for company in companies:
+        warehouses = await _ensure_legacy_warehouses(db, company)
+        by_company[str(company.id)] = warehouses
+        if warehouses and (not company.has_warehouse or company.warehouse_type is None):
+            company.has_warehouse = True
+            if len(warehouses) == 1:
+                company.warehouse_type = warehouses[0].warehouse_type
+            dirty = True
+
+    if dirty:
+        await db.commit()
 
     return [_company_out(c, by_company.get(str(c.id), [])) for c in companies]
 
