@@ -551,9 +551,18 @@ export function WarehouseSection() {
     const active = pickActiveCompany(list);
     setCompany(active);
     if (active) {
-      const rows = active.warehouses?.length
-        ? active.warehouses
-        : await api.getWarehouses(active.id).catch(() => []);
+      let rows = active.warehouses?.length ? active.warehouses : [];
+      if (!rows.length) {
+        rows = await api.getWarehouses(active.id).catch(() => []);
+      }
+      // Legacy: company still has food/tech/clothing flag but warehouses row missing
+      if (!rows.length && active.has_warehouse && active.warehouse_type) {
+        try {
+          rows = [await api.createWarehouse(active.id, active.warehouse_type)];
+        } catch {
+          rows = await api.getWarehouses(active.id).catch(() => []);
+        }
+      }
       setWarehouses(rows || []);
       const used = new Set((rows || []).map((w) => w.warehouse_type));
       const next = Object.keys(WAREHOUSE_TYPE_LABELS).find((k) => !used.has(k));
@@ -618,7 +627,11 @@ export function WarehouseSection() {
 
       {warehouses.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 14px" }}>
-          Hali ombor yo'q. Pastdan tur tanlab qo'shing.
+          {company.has_warehouse || company.warehouse_type
+            ? `Eski ombor tiklanmoqda / qayta qo'shing${
+                company.warehouse_type ? ` (oldingi tur: ${WAREHOUSE_TYPE_LABELS[company.warehouse_type] || company.warehouse_type})` : ""
+              }. Sahifani yangilab ko'ring yoki pastdan qayta qo'shing — mahsulotlar o'chmagan.`
+            : "Hali ombor yo'q. Pastdan tur tanlab qo'shing."}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
