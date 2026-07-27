@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import RafiqAvatar from "./RafiqAvatar";
 
 const SCRIPT = [
   "Salom! Men Ziyo.",
@@ -44,22 +43,13 @@ export default function RafiqWidget() {
   }, []);
 
   return (
-    <div className="rafiq-widget">
-      <span className="orbit-particle" style={{ top: "10%", right: "12%" }} />
-      <span className="orbit-particle" style={{ bottom: "18%", left: "8%", animationDelay: "2s" }} />
+    <div className="rafiq-widget rafiq-widget-slim">
       <div className="rafiq-widget-header">
-        <div className="rafiq-orb-wrap">
-          <span className="rafiq-ring" />
-          <span className="rafiq-ring" />
-          <div className="rafiq-orb">
-            <RafiqAvatar size={52} variant="photo" />
-          </div>
-        </div>
         <div>
           <div className="title">AI Ziyo</div>
           <div className="status">
             <span className="dot" />
-            Onlayn
+            Onlayn · suhbat
           </div>
         </div>
       </div>

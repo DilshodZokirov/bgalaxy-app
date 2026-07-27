@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
-import Logo from "../components/Logo";
+import AuthOrbitShell from "../components/AuthOrbitShell";
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -31,47 +31,54 @@ export default function ResetPassword() {
     }
   }
 
+  if (done) {
+    return (
+      <AuthOrbitShell
+        kicker="Gate open"
+        title="Tayyor!"
+        subtitle="Parolingiz almashtirildi — Kirish sahifasiga yo'naltirilmoqdasiz..."
+      >
+        <h2>Parol yangilandi</h2>
+        <p className="subtitle">Endi yangi parol bilan galaktikaga kira olasiz.</p>
+      </AuthOrbitShell>
+    );
+  }
+
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <Logo withTagline />
-        {done ? (
-          <>
-            <h1>✓ Tayyor!</h1>
-            <p className="subtitle">Parolingiz almashtirildi — Kirish sahifasiga yo'naltirilmoqdasiz...</p>
-          </>
-        ) : (
-          <>
-            <h1>Yangi parol o'rnatish</h1>
-            <p className="subtitle">Hisobingiz uchun yangi parol kiriting.</p>
-            <form onSubmit={handleSubmit}>
-              <label>Yangi parol</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <label>Parolni takrorlang</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
-              {error && <p className="error">{error}</p>}
-              <button type="submit" disabled={loading}>
-                {loading ? "Saqlanmoqda..." : "Parolni o'rnatish"}
-              </button>
-            </form>
-            <p className="auth-footer">
-              <Link to="/login">← Kirishga qaytish</Link>
-            </p>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthOrbitShell
+      kicker="New key"
+      title="Yangi parol o'rnatish"
+      subtitle="Hisobingiz uchun yangi kalit yarating — Ziyo kutmoqda."
+      footer={
+        <p className="auth-footer">
+          <Link to="/login">← Kirishga qaytish</Link>
+        </p>
+      }
+    >
+      <h2>Yangi parol</h2>
+      <p className="subtitle">Hisobingiz uchun yangi parol kiriting.</p>
+      <form onSubmit={handleSubmit}>
+        <label>Yangi parol</label>
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <label>Parolni takrorlang</label>
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+        />
+        {error && <p className="error">{error}</p>}
+        <button type="submit" disabled={loading}>
+          {loading ? "Saqlanmoqda..." : "Parolni o'rnatish"}
+        </button>
+      </form>
+    </AuthOrbitShell>
   );
 }
