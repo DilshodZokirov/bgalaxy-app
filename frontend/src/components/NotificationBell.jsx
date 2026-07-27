@@ -27,6 +27,8 @@ const TYPE_META = {
   task_update: { icon: "🗂️", accent: "task", label: "Vazifa yangilandi" },
   direct_message: { icon: "✉️", accent: "chat", label: "Xabar" },
   mention: { icon: "@", accent: "chat", label: "Eslatma" },
+  warehouse_order: { icon: "📦", accent: "task", label: "Ombor buyurtma" },
+  warehouse_receipt: { icon: "✅", accent: "invite", label: "Qabul qilish" },
   info: { icon: "ℹ️", accent: "info", label: "Ma'lumot" },
 };
 
@@ -144,6 +146,21 @@ export default function NotificationBell({ variant = "fixed" }) {
     navigate("/group-meeting");
   }
 
+  async function handleOpenWarehouseOrder(n, tabHint) {
+    try {
+      await api.markNotificationRead(n.id);
+      markLocally(n.id, { read: true });
+    } catch {
+      // ignore
+    }
+    setOpen(false);
+    if (n.company_id) setActiveCompanyId(n.company_id);
+    const q = new URLSearchParams();
+    q.set("tab", tabHint || "orders");
+    if (n.invite_token) q.set("order", n.invite_token);
+    navigate(`/warehouse?${q.toString()}`);
+  }
+
   async function handleAccept(id) {
     try {
       await api.acceptJoinRequest(id);
@@ -235,7 +252,9 @@ export default function NotificationBell({ variant = "fixed" }) {
                 n.type === "scheduled_meeting_booked" ||
                 n.type === "task_assigned" ||
                 n.type === "task_update" ||
-                n.type === "direct_message");
+                n.type === "direct_message" ||
+                n.type === "warehouse_order" ||
+                n.type === "warehouse_receipt");
 
             return (
               <article
@@ -332,6 +351,30 @@ export default function NotificationBell({ variant = "fixed" }) {
                         }}
                       >
                         Ko'rish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "warehouse_receipt" ? (
+                    <div className="notif-item-actions">
+                      <button
+                        className="notif-btn-primary"
+                        onClick={() => handleOpenWarehouseOrder(n, "receipt")}
+                      >
+                        Tekshirish
+                      </button>
+                      <button className="secondary" onClick={() => handleDismiss(n)}>
+                        Yopish
+                      </button>
+                    </div>
+                  ) : n.type === "warehouse_order" ? (
+                    <div className="notif-item-actions">
+                      <button
+                        className="notif-btn-primary"
+                        onClick={() => handleOpenWarehouseOrder(n, "orders")}
+                      >
+                        Buyurtmalar
                       </button>
                       <button className="secondary" onClick={() => handleDismiss(n)}>
                         Yopish

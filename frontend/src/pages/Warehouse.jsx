@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../api/client";
 import { pickActiveCompany } from "../hooks/useCompany";
@@ -8,6 +8,19 @@ import Wh3DBarChart from "../components/Wh3DBarChart";
 
 const TYPE_LABELS = { technology: "Texnologiya", clothing: "Kiyim-kechak", food: "Oziq-ovqat" };
 const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
+
+const ORDER_STATUS_LABELS = {
+  ordered: "Buyurtma qilindi",
+  loading: "Yuklash",
+  loaded: "Yuklandi",
+  on_road: "Yo'lda",
+  courier_accepted: "Yetkazuvchi qabul qildi",
+  awaiting_receipt: "Qabul qilish",
+  completed: "Yakunlandi",
+  cancelled: "Bekor qilindi",
+};
+
+const ORDER_STEPS = ["ordered", "loading", "loaded", "on_road", "courier_accepted", "awaiting_receipt", "completed"];
 
 const PERIODS = [
   { key: "today", label: "Bugun" },
@@ -628,7 +641,8 @@ function OrderModal({ product, onClose, onOrdered }) {
           <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
         </div>
         <p className="wh-hint">
-          {product.company_name} — mavjud: {product.quantity} {UNIT_LABELS[product.unit] || product.unit}, narxi: {money(product.price)}
+          {product.company_name} — mavjud (banddan tashqari): {product.quantity}{" "}
+          {UNIT_LABELS[product.unit] || product.unit}, narxi: {money(product.price)}
         </p>
         <label>Buyurtma miqdori</label>
         <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} min="0.001" step="0.001" max={product.quantity} required />
@@ -640,6 +654,188 @@ function OrderModal({ product, onClose, onOrdered }) {
           {saving ? "Buyurtma berilmoqda..." : "Buyurtma berish"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function OrderPipelineCard({ order, actions, highlight }) {
+  const stepIdx = ORDER_STEPS.indexOf(order.status);
+  return (
+    <article className={`wh-order-card ${highlight ? "is-highlight" : ""}`}>
+      <div className="wh-order-top">
+        <div>
+          <h4>{order.product_name}</h4>
+          <p className="wh-hint">
+            {order.quantity} {UNIT_LABELS[order.unit] || order.unit} · {money(order.total_price)}
+          </p>
+          <p className="wh-hint">
+            {order.buyer_company_name && <>Xaridor: <strong>{order.buyer_company_name}</strong> · </>}
+            {order.seller_company_name && <>Sotuvchi: <strong>{order.seller_company_name}</strong></>}
+          </p>
+          {order.courier_name && <p className="wh-hint">Yetkazuvchi: {order.courier_name}</p>}
+          {order.status_note && <p className="wh-hint">{order.status_note}</p>}
+        </div>
+        <span className={`wh-order-status status-${order.status}`}>
+          {ORDER_STATUS_LABELS[order.status] || order.status}
+        </span>
+      </div>
+      {order.status !== "cancelled" && (
+        <div className="wh-order-steps" aria-hidden>
+          {ORDER_STEPS.map((s, i) => (
+            <span key={s} className={stepIdx >= i ? "done" : ""} title={ORDER_STATUS_LABELS[s]} />
+          ))}
+        </div>
+      )}
+      {actions?.length > 0 && (
+        <div className="wh-order-actions">
+          {actions.map((a) => (
+            <button
+              key={a.action}
+              type="button"
+              className={a.danger ? "secondary wh-soft-btn danger" : "wh-cta slim"}
+              disabled={a.busy}
+              onClick={() => a.onClick()}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
+  const isDistributor = company.company_type === "distributor";
+  const canManage = !!(perms?.is_owner || perms?.permissions?.manage_warehouse);
+  const canLoad = !!(perms?.is_owner || perms?.permissions?.warehouse_loader || canManage);
+  const canCourier = !!(perms?.is_owner || perms?.permissions?.warehouse_courier || canManage);
+
+  const scopes = [];
+  if (isDistributor) {
+    scopes.push({ key: "purchases", label: "Mening buyurtmalarim" });
+    scopes.push({ key: "receipt", label: "Qabul qilish" });
+  } else {
+    scopes.push({ key: "sales", label: "Ombor kuzatuv" });
+    if (canLoad) scopes.push({ key: "loader", label: "Yuklash" });
+    if (canCourier) scopes.push({ key: "courier", label: "Yetkazish" });
+  }
+
+  const initial =
+    defaultScope && scopes.some((s) => s.key === defaultScope)
+      ? defaultScope
+      : scopes[0]?.key || "sales";
+
+  const [scope, setScope] = useState(initial);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    if (defaultScope && scopes.some((s) => s.key === defaultScope)) {
+      setScope(defaultScope);
+    }
+  }, [defaultScope, company.id]);
+
+  useEffect(() => {
+    refresh();
+  }, [company.id, scope]);
+
+  function refresh() {
+    setLoading(true);
+    setError(null);
+    api
+      .getWarehouseOrders(company.id, scope)
+      .then(setOrders)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  async function runAction(orderId, action) {
+    setBusyId(orderId);
+    setError(null);
+    try {
+      await api.transitionWarehouseOrder(company.id, orderId, action);
+      refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function actionsFor(order) {
+    const busy = busyId === order.id;
+    const list = [];
+    if (!isDistributor && scope === "sales" && canManage && order.status === "ordered") {
+      list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
+    }
+    if (!isDistributor && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
+      list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(order.id, "confirm_loaded") });
+    }
+    if (!isDistributor && scope === "sales" && canManage && order.status === "loaded") {
+      list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(order.id, "dispatch") });
+    }
+    if (!isDistributor && scope === "courier" && canCourier && order.status === "on_road") {
+      list.push({ action: "accept_courier", label: "Arizani qabul qilish", busy, onClick: () => runAction(order.id, "accept_courier") });
+    }
+    if (!isDistributor && scope === "courier" && canCourier && order.status === "courier_accepted") {
+      list.push({ action: "confirm_arrival", label: "Yetib keldim", busy, onClick: () => runAction(order.id, "confirm_arrival") });
+    }
+    if (isDistributor && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
+      list.push({ action: "confirm_receipt", label: "Qabul qilishni tasdiqlash", busy, onClick: () => runAction(order.id, "confirm_receipt") });
+    }
+    if (canManage && (order.status === "ordered" || order.status === "loading")) {
+      list.push({
+        action: "cancel",
+        label: "Bekor qilish",
+        danger: true,
+        busy,
+        onClick: () => {
+          if (window.confirm("Buyurtmani bekor qilasizmi? Band zaxira qaytariladi.")) {
+            runAction(order.id, "cancel");
+          }
+        },
+      });
+    }
+    return list;
+  }
+
+  return (
+    <div className="wh-orders">
+      <p className="wh-section-lead">
+        {isDistributor
+          ? "Buyurtma holati, yo‘l kuzatuvi va yetkazilgan yukni tekshirib qabul qiling — tasdiqlangandan keyin omborga avtomatik qo‘shiladi."
+          : "Barcha buyurtmalar: qaysi distributiv, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish."}
+      </p>
+      <div className="wh-view-tabs" role="tablist">
+        {scopes.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            className={scope === s.key ? "active" : ""}
+            onClick={() => setScope(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {error && <p className="error">{error}</p>}
+      {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
+      {!loading && orders.length === 0 && (
+        <div className="wh-empty"><p>Bu bo‘limda buyurtma yo‘q.</p></div>
+      )}
+      <div className="wh-orders-list">
+        {orders.map((o) => (
+          <OrderPipelineCard
+            key={o.id}
+            order={o}
+            highlight={focusOrderId && focusOrderId === o.id}
+            actions={actionsFor(o)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -669,7 +865,8 @@ function MarketplaceTab({ company, onOrdered }) {
   return (
     <div className="wh-market">
       <p className="wh-section-lead">
-        Ishlab chiqaruvchi kompaniyalar omboridan buyurtma bering — mahsulot o‘z omboringizga qo‘shiladi.
+        Ishlab chiqaruvchi omboridan buyurtma bering. Mavjud miqdor — boshqa firmalar band qilgan zaxiradan tashqari qoldiq.
+        Buyurtma berilgach yuklash → yo‘l → qabul qilish bosqichlari boshlanadi; omborga faqat qabuldan keyin tushadi.
       </p>
       <input className="wh-search" type="text" placeholder="Nomi bo‘yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} />
       {error && <p className="error">{error}</p>}
@@ -688,6 +885,9 @@ function MarketplaceTab({ company, onOrdered }) {
               <h4>{p.name}</h4>
               <p>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</p>
               <p className="ok">Mavjud: {p.quantity} {UNIT_LABELS[p.unit] || p.unit}</p>
+              {p.reserved_quantity > 0 && (
+                <p className="wh-hint">Boshqa buyurtmalar band: {p.reserved_quantity}</p>
+              )}
               <button
                 type="button"
                 className="wh-cta"
@@ -720,6 +920,7 @@ function MarketplaceTab({ company, onOrdered }) {
 
 export default function Warehouse() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [company, setCompany] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(null); // null = all (multi only)
@@ -729,10 +930,22 @@ export default function Warehouse() {
   const [showAdd, setShowAdd] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [stockProduct, setStockProduct] = useState(null);
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState(() => searchParams.get("tab") || "dashboard");
+  const [perms, setPerms] = useState(null);
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
   const [sortBy, setSortBy] = useState("recent");
+  const focusOrderId = searchParams.get("order");
+  const ordersDefaultScope =
+    searchParams.get("tab") === "receipt"
+      ? "receipt"
+      : searchParams.get("scope") || null;
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "receipt") setTab("orders");
+    else if (t) setTab(t);
+  }, [searchParams]);
 
   useEffect(() => {
     api
@@ -744,6 +957,9 @@ export default function Warehouse() {
         setWarehouses(rows);
         if (rows.length === 1) setSelectedWarehouseId(rows[0].id);
         else setSelectedWarehouseId(null);
+        if (active?.id) {
+          api.getMyPermissions(active.id).then(setPerms).catch(() => setPerms(null));
+        }
       })
       .catch(() => {});
   }, []);
@@ -835,6 +1051,7 @@ export default function Warehouse() {
   const tabs = [
     { key: "dashboard", label: "Dashboard" },
     { key: "products", label: "Mahsulotlar" },
+    { key: "orders", label: "Buyurtmalar" },
   ];
   if (company?.company_type === "distributor") {
     tabs.push({ key: "marketplace", label: "Bozor" });
@@ -927,6 +1144,14 @@ export default function Warehouse() {
           />
         )}
         {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
+        {tab === "orders" && (
+          <OrdersPipelineTab
+            company={company}
+            perms={perms}
+            focusOrderId={focusOrderId}
+            defaultScope={ordersDefaultScope}
+          />
+        )}
 
         {tab === "products" && (
           <section className="wh-products">
@@ -997,10 +1222,14 @@ export default function Warehouse() {
                       <div className="wh-card-top">
                         <h4>{p.name}</h4>
                         <span className={`wh-qty ${tone}`}>
-                          {p.quantity} {UNIT_LABELS[p.unit] || p.unit}
+                          {p.available_quantity != null ? p.available_quantity : p.quantity}{" "}
+                          {UNIT_LABELS[p.unit] || p.unit}
                         </span>
                       </div>
                       <p className="wh-price">{money(p.price)}</p>
+                      {p.reserved_quantity > 0 && (
+                        <p className="wh-meta">Band (buyurtma): {p.reserved_quantity} · Ombor: {p.quantity}</p>
+                      )}
                       {p.size && <p className="wh-meta">O‘lcham: {p.size}{p.color ? `, Rang: ${p.color}` : ""}</p>}
                       {p.expiry_date && <p className="wh-meta">Muddat: {p.expiry_date}</p>}
                       {p.sku && <p className="wh-meta">SKU: {p.sku}</p>}

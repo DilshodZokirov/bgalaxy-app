@@ -48,7 +48,13 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
       .then((info) => {
         setCanManageAccounting(info.is_owner || !!info.permissions?.manage_accounting);
         setCanViewAnalytics(info.is_owner || !!info.permissions?.view_analytics);
-        setCanViewWarehouse(info.is_owner || !!info.permissions?.manage_warehouse || !!info.permissions?.ombor_ishchi);
+        setCanViewWarehouse(
+          info.is_owner ||
+            !!info.permissions?.manage_warehouse ||
+            !!info.permissions?.ombor_ishchi ||
+            !!info.permissions?.warehouse_loader ||
+            !!info.permissions?.warehouse_courier
+        );
       })
       .catch(() => {
         setCanManageAccounting(false);

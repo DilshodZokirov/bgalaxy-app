@@ -21,6 +21,8 @@ PERMISSION_KEYS = [
     "view_analytics",
     "manage_warehouse",
     "ombor_ishchi",
+    "warehouse_loader",
+    "warehouse_courier",
 ]
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -35,6 +37,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         "view_analytics": True,
         "manage_warehouse": True,
         "ombor_ishchi": True,
+        "warehouse_loader": True,
+        "warehouse_courier": True,
     },
     "Menejer": {
         "invite_members": False,
@@ -47,6 +51,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         "view_analytics": True,
         "manage_warehouse": True,
         "ombor_ishchi": True,
+        "warehouse_loader": True,
+        "warehouse_courier": True,
     },
     "Buxgalter": {
         "invite_members": False,
@@ -59,6 +65,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         "view_analytics": False,
         "manage_warehouse": False,
         "ombor_ishchi": False,
+        "warehouse_loader": False,
+        "warehouse_courier": False,
     },
     "Xodim": {
         "invite_members": False,
@@ -71,6 +79,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         "view_analytics": False,
         "manage_warehouse": False,
         "ombor_ishchi": False,
+        "warehouse_loader": False,
+        "warehouse_courier": False,
     },
 }
 

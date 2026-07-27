@@ -12,6 +12,8 @@ const PERMISSION_LABELS = {
   view_analytics: "Kompaniya statistikasini ko'rish",
   manage_warehouse: "Ombor bo'limini boshqarish",
   ombor_ishchi: "Ombor ishchisi (faqat ko'rish)",
+  warehouse_loader: "Ombor yuklovchi (yuklash tasdiqi)",
+  warehouse_courier: "Yetkazib beruvchi (yo'l / yetkazish)",
 };
 const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS);
 
