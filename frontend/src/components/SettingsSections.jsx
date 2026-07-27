@@ -213,6 +213,8 @@ export function PinSection({ user, onSaved }) {
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState(null);
   const [pinSuccess, setPinSuccess] = useState(false);
+  const [forgotSending, setForgotSending] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   async function handleSetPin(e) {
     e.preventDefault();
@@ -260,34 +262,62 @@ export function PinSection({ user, onSaved }) {
     }
   }
 
+  async function handleForgotPin() {
+    setPinError(null);
+    setForgotSending(true);
+    try {
+      await api.forgotPin();
+      setForgotSent(true);
+    } catch (err) {
+      setPinError(err.message);
+    } finally {
+      setForgotSending(false);
+    }
+  }
+
   if (user?.has_pin) {
     return (
-      <form onSubmit={handleChangePin}>
-        <input type="password" placeholder="Gmail (kirish) parolingiz" value={pinPassword} onChange={(e) => setPinPassword(e.target.value)} required />
-        <input type="password" inputMode="numeric" placeholder="Joriy PIN" value={oldPin} onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
-        <input type="password" inputMode="numeric" placeholder="Yangi PIN (4-6 raqam)" value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
-        <input type="password" inputMode="numeric" placeholder="Yangi PINni takrorlang" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
-        {pinError && <p className="error">{pinError}</p>}
-        {pinSuccess && <p style={{ color: "var(--green)", fontSize: 12.5, margin: "0 0 12px" }}>✓ PIN almashtirildi</p>}
-        <button type="submit" className="secondary" disabled={pinSaving}>
-          {pinSaving ? "Saqlanmoqda..." : "PINni almashtirish"}
-        </button>
-      </form>
+      <div className="settings-pin">
+        <form onSubmit={handleChangePin}>
+          <p className="settings-hint">PINni bilasangiz — parol + joriy PIN bilan almashtiring.</p>
+          <input type="password" placeholder="Kirish parolingiz" value={pinPassword} onChange={(e) => setPinPassword(e.target.value)} required />
+          <input type="password" inputMode="numeric" placeholder="Joriy PIN" value={oldPin} onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
+          <input type="password" inputMode="numeric" placeholder="Yangi PIN (4-6 raqam)" value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
+          <input type="password" inputMode="numeric" placeholder="Yangi PINni takrorlang" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
+          {pinError && <p className="error">{pinError}</p>}
+          {pinSuccess && <p className="settings-success">✓ PIN almashtirildi</p>}
+          <button type="submit" className="secondary" disabled={pinSaving}>
+            {pinSaving ? "Saqlanmoqda..." : "PINni almashtirish"}
+          </button>
+        </form>
+
+        <div className="settings-pin-forgot">
+          <p className="settings-hint">PINni unutdingizmi? Emailingizga yangi kod o‘rnatish havolasi yuboriladi.</p>
+          {forgotSent ? (
+            <p className="settings-success">✓ Havola {user.email} ga yuborildi — pochtangizni tekshiring.</p>
+          ) : (
+            <button type="button" className="secondary" onClick={handleForgotPin} disabled={forgotSending}>
+              {forgotSending ? "Yuborilmoqda..." : "PINni unutdingizmi?"}
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
-    <form onSubmit={handleSetPin}>
-      <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 8px" }}>
-        PIN hali o'rnatilmagan — Gmail (kirish) parolingizni tasdiqlab, yangi PIN o'rnating. (Agar hisobingizda parol bo'lmasa — masalan Google orqali kirgan bo'lsangiz — avval "Parolni unutdingizmi?" orqali parol o'rnating.)
+    <form onSubmit={handleSetPin} className="settings-pin">
+      <p className="settings-hint">
+        PIN hali o‘rnatilmagan — kirish parolingizni tasdiqlab, yangi PIN qo‘ying. Google orqali kirgan bo‘lsangiz,
+        avval “Parolni unutdingizmi?” orqali parol o‘rnating.
       </p>
-      <input type="password" placeholder="Gmail (kirish) parolingiz" value={pinPassword} onChange={(e) => setPinPassword(e.target.value)} required />
+      <input type="password" placeholder="Kirish parolingiz" value={pinPassword} onChange={(e) => setPinPassword(e.target.value)} required />
       <input type="password" inputMode="numeric" placeholder="Yangi PIN (4-6 raqam)" value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
       <input type="password" inputMode="numeric" placeholder="Yangi PINni takrorlang" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
       {pinError && <p className="error">{pinError}</p>}
-      {pinSuccess && <p style={{ color: "var(--green)", fontSize: 12.5, margin: "0 0 12px" }}>✓ PIN o'rnatildi</p>}
+      {pinSuccess && <p className="settings-success">✓ PIN o‘rnatildi</p>}
       <button type="submit" className="secondary" disabled={pinSaving}>
-        {pinSaving ? "Saqlanmoqda..." : "PIN o'rnatish"}
+        {pinSaving ? "Saqlanmoqda..." : "PIN o‘rnatish"}
       </button>
     </form>
   );
@@ -335,7 +365,7 @@ export function AutoLockSection({ user, onSaved }) {
   );
 }
 
-// ---------- 4. Dashboard tahriri → UI tahriri ----------
+// ---------- 4. UI + theme presets ----------
 export function DashboardUiSection({ user, onSaved }) {
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [uiTheme, setUiTheme] = useState(user?.ui_theme || "default");
@@ -343,6 +373,7 @@ export function DashboardUiSection({ user, onSaved }) {
   const [lightBg, setLightBg] = useState(user?.light_background || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [systemOk, setSystemOk] = useState(false);
 
   const activeBg = theme === "light" ? lightBg : darkBg;
   const setActiveBg = theme === "light" ? setLightBg : setDarkBg;
@@ -350,6 +381,7 @@ export function DashboardUiSection({ user, onSaved }) {
   async function persist(updates) {
     setSaving(true);
     setError(null);
+    setSystemOk(false);
     try {
       await api.updateProfile(updates);
       await onSaved();
@@ -365,9 +397,38 @@ export function DashboardUiSection({ user, onSaved }) {
     await persist({ theme: next });
   }
 
-  async function handleUiThemeChange(id) {
-    setUiTheme(id);
-    await persist({ ui_theme: id });
+  async function handleUiThemeChange(preset) {
+    setUiTheme(preset.id);
+    setDarkBg(preset.dark_background || "");
+    setLightBg(preset.light_background || "");
+    await persist({
+      ui_theme: preset.id,
+      dark_background: preset.dark_background || "",
+      light_background: preset.light_background || "",
+    });
+  }
+
+  async function handleSystemUi() {
+    setTheme("dark");
+    setUiTheme("default");
+    setDarkBg("");
+    setLightBg("");
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateProfile({
+        theme: "dark",
+        ui_theme: "default",
+        dark_background: "",
+        light_background: "",
+      });
+      await onSaved();
+      setSystemOk(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handlePickPreset(value) {
@@ -388,41 +449,58 @@ export function DashboardUiSection({ user, onSaved }) {
   }
 
   return (
-    <div>
-      <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 10px" }}>Rejim</p>
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        <button className={theme === "dark" ? "" : "secondary"} style={{ width: "auto", padding: "8px 16px" }} onClick={() => handleThemeChange("dark")}>
-          🌙 Qorong'u
+    <div className="settings-ui">
+      <div className="settings-ui-toolbar">
+        <button type="button" className="meetings-cta settings-system-btn" onClick={handleSystemUi} disabled={saving}>
+          System UI
         </button>
-        <button className={theme === "light" ? "" : "secondary"} style={{ width: "auto", padding: "8px 16px" }} onClick={() => handleThemeChange("light")}>
-          ☀️ Yorug'
+        <p className="settings-hint">Standart ko‘rinishga qaytaradi — ranglar va fonlar tozalanadi.</p>
+      </div>
+      {systemOk && <p className="settings-success">✓ System UI tiklandi</p>}
+
+      <p className="settings-label">Rejim (tema)</p>
+      <div className="settings-theme-toggle">
+        <button type="button" className={theme === "dark" ? "active" : ""} onClick={() => handleThemeChange("dark")}>
+          Qorong‘u
+        </button>
+        <button type="button" className={theme === "light" ? "active" : ""} onClick={() => handleThemeChange("light")}>
+          Yorug‘
         </button>
       </div>
 
-      <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 10px" }}>Mavzu (asosiy ranglar):</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8, marginBottom: 20 }}>
+      <p className="settings-label">Bomba UI ({UI_THEMES.length})</p>
+      <p className="settings-hint">Tanlangan UI dastur ranglarini va fonini o‘zgartiradi.</p>
+      <div className="settings-ui-grid">
         {UI_THEMES.map((t) => (
-          <div
+          <button
             key={t.id}
-            onClick={() => handleUiThemeChange(t.id)}
-            style={{
-              cursor: "pointer",
-              borderRadius: 10,
-              padding: 8,
-              border: uiTheme === t.id ? "2px solid var(--text)" : "2px solid transparent",
-              background: "var(--panel-2)",
-              textAlign: "center",
-            }}
+            type="button"
+            className={`settings-ui-card ${uiTheme === t.id ? "active" : ""}`}
+            onClick={() => handleUiThemeChange(t)}
+            disabled={saving}
           >
-            <div style={{ height: 28, borderRadius: 6, background: `linear-gradient(135deg, ${t.blue}, ${t.purple})`, marginBottom: 6 }} />
-            <span style={{ fontSize: 11 }}>{t.label}</span>
-          </div>
+            <span
+              className="settings-ui-swatch"
+              style={{
+                background:
+                  t.dark_background ||
+                  `linear-gradient(135deg, ${t.blue}, ${t.purple})`,
+              }}
+            />
+            <span className="settings-ui-meta">
+              <strong>{t.label}</strong>
+              <em>{t.tagline}</em>
+            </span>
+            <span className="settings-ui-dots" aria-hidden>
+              <i style={{ background: t.blue }} />
+              <i style={{ background: t.cyan }} />
+              <i style={{ background: t.orange }} />
+            </span>
+          </button>
         ))}
       </div>
 
-      <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 10px" }}>
-        {theme === "light" ? "Yorug'" : "Qorong'u"} rejim uchun orqa fon:
-      </p>
+      <p className="settings-label">{theme === "light" ? "Yorug‘" : "Qorong‘u"} rejim foni</p>
       <input type="file" accept="image/*" onChange={handleFileUpload} disabled={saving} style={{ marginBottom: 14 }} />
       <div className="bg-gallery">
         {BACKGROUND_PRESETS.map((p) => (
@@ -437,9 +515,13 @@ export function DashboardUiSection({ user, onSaved }) {
       </div>
       {activeBg && (
         <button
+          type="button"
           className="secondary"
-          style={{ marginTop: 14 }}
-          onClick={() => { setActiveBg(""); persist(theme === "light" ? { light_background: "" } : { dark_background: "" }); }}
+          style={{ marginTop: 14, width: "auto" }}
+          onClick={() => {
+            setActiveBg("");
+            persist(theme === "light" ? { light_background: "" } : { dark_background: "" });
+          }}
         >
           Fonni tozalash
         </button>

@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.config import settings
-from app.core.mail import send_password_changed_email, send_password_reset_email, send_verification_email
+from app.core.mail import (
+    send_password_changed_email,
+    send_password_reset_email,
+    send_pin_reset_email,
+    send_verification_email,
+)
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.database import get_db
 from app.models.user import User
@@ -20,6 +25,7 @@ from app.schemas.auth import (
     MessageOut,
     ResendVerificationRequest,
     ResetPasswordRequest,
+    ResetPinRequest,
     SetPinRequest,
     TokenOut,
     UserLogin,
@@ -245,6 +251,11 @@ async def set_pin(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.pin_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="PIN allaqachon o'rnatilgan — almashtirish yoki 'PINni unutdingizmi?' orqali tiklang.",
+        )
     if not current_user.hashed_password:
         raise HTTPException(
             status_code=400,
@@ -274,8 +285,55 @@ async def change_pin(
         raise HTTPException(status_code=400, detail="Yangi PIN 4-6 ta raqamdan iborat bo'lsin")
 
     current_user.pin_hash = hash_password(payload.new_pin)
+    current_user.pin_reset_token = None
+    current_user.pin_reset_token_expires = None
     await db.commit()
     return MessageOut(message="PIN-kod almashtirildi.")
+
+
+@router.post("/pin/forgot", response_model=MessageOut)
+async def forgot_pin(
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Logged-in user forgot their screen PIN — email a reset link."""
+    if not current_user.pin_hash:
+        raise HTTPException(status_code=400, detail="PIN hali o'rnatilmagan")
+
+    current_user.pin_reset_token = uuid.uuid4().hex
+    current_user.pin_reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    await db.commit()
+
+    reset_link = f"{settings.frontend_url}/reset-pin/{current_user.pin_reset_token}"
+    background_tasks.add_task(send_pin_reset_email, current_user.email, current_user.full_name, reset_link)
+    return MessageOut(message="PIN tiklash havolasi emailingizga yuborildi.")
+
+
+@router.post("/pin/reset", response_model=MessageOut)
+async def reset_pin(
+    payload: ResetPinRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.pin_reset_token == payload.token))
+    user = result.scalar_one_or_none()
+    if user is None or user.pin_reset_token_expires is None:
+        raise HTTPException(status_code=400, detail="Havola noto'g'ri yoki eskirgan")
+
+    expires = user.pin_reset_token_expires
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Havola muddati o'tgan — qaytadan so'rov yuboring")
+
+    if not payload.new_pin.isdigit() or not (4 <= len(payload.new_pin) <= 6):
+        raise HTTPException(status_code=400, detail="Yangi PIN 4-6 ta raqamdan iborat bo'lsin")
+
+    user.pin_hash = hash_password(payload.new_pin)
+    user.pin_reset_token = None
+    user.pin_reset_token_expires = None
+    await db.commit()
+    return MessageOut(message="PIN-kod muvaffaqiyatli yangilandi.")
 
 
 @router.post("/pin/verify", response_model=MessageOut)

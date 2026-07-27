@@ -30,6 +30,8 @@ class User(Base):
     light_background: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     pin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pin_reset_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pin_reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auto_lock_minutes: Mapped[int] = mapped_column(default=0)  # 0 = disabled
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

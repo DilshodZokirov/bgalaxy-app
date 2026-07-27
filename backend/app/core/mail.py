@@ -172,6 +172,48 @@ def send_password_reset_email(to_email: str, full_name: str, reset_link: str) ->
     )
 
 
+def _pin_reset_email_html(full_name: str, reset_link: str) -> str:
+    return f"""
+    <div style="font-family: 'Poppins', Arial, sans-serif; background:#0a0e17; padding:32px;">
+      <div style="max-width:480px;margin:0 auto;background:#111827;border-radius:14px;
+                  padding:32px;border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+          <div style="width:32px;height:32px;border-radius:9px;
+                      background:linear-gradient(135deg,#2563eb,#22d3ee);
+                      display:inline-block;text-align:center;line-height:32px;
+                      color:white;font-weight:700;">B</div>
+          <span style="color:#f1f5f9;font-size:18px;font-weight:600;">BGalaxy</span>
+        </div>
+        <h2 style="color:#f1f5f9;font-size:20px;margin:0 0 12px;">
+          Salom, {full_name}
+        </h2>
+        <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">
+          PIN-kodni tiklash uchun so'rov yubordingiz. Quyidagi tugmani bosib yangi PIN o'rnating.
+          Havola 1 soat davomida amal qiladi. Agar bu siz bo'lmasangiz, bu xatni e'tiborsiz qoldiring.
+        </p>
+        <a href="{reset_link}"
+           style="display:inline-block;background:linear-gradient(135deg,#0ea5e9,#22d3ee);
+                  color:#0f172a;text-decoration:none;padding:12px 24px;border-radius:10px;
+                  font-weight:600;font-size:14px;">
+          Yangi PIN o'rnatish
+        </a>
+        <p style="color:#5b6478;font-size:12px;margin-top:28px;">
+          Agar tugma ishlamasa, quyidagi havolani brauzeringizga nusxalang:<br/>
+          <span style="color:#94a3b8;">{reset_link}</span>
+        </p>
+      </div>
+    </div>
+    """
+
+
+def send_pin_reset_email(to_email: str, full_name: str, reset_link: str) -> bool:
+    return _send_email(
+        to_email,
+        "PIN-kodni tiklash — BGalaxy",
+        _pin_reset_email_html(full_name, reset_link),
+    )
+
+
 def send_password_changed_email(to_email: str, full_name: str) -> bool:
     html = f"""
     <div style="font-family: 'Poppins', Arial, sans-serif; background:#0a0e17; padding:32px;">

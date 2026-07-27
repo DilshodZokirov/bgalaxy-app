@@ -358,6 +358,9 @@ export const api = {
   changePassword: (oldPassword, newPassword) =>
     request("/auth/change-password", { method: "POST", body: { old_password: oldPassword, new_password: newPassword } }),
   setPin: (password, pin) => request("/auth/pin/set", { method: "POST", body: { password, pin } }),
+  forgotPin: () => request("/auth/pin/forgot", { method: "POST" }),
+  resetPin: (token, newPin) =>
+    request("/auth/pin/reset", { method: "POST", body: { token, new_pin: newPin }, auth: false }),
   changePin: (password, oldPin, newPin) =>
     request("/auth/pin/change", { method: "POST", body: { password, old_pin: oldPin, new_pin: newPin } }),
   verifyPin: (pin) => request("/auth/pin/verify", { method: "POST", body: { pin } }),
