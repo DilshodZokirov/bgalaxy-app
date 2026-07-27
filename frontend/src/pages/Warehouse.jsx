@@ -930,6 +930,8 @@ export default function Warehouse() {
   const [showAdd, setShowAdd] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [stockProduct, setStockProduct] = useState(null);
+  const [reorderProduct, setReorderProduct] = useState(null);
+  const [reorderBusy, setReorderBusy] = useState(null);
   const [tab, setTab] = useState(() => searchParams.get("tab") || "dashboard");
   const [perms, setPerms] = useState(null);
   const [search, setSearch] = useState("");
@@ -1008,6 +1010,42 @@ export default function Warehouse() {
       refreshProducts();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleReorder(product) {
+    setError(null);
+    setReorderBusy(product.id);
+    try {
+      const market = await api.getWarehouseMarketplace(company.id);
+      const nameKey = (product.name || "").trim().toLowerCase();
+      const match = market.find(
+        (m) =>
+          String(m.company_id) === String(product.source_company_id) &&
+          (m.name || "").trim().toLowerCase() === nameKey &&
+          m.unit === product.unit
+      ) || market.find(
+        (m) =>
+          (m.name || "").trim().toLowerCase() === nameKey &&
+          m.unit === product.unit &&
+          (m.company_name || "").trim().toLowerCase() === (product.source_company_name || "").trim().toLowerCase()
+      );
+      if (!match) {
+        setError(
+          `"${product.name}" bozorda topilmadi yoki zaxira tugagan. Bozor bo‘limidan boshqa mahsulot buyurtma qiling.`
+        );
+        setTab("marketplace");
+        return;
+      }
+      setReorderProduct({
+        ...match,
+        onOrder: (q) =>
+          api.placeWarehouseOrder(company.id, match.company_id, match.id, q, product.warehouse_id || null),
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReorderBusy(null);
     }
   }
 
@@ -1202,7 +1240,20 @@ export default function Warehouse() {
 
             {error && <p className="error">{error}</p>}
             {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
-            {!loading && products.length === 0 && <div className="wh-empty"><p>Hali mahsulot qo‘shilmagan.</p></div>}
+            {!loading && products.length === 0 && (
+              <div className="wh-empty">
+                <p>
+                  {company.company_type === "distributor"
+                    ? "Hali mahsulot yo‘q — Bozor bo‘limidan buyurtma bering."
+                    : "Hali mahsulot qo‘shilmagan."}
+                </p>
+                {company.company_type === "distributor" && (
+                  <button type="button" className="wh-cta" onClick={() => setTab("marketplace")}>
+                    Bozorga o‘tish
+                  </button>
+                )}
+              </div>
+            )}
             {!loading && products.length > 0 && visibleProducts.length === 0 && (
               <div className="wh-empty"><p>Qidiruv/filtrga mos mahsulot topilmadi.</p></div>
             )}
@@ -1210,6 +1261,7 @@ export default function Warehouse() {
             <div className="wh-grid">
               {visibleProducts.map((p) => {
                 const tone = stockTone(p, isLowStock(p));
+                const isDistributor = company.company_type === "distributor";
                 return (
                   <article key={p.id} className={`wh-card tone-${tone}`}>
                     {p.image_url ? (
@@ -1235,9 +1287,22 @@ export default function Warehouse() {
                       {p.sku && <p className="wh-meta">SKU: {p.sku}</p>}
                       {p.notes && <p className="wh-meta">{p.notes}</p>}
                       <div className="wh-card-actions">
-                        <button type="button" className="wh-cta slim" onClick={() => setStockProduct(p)}>Zaxira</button>
-                        {p.unit === "dona" && (
-                          <button type="button" className="secondary wh-soft-btn" onClick={() => handleQuickAdd(p)}>+1</button>
+                        {isDistributor ? (
+                          <button
+                            type="button"
+                            className="wh-cta slim"
+                            disabled={reorderBusy === p.id}
+                            onClick={() => handleReorder(p)}
+                          >
+                            {reorderBusy === p.id ? "Qidirilmoqda..." : "Qayta buyurtma"}
+                          </button>
+                        ) : (
+                          <>
+                            <button type="button" className="wh-cta slim" onClick={() => setStockProduct(p)}>Zaxira</button>
+                            {p.unit === "dona" && (
+                              <button type="button" className="secondary wh-soft-btn" onClick={() => handleQuickAdd(p)}>+1</button>
+                            )}
+                          </>
                         )}
                         <button type="button" className="secondary wh-soft-btn" onClick={() => setEditProduct(p)}>Tahrir</button>
                         <button type="button" className="secondary wh-soft-btn danger" onClick={() => handleDelete(p)}>O‘chirish</button>
@@ -1272,7 +1337,20 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {stockProduct && <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />}
+      {stockProduct && company.company_type !== "distributor" && (
+        <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />
+      )}
+      {reorderProduct && (
+        <OrderModal
+          product={reorderProduct}
+          onClose={() => setReorderProduct(null)}
+          onOrdered={() => {
+            setReorderProduct(null);
+            refreshProducts();
+            setTab("orders");
+          }}
+        />
+      )}
     </AppShell>
   );
 }
