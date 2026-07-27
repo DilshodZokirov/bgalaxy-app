@@ -1096,8 +1096,7 @@ video {
   50% { transform: translateY(-12px); }
 }
 
-.rafiq-widget-slim {
-  align-self: center;
+.landing-bomb .rafiq-widget {
   background: linear-gradient(165deg, rgba(8, 16, 36, 0.88), rgba(6, 12, 28, 0.72));
   border: 1px solid rgba(34, 211, 238, 0.22);
   box-shadow:
@@ -1105,18 +1104,6 @@ video {
     0 24px 60px rgba(0, 0, 0, 0.45),
     0 0 70px rgba(34, 211, 238, 0.1);
   backdrop-filter: blur(20px);
-}
-
-.rafiq-widget-slim .rafiq-widget-header {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.rafiq-widget-slim .rafiq-line {
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid rgba(34, 211, 238, 0.12);
-  color: #dbeafe;
 }
 
 .landing-bomb .badge-strip {
@@ -1159,15 +1146,6 @@ video {
   border-top-color: rgba(148, 163, 184, 0.12);
 }
 
-@media (max-width: 900px) {
-  .hero-stage {
-    grid-template-columns: 1fr;
-    min-height: 0;
-    justify-items: center;
-  }
-  .hero-ziyo-full { max-width: 190px; }
-  .rafiq-widget-slim { width: 100%; }
-}
 
 /* Auth orbit shell */
 .auth-orbit {
@@ -1276,6 +1254,22 @@ video {
   font-size: 0.95rem;
   line-height: 1.65;
   max-width: 36ch;
+}
+
+.auth-orbit-widget {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 18px;
+}
+
+.auth-orbit-widget .rafiq-widget {
+  background: linear-gradient(165deg, rgba(8, 16, 36, 0.88), rgba(6, 12, 28, 0.72));
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 0 70px rgba(34, 211, 238, 0.1);
+  backdrop-filter: blur(20px);
 }
 
 .auth-orbit-robot-wrap {
@@ -1406,6 +1400,10 @@ video {
   }
   .auth-orbit-robot-wrap {
     width: min(200px, 55%);
+    margin: 12px auto 0;
+  }
+  .auth-orbit-widget {
+    max-width: 100%;
     margin: 12px auto 0;
   }
   .auth-orbit-brand {
