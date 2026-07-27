@@ -204,6 +204,8 @@ def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
         slug=company.slug,
         owner_id=company.owner_id,
         logo_url=company.logo_url,
+        location_region=getattr(company, "location_region", None),
+        location_address=getattr(company, "location_address", None),
         company_type=company.company_type,
         has_warehouse=bool(warehouses) or bool(company.has_warehouse),
         warehouse_type=company.warehouse_type

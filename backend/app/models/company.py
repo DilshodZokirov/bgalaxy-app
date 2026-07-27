@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,7 +26,10 @@ class Company(Base):
     head_admin_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
-    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Ordered region (viloyat/shahar) + free-text address for company placement
+    location_region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    location_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_type: Mapped[str] = mapped_column(String(20), default="kompaniya")  # "kompaniya" | "distributor" | "market"
     has_warehouse: Mapped[bool] = mapped_column(default=False)
     warehouse_type: Mapped[str | None] = mapped_column(String(30), nullable=True)  # "technology"|"clothing"|"food"
