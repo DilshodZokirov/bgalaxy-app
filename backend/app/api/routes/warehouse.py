@@ -621,7 +621,12 @@ async def delete_product(
     current_user: User = Depends(get_current_user),
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
-    await _require_warehouse_enabled(db, company_id)
+    company, _warehouses = await _require_warehouse_enabled(db, company_id)
+    if company.company_type == "distributor":
+        raise HTTPException(
+            status_code=400,
+            detail="Distributiv firma mahsulotni o'chira olmaydi — zaxira Bozor buyurtmalari orqali boshqariladi.",
+        )
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
