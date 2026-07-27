@@ -1,7 +1,7 @@
 import uuid as uuid_lib
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +9,7 @@ from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.models.company import Company
 from app.models.user import User
-from app.models.warehouse import StockMovement, WarehouseProduct, WarehouseOrder
+from app.models.warehouse import StockMovement, Warehouse, WarehouseOrder, WarehouseProduct
 from app.schemas.company import CompanyOut
 from app.schemas.warehouse import (
     MarketplaceProductOut,
@@ -20,6 +20,8 @@ from app.schemas.warehouse import (
     ProductUpdate,
     StockAdjustment,
     StockMovementOut,
+    WarehouseCreate,
+    WarehouseOut,
     WarehouseSettingsUpdate,
 )
 from app.services.permissions import require_any_permission, require_permission
@@ -27,6 +29,12 @@ from app.services.permissions import require_any_permission, require_permission
 router = APIRouter(prefix="/companies/{company_id}/warehouse", tags=["warehouse"])
 
 WAREHOUSE_TYPES = {"technology", "clothing", "food"}
+WAREHOUSE_TYPE_NAMES = {
+    "technology": "Texnologiya ombori",
+    "clothing": "Kiyim-kechak ombori",
+    "food": "Oziq-ovqat ombori",
+}
+MAX_WAREHOUSES = 3
 VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi"]
 
 
@@ -78,11 +86,168 @@ async def _get_company(db: AsyncSession, company_id: str) -> Company:
     return company
 
 
-async def _require_warehouse_enabled(db: AsyncSession, company_id: str) -> Company:
+async def _list_warehouses(db: AsyncSession, company_id: str) -> list[Warehouse]:
+    result = await db.execute(
+        select(Warehouse)
+        .where(Warehouse.company_id == company_id)
+        .order_by(Warehouse.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def _sync_company_flags(db: AsyncSession, company: Company) -> list[Warehouse]:
+    warehouses = await _list_warehouses(db, str(company.id))
+    company.has_warehouse = len(warehouses) > 0
+    if len(warehouses) == 1:
+        company.warehouse_type = warehouses[0].warehouse_type
+    elif len(warehouses) == 0:
+        company.warehouse_type = None
+    else:
+        # Multi-warehouse: legacy single field is intentionally cleared.
+        company.warehouse_type = None
+    return warehouses
+
+
+def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
+    return CompanyOut(
+        id=company.id,
+        name=company.name,
+        slug=company.slug,
+        owner_id=company.owner_id,
+        logo_url=company.logo_url,
+        company_type=company.company_type,
+        has_warehouse=bool(warehouses) or bool(company.has_warehouse),
+        warehouse_type=company.warehouse_type,
+        warehouses=[WarehouseOut.model_validate(w) for w in warehouses],
+        created_at=company.created_at,
+    )
+
+
+async def _require_warehouse_enabled(db: AsyncSession, company_id: str) -> tuple[Company, list[Warehouse]]:
     company = await _get_company(db, company_id)
-    if not company.has_warehouse:
+    warehouses = await _list_warehouses(db, company_id)
+    if not warehouses and not company.has_warehouse:
         raise HTTPException(status_code=400, detail="Ombor bo'limi bu kompaniyada yoqilmagan")
-    return company
+    return company, warehouses
+
+
+async def _get_warehouse(
+    db: AsyncSession, company_id: str, warehouse_id: str | None
+) -> Warehouse | None:
+    if not warehouse_id:
+        return None
+    result = await db.execute(
+        select(Warehouse).where(Warehouse.id == warehouse_id, Warehouse.company_id == company_id)
+    )
+    warehouse = result.scalar_one_or_none()
+    if warehouse is None:
+        raise HTTPException(status_code=404, detail="Ombor topilmadi")
+    return warehouse
+
+
+def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) -> ProductOut:
+    wh_type = warehouse.warehouse_type if warehouse else None
+    return ProductOut(
+        id=product.id,
+        company_id=product.company_id,
+        warehouse_id=product.warehouse_id,
+        warehouse_type=wh_type,
+        name=product.name,
+        price=float(product.price),
+        quantity=float(product.quantity),
+        unit=product.unit,
+        image_url=product.image_url,
+        low_stock_threshold=float(product.low_stock_threshold) if product.low_stock_threshold is not None else None,
+        source_company_id=product.source_company_id,
+        source_company_name=product.source_company_name,
+        size=product.size,
+        color=product.color,
+        expiry_date=product.expiry_date,
+        sku=product.sku,
+        notes=product.notes,
+        created_at=product.created_at,
+        updated_at=product.updated_at,
+    )
+
+
+async def _warehouse_map(db: AsyncSession, company_id: str) -> dict[str, Warehouse]:
+    warehouses = await _list_warehouses(db, company_id)
+    return {str(w.id): w for w in warehouses}
+
+
+@router.get("/list", response_model=list[WarehouseOut])
+async def list_warehouses(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS + ["edit_company_settings"])
+    return await _list_warehouses(db, company_id)
+
+
+@router.post("/list", response_model=WarehouseOut, status_code=201)
+async def create_warehouse(
+    company_id: str,
+    payload: WarehouseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_permission(db, company_id, current_user.id, "edit_company_settings")
+    company = await _get_company(db, company_id)
+
+    if payload.warehouse_type not in WAREHOUSE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Ombor turi: technology, clothing yoki food bo'lishi kerak",
+        )
+
+    existing = await _list_warehouses(db, company_id)
+    if len(existing) >= MAX_WAREHOUSES:
+        raise HTTPException(status_code=400, detail="Bir korxonada maksimal 3 ta ombor bo'lishi mumkin")
+    if any(w.warehouse_type == payload.warehouse_type for w in existing):
+        raise HTTPException(
+            status_code=400,
+            detail="Bu turdagi ombor allaqachon mavjud — har bir turdan faqat bittadan",
+        )
+
+    warehouse = Warehouse(
+        id=uuid_lib.uuid4(),
+        company_id=company_id,
+        warehouse_type=payload.warehouse_type,
+        name=(payload.name or "").strip() or WAREHOUSE_TYPE_NAMES[payload.warehouse_type],
+    )
+    db.add(warehouse)
+    await db.flush()
+    await _sync_company_flags(db, company)
+    await db.commit()
+    await db.refresh(warehouse)
+    return warehouse
+
+
+@router.delete("/list/{warehouse_id}", status_code=204)
+async def delete_warehouse(
+    company_id: str,
+    warehouse_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_permission(db, company_id, current_user.id, "edit_company_settings")
+    company = await _get_company(db, company_id)
+    warehouse = await _get_warehouse(db, company_id, warehouse_id)
+    assert warehouse is not None
+
+    products_result = await db.execute(
+        select(WarehouseProduct.id).where(WarehouseProduct.warehouse_id == warehouse.id)
+    )
+    product_ids = [row[0] for row in products_result.all()]
+    if product_ids:
+        await db.execute(StockMovement.__table__.delete().where(StockMovement.product_id.in_(product_ids)))
+        await db.execute(WarehouseProduct.__table__.delete().where(WarehouseProduct.id.in_(product_ids)))
+
+    await db.delete(warehouse)
+    await db.flush()
+    await _sync_company_flags(db, company)
+    await db.commit()
 
 
 @router.patch("/settings", response_model=CompanyOut)
@@ -92,8 +257,10 @@ async def update_warehouse_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy toggle — creates the first warehouse or removes all."""
     await require_permission(db, company_id, current_user.id, "edit_company_settings")
     company = await _get_company(db, company_id)
+    warehouses = await _list_warehouses(db, company_id)
 
     if payload.has_warehouse:
         if payload.warehouse_type not in WAREHOUSE_TYPES:
@@ -101,30 +268,54 @@ async def update_warehouse_settings(
                 status_code=400,
                 detail="Ishlab chiqarish turini tanlang: technology, clothing yoki food",
             )
-        company.warehouse_type = payload.warehouse_type
+        if not any(w.warehouse_type == payload.warehouse_type for w in warehouses):
+            if len(warehouses) >= MAX_WAREHOUSES:
+                raise HTTPException(status_code=400, detail="Bir korxonada maksimal 3 ta ombor bo'lishi mumkin")
+            db.add(
+                Warehouse(
+                    id=uuid_lib.uuid4(),
+                    company_id=company_id,
+                    warehouse_type=payload.warehouse_type,
+                    name=WAREHOUSE_TYPE_NAMES[payload.warehouse_type],
+                )
+            )
+            await db.flush()
     else:
-        company.warehouse_type = None
-    company.has_warehouse = payload.has_warehouse
+        for wh in warehouses:
+            products_result = await db.execute(
+                select(WarehouseProduct.id).where(WarehouseProduct.warehouse_id == wh.id)
+            )
+            product_ids = [row[0] for row in products_result.all()]
+            if product_ids:
+                await db.execute(StockMovement.__table__.delete().where(StockMovement.product_id.in_(product_ids)))
+                await db.execute(WarehouseProduct.__table__.delete().where(WarehouseProduct.id.in_(product_ids)))
+            await db.delete(wh)
+        await db.flush()
 
+    warehouses = await _sync_company_flags(db, company)
     await db.commit()
     await db.refresh(company)
-    return company
+    return _company_out(company, warehouses)
 
 
 @router.get("/products", response_model=list[ProductOut])
 async def list_products(
     company_id: str,
+    warehouse_id: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     await _require_warehouse_enabled(db, company_id)
-    result = await db.execute(
-        select(WarehouseProduct)
-        .where(WarehouseProduct.company_id == company_id)
-        .order_by(WarehouseProduct.created_at.desc())
-    )
-    return result.scalars().all()
+    wh_map = await _warehouse_map(db, company_id)
+
+    query = select(WarehouseProduct).where(WarehouseProduct.company_id == company_id)
+    if warehouse_id:
+        await _get_warehouse(db, company_id, warehouse_id)
+        query = query.where(WarehouseProduct.warehouse_id == warehouse_id)
+    result = await db.execute(query.order_by(WarehouseProduct.created_at.desc()))
+    products = result.scalars().all()
+    return [_product_out(p, wh_map.get(str(p.warehouse_id)) if p.warehouse_id else None) for p in products]
 
 
 @router.post("/products", response_model=ProductOut, status_code=201)
@@ -135,7 +326,7 @@ async def create_product(
     current_user: User = Depends(get_current_user),
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
-    company = await _require_warehouse_enabled(db, company_id)
+    company, warehouses = await _require_warehouse_enabled(db, company_id)
 
     if company.company_type == "distributor":
         raise HTTPException(
@@ -143,25 +334,36 @@ async def create_product(
             detail="Distributiv firma o'zi mahsulot qo'sha olmaydi — Bozor bo'limidan boshqa kompaniyalar omboridan buyurtma bering.",
         )
 
-    # Type-specific fields don't apply outside their warehouse_type — drop
-    # them here rather than trust the client to leave them out.
-    size = payload.size if company.warehouse_type == "clothing" else None
-    color = payload.color if company.warehouse_type == "clothing" else None
-    expiry_date = payload.expiry_date if company.warehouse_type == "food" else None
-    sku = payload.sku if company.warehouse_type == "technology" else None
+    if not warehouses:
+        raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
 
-    # Same product (by name, plus size/color for clothing or sku for tech)
-    # already exists — don't create a duplicate row, just add to its stock.
+    warehouse: Warehouse | None = None
+    if payload.warehouse_id:
+        warehouse = await _get_warehouse(db, company_id, str(payload.warehouse_id))
+    elif len(warehouses) == 1:
+        warehouse = warehouses[0]
+    else:
+        raise HTTPException(status_code=400, detail="Qaysi omborga qo'shishni tanlang")
+
+    assert warehouse is not None
+    wh_type = warehouse.warehouse_type
+
+    size = payload.size if wh_type == "clothing" else None
+    color = payload.color if wh_type == "clothing" else None
+    expiry_date = payload.expiry_date if wh_type == "food" else None
+    sku = payload.sku if wh_type == "technology" else None
+
     existing_query = select(WarehouseProduct).where(
         WarehouseProduct.company_id == company_id,
+        WarehouseProduct.warehouse_id == warehouse.id,
         func.lower(WarehouseProduct.name) == payload.name.strip().lower(),
         WarehouseProduct.unit == payload.unit,
     )
-    if company.warehouse_type == "clothing":
+    if wh_type == "clothing":
         existing_query = existing_query.where(
             WarehouseProduct.size == size, WarehouseProduct.color == color
         )
-    elif company.warehouse_type == "technology":
+    elif wh_type == "technology":
         existing_query = existing_query.where(WarehouseProduct.sku == sku)
     existing_result = await db.execute(existing_query)
     existing = existing_result.scalar_one_or_none()
@@ -180,11 +382,12 @@ async def create_product(
             )
             await db.commit()
             await db.refresh(existing)
-        return existing
+        return _product_out(existing, warehouse)
 
     product = WarehouseProduct(
         id=uuid_lib.uuid4(),
         company_id=company_id,
+        warehouse_id=warehouse.id,
         name=payload.name,
         price=payload.price,
         quantity=payload.quantity,
@@ -198,7 +401,7 @@ async def create_product(
         notes=payload.notes,
     )
     db.add(product)
-    await db.flush()  # guarantees the product row exists before we reference its id below
+    await db.flush()
     if payload.quantity:
         db.add(
             StockMovement(
@@ -211,7 +414,7 @@ async def create_product(
         )
     await db.commit()
     await db.refresh(product)
-    return product
+    return _product_out(product, warehouse)
 
 
 @router.patch("/products/{product_id}", response_model=ProductOut)
@@ -223,7 +426,7 @@ async def update_product(
     current_user: User = Depends(get_current_user),
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
-    company = await _require_warehouse_enabled(db, company_id)
+    await _require_warehouse_enabled(db, company_id)
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
@@ -232,21 +435,24 @@ async def update_product(
     if product is None:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
+    warehouse = await _get_warehouse(db, company_id, str(product.warehouse_id) if product.warehouse_id else None)
+    wh_type = warehouse.warehouse_type if warehouse else None
+
     data = payload.model_dump(exclude_unset=True)
-    if "size" in data and company.warehouse_type != "clothing":
+    if "size" in data and wh_type != "clothing":
         data.pop("size")
-    if "color" in data and company.warehouse_type != "clothing":
+    if "color" in data and wh_type != "clothing":
         data.pop("color")
-    if "expiry_date" in data and company.warehouse_type != "food":
+    if "expiry_date" in data and wh_type != "food":
         data.pop("expiry_date")
-    if "sku" in data and company.warehouse_type != "technology":
+    if "sku" in data and wh_type != "technology":
         data.pop("sku")
     for key, value in data.items():
         setattr(product, key, value)
 
     await db.commit()
     await db.refresh(product)
-    return product
+    return _product_out(product, warehouse)
 
 
 @router.delete("/products/{product_id}", status_code=204)
@@ -310,7 +516,8 @@ async def adjust_stock(
     )
     await db.commit()
     await db.refresh(product)
-    return product
+    warehouse = await _get_warehouse(db, company_id, str(product.warehouse_id) if product.warehouse_id else None)
+    return _product_out(product, warehouse)
 
 
 @router.get("/products/{product_id}/history", response_model=list[StockMovementOut])
@@ -349,25 +556,26 @@ async def get_stock_history(
 async def get_warehouse_dashboard(
     company_id: str,
     period: str = "month",
+    warehouse_id: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Statistika: qabul qilingan (kirim) mahsulotlar davr bo'yicha, HAR BIR
-    mahsulot uchun alohida (turli birliklarni — dona/kg/litr — bitta songa
-    qo'shib bo'lmaydi, shuning uchun bu yerda hech narsa aralashtirilmaydi).
-    "Sotilgan" — bu kompaniya SOTUVCHI bo'lgan barcha WarehouseOrder
-    yozuvlaridan hisoblanadi (Distributiv firma undan buyurtma berganda
-    avtomatik yoziladi)."""
+    """Statistika: bitta ombor yoki barcha omborlar umumiy byudjeti."""
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     await _require_warehouse_enabled(db, company_id)
+    if warehouse_id:
+        await _get_warehouse(db, company_id, warehouse_id)
 
     buckets, start, key_fn = _dashboard_buckets(period)
 
-    orders_result = await db.execute(
-        select(WarehouseOrder.created_at, WarehouseOrder.total_price, WarehouseOrder.quantity).where(
-            WarehouseOrder.seller_company_id == company_id, WarehouseOrder.created_at >= start
-        )
+    sold_query = (
+        select(WarehouseOrder.created_at, WarehouseOrder.total_price, WarehouseOrder.quantity)
+        .join(WarehouseProduct, WarehouseProduct.id == WarehouseOrder.seller_product_id)
+        .where(WarehouseOrder.seller_company_id == company_id, WarehouseOrder.created_at >= start)
     )
+    if warehouse_id:
+        sold_query = sold_query.where(WarehouseProduct.warehouse_id == warehouse_id)
+    orders_result = await db.execute(sold_query)
     sold_value_by_bucket = {b: 0.0 for b in buckets}
     total_sold_value = 0.0
     total_sold_quantity = 0.0
@@ -378,29 +586,29 @@ async def get_warehouse_dashboard(
         total_sold_value += float(total_price)
         total_sold_quantity += float(quantity)
 
+    kirim_filters = [
+        WarehouseProduct.company_id == company_id,
+        StockMovement.created_at >= start,
+        StockMovement.change > 0,
+    ]
+    if warehouse_id:
+        kirim_filters.append(WarehouseProduct.warehouse_id == warehouse_id)
     result = await db.execute(
         select(
-            StockMovement.created_at, StockMovement.change,
-            WarehouseProduct.id, WarehouseProduct.name, WarehouseProduct.unit, WarehouseProduct.price,
+            StockMovement.created_at,
+            StockMovement.change,
+            WarehouseProduct.id,
+            WarehouseProduct.name,
+            WarehouseProduct.unit,
+            WarehouseProduct.price,
         )
         .join(WarehouseProduct, WarehouseProduct.id == StockMovement.product_id)
-        .where(
-            WarehouseProduct.company_id == company_id,
-            StockMovement.created_at >= start,
-            StockMovement.change > 0,
-        )
+        .where(*kirim_filters)
     )
     rows = result.all()
 
-    # Trend line stays unit-agnostic on purpose — it counts KIRIM EVENTS per
-    # period bucket, not raw quantities, so mixing a "5 kg" delivery with a
-    # "5 dona" delivery in the same chart never produces a meaningless sum.
-    # received_value (change × price, summed in so'm) IS safe to sum across
-    # units though — that's what powers the "Umumiy byudjet" trend chart.
     events_by_bucket = {b: 0 for b in buckets}
     received_value_by_bucket = {b: 0.0 for b in buckets}
-    # Per-product totals, kept in each product's own unit — this is what
-    # actually answers "how much of THIS product came in this period".
     by_product: dict[str, dict] = {}
     for created_at, change, product_id_val, name, unit, price in rows:
         key = key_fn(created_at.date())
@@ -411,35 +619,44 @@ async def get_warehouse_dashboard(
         entry["received"] += float(change)
 
     trend = [
-        {"label": b, "events": events_by_bucket[b], "received_value": received_value_by_bucket[b], "sold_value": sold_value_by_bucket[b]}
+        {
+            "label": b,
+            "events": events_by_bucket[b],
+            "received_value": received_value_by_bucket[b],
+            "sold_value": sold_value_by_bucket[b],
+        }
         for b in buckets
     ]
     by_product_list = sorted(by_product.values(), key=lambda e: e["received"], reverse=True)
 
-    products_result = await db.execute(
-        select(WarehouseProduct.unit, func.count(WarehouseProduct.id), func.coalesce(func.sum(WarehouseProduct.quantity), 0))
-        .where(WarehouseProduct.company_id == company_id)
-        .group_by(WarehouseProduct.unit)
-    )
+    stock_query = select(
+        WarehouseProduct.unit,
+        func.count(WarehouseProduct.id),
+        func.coalesce(func.sum(WarehouseProduct.quantity), 0),
+    ).where(WarehouseProduct.company_id == company_id)
+    if warehouse_id:
+        stock_query = stock_query.where(WarehouseProduct.warehouse_id == warehouse_id)
+    products_result = await db.execute(stock_query.group_by(WarehouseProduct.unit))
     total_by_unit = {}
     product_count = 0
     for unit, count, qty in products_result.all():
         total_by_unit[unit] = float(qty)
         product_count += count
 
-    # "Umumiy byudjet" view — price ties every product to a common unit
-    # (so'm), so unlike raw quantities, these values CAN be meaningfully
-    # summed across a mix of dona/kg/litr products.
-    budget_result = await db.execute(
-        select(WarehouseProduct.name, WarehouseProduct.unit, WarehouseProduct.quantity, WarehouseProduct.price)
-        .where(WarehouseProduct.company_id == company_id)
-    )
+    budget_query = select(
+        WarehouseProduct.name, WarehouseProduct.unit, WarehouseProduct.quantity, WarehouseProduct.price
+    ).where(WarehouseProduct.company_id == company_id)
+    if warehouse_id:
+        budget_query = budget_query.where(WarehouseProduct.warehouse_id == warehouse_id)
+    budget_result = await db.execute(budget_query)
     by_product_budget = []
     total_budget_value = 0.0
     for name, unit, qty, price in budget_result.all():
         value = float(qty) * float(price)
         total_budget_value += value
-        by_product_budget.append({"name": name, "unit": unit, "quantity": float(qty), "price": float(price), "value": value})
+        by_product_budget.append(
+            {"name": name, "unit": unit, "quantity": float(qty), "price": float(price), "value": value}
+        )
     by_product_budget.sort(key=lambda e: e["value"], reverse=True)
 
     return {
@@ -451,6 +668,8 @@ async def get_warehouse_dashboard(
         "product_count": product_count,
         "by_product_budget": by_product_budget,
         "total_budget_value": total_budget_value,
+        "warehouse_id": warehouse_id,
+        "aggregated": warehouse_id is None,
     }
 
 
@@ -468,8 +687,9 @@ async def browse_marketplace(
         raise HTTPException(status_code=400, detail="Bozor faqat Distributiv firmalar uchun mavjud")
 
     result = await db.execute(
-        select(WarehouseProduct, Company.name)
+        select(WarehouseProduct, Company.name, Warehouse.warehouse_type)
         .join(Company, Company.id == WarehouseProduct.company_id)
+        .outerjoin(Warehouse, Warehouse.id == WarehouseProduct.warehouse_id)
         .where(
             Company.company_type == "kompaniya",
             Company.has_warehouse == True,  # noqa: E712
@@ -478,12 +698,14 @@ async def browse_marketplace(
         .order_by(WarehouseProduct.name)
     )
     out = []
-    for product, company_name in result.all():
+    for product, company_name, wh_type in result.all():
         out.append(
             MarketplaceProductOut(
                 id=product.id,
                 company_id=product.company_id,
                 company_name=company_name,
+                warehouse_id=product.warehouse_id,
+                warehouse_type=wh_type,
                 name=product.name,
                 price=float(product.price),
                 quantity=float(product.quantity),
@@ -501,15 +723,15 @@ async def place_marketplace_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Distributiv firma boshqa kompaniyaning omboridan buyurtma beradi —
-    sotuvchidan avtomatik ayiriladi, xaridorning o'z omboriga (manba
-    belgilangan holda) qo'shiladi, va ikkala tomonda ham tarix yoziladi."""
+    """Distributiv firma boshqa kompaniyaning omboridan buyurtma beradi."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
-    buyer = await _require_warehouse_enabled(db, company_id)
+    buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
     if buyer.company_type != "distributor":
         raise HTTPException(status_code=400, detail="Buyurtma faqat Distributiv firmalar uchun mavjud")
     if payload.quantity <= 0:
         raise HTTPException(status_code=400, detail="Miqdor musbat bo'lishi kerak")
+    if not buyer_warehouses:
+        raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
 
     seller_result = await db.execute(select(Company).where(Company.id == payload.seller_company_id))
     seller = seller_result.scalar_one_or_none()
@@ -527,7 +749,20 @@ async def place_marketplace_order(
     if float(seller_product.quantity) < payload.quantity:
         raise HTTPException(status_code=400, detail="Sotuvchida yetarli zaxira yo'q")
 
-    # 1) deduct from the seller (this is the "sold" event their dashboard cares about)
+    target_warehouse: Warehouse | None = None
+    if payload.warehouse_id:
+        target_warehouse = await _get_warehouse(db, company_id, str(payload.warehouse_id))
+    else:
+        seller_wh = await _get_warehouse(
+            db, str(seller.id), str(seller_product.warehouse_id) if seller_product.warehouse_id else None
+        )
+        if seller_wh:
+            target_warehouse = next(
+                (w for w in buyer_warehouses if w.warehouse_type == seller_wh.warehouse_type), None
+            )
+        if target_warehouse is None:
+            target_warehouse = buyer_warehouses[0]
+
     seller_product.quantity = float(seller_product.quantity) - payload.quantity
     db.add(
         StockMovement(
@@ -539,10 +774,10 @@ async def place_marketplace_order(
         )
     )
 
-    # 2) add to (or top up) the buyer's own source-tagged copy of the product
     existing_result = await db.execute(
         select(WarehouseProduct).where(
             WarehouseProduct.company_id == company_id,
+            WarehouseProduct.warehouse_id == target_warehouse.id,
             func.lower(WarehouseProduct.name) == seller_product.name.strip().lower(),
             WarehouseProduct.unit == seller_product.unit,
             WarehouseProduct.source_company_id == seller.id,
@@ -555,6 +790,7 @@ async def place_marketplace_order(
         buyer_product = WarehouseProduct(
             id=uuid_lib.uuid4(),
             company_id=company_id,
+            warehouse_id=target_warehouse.id,
             name=seller_product.name,
             price=seller_product.price,
             quantity=payload.quantity,

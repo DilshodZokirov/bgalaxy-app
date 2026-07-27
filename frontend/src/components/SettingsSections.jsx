@@ -531,7 +531,7 @@ export function DashboardUiSection({ user, onSaved }) {
   );
 }
 
-// ---------- 5. Ombor (kompaniya darajasidagi sozlama) ----------
+// ---------- 5. Ombor (korxonada 3 tagacha, har turdan bittadan) ----------
 const WAREHOUSE_TYPE_LABELS = {
   technology: "Texnologiya",
   clothing: "Kiyim-kechak",
@@ -540,34 +540,64 @@ const WAREHOUSE_TYPE_LABELS = {
 
 export function WarehouseSection() {
   const [company, setCompany] = useState(null);
-  const [hasWarehouse, setHasWarehouse] = useState(false);
-  const [warehouseType, setWarehouseType] = useState("technology");
+  const [warehouses, setWarehouses] = useState([]);
+  const [addType, setAddType] = useState("technology");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
+  async function reload() {
+    const list = await api.getMyCompanies();
+    const active = pickActiveCompany(list);
+    setCompany(active);
+    if (active) {
+      const rows = active.warehouses?.length
+        ? active.warehouses
+        : await api.getWarehouses(active.id).catch(() => []);
+      setWarehouses(rows || []);
+      const used = new Set((rows || []).map((w) => w.warehouse_type));
+      const next = Object.keys(WAREHOUSE_TYPE_LABELS).find((k) => !used.has(k));
+      setAddType(next || "technology");
+    } else {
+      setWarehouses([]);
+    }
+  }
+
   useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => {
-        const active = pickActiveCompany(list);
-        setCompany(active);
-        if (active) {
-          setHasWarehouse(!!active.has_warehouse);
-          setWarehouseType(active.warehouse_type || "technology");
-        }
-      })
-      .catch(() => {});
+    reload().catch(() => {});
   }, []);
 
-  async function handleSave() {
-    if (!company) return;
+  const usedTypes = new Set(warehouses.map((w) => w.warehouse_type));
+  const availableTypes = Object.entries(WAREHOUSE_TYPE_LABELS).filter(([key]) => !usedTypes.has(key));
+  const canAdd = warehouses.length < 3 && availableTypes.length > 0;
+
+  async function handleAdd() {
+    if (!company || !canAdd) return;
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await api.updateWarehouseSettings(company.id, hasWarehouse, hasWarehouse ? warehouseType : null);
+      await api.createWarehouse(company.id, addType);
       setSaved(true);
+      await reload();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove(warehouse) {
+    if (!company) return;
+    const label = WAREHOUSE_TYPE_LABELS[warehouse.warehouse_type] || warehouse.warehouse_type;
+    if (!window.confirm(`"${label}" omborini o'chirasizmi? Ichidagi mahsulotlar ham o'chadi.`)) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await api.deleteWarehouse(company.id, warehouse.id);
+      setSaved(true);
+      await reload();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -582,33 +612,76 @@ export function WarehouseSection() {
   return (
     <div>
       <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 14px" }}>
-        <strong style={{ color: "var(--text)" }}>{company.name}</strong> uchun ombor bo'limini yoqing yoki o'chiring.
+        <strong style={{ color: "var(--text)" }}>{company.name}</strong> uchun 3 tagacha ombor
+        ochishingiz mumkin — har bir turdan faqat bittadan (kiyim, texnologiya, oziq-ovqat).
       </p>
 
-      <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}>
-        <input type="checkbox" checked={hasWarehouse} onChange={(e) => setHasWarehouse(e.target.checked)} style={{ width: "auto" }} />
-        <span style={{ fontSize: 13 }}>Ombor bo'limini yoqish</span>
-      </label>
+      {warehouses.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "0 0 14px" }}>
+          Hali ombor yo'q. Pastdan tur tanlab qo'shing.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {warehouses.map((w) => (
+            <div
+              key={w.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid var(--border)",
+                background: "var(--panel-2)",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: 13.5 }}>
+                  {w.name || WAREHOUSE_TYPE_LABELS[w.warehouse_type] || w.warehouse_type}
+                </strong>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>
+                  {WAREHOUSE_TYPE_LABELS[w.warehouse_type] || w.warehouse_type}
+                </div>
+              </div>
+              <button type="button" className="secondary" disabled={saving} onClick={() => handleRemove(w)}>
+                O'chirish
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {hasWarehouse && (
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 8px" }}>Korxonangiz nima ishlab chiqarish uchun mo'ljallangan?</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {Object.entries(WAREHOUSE_TYPE_LABELS).map(([key, label]) => (
-              <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-                <input type="radio" name="warehouse_type" checked={warehouseType === key} onChange={() => setWarehouseType(key)} style={{ width: "auto" }} />
-                {label}
-              </label>
-            ))}
+      {canAdd ? (
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 8px" }}>
+            Yangi ombor turi ({warehouses.length}/3)
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <select
+              value={addType}
+              onChange={(e) => setAddType(e.target.value)}
+              style={{ minWidth: 180 }}
+            >
+              {availableTypes.map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <button type="button" disabled={saving} onClick={handleAdd}>
+              {saving ? "Saqlanmoqda..." : "Ombor qo'shish"}
+            </button>
           </div>
         </div>
+      ) : (
+        <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
+          {warehouses.length >= 3
+            ? "Maksimal 3 ta ombor ulangan."
+            : "Barcha turlar allaqachon ochilgan."}
+        </p>
       )}
 
       {error && <p className="error">{error}</p>}
       {saved && <p style={{ color: "var(--green)", fontSize: 12.5, margin: "0 0 12px" }}>✓ Saqlandi</p>}
-      <button className="secondary" disabled={saving} onClick={handleSave}>
-        {saving ? "Saqlanmoqda..." : "Saqlash"}
-      </button>
     </div>
   );
 }

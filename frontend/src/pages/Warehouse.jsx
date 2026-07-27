@@ -108,8 +108,9 @@ function ChartBlock({ title, period, setPeriod, chartType, setChartType, childre
   );
 }
 
-function ProductModal({ company, product, products, onClose, onSaved }) {
+function ProductModal({ company, product, products, warehouseType, warehouseId, onClose, onSaved }) {
   const isEdit = !!product;
+  const type = warehouseType || product?.warehouse_type || company.warehouse_type;
   const [form, setForm] = useState(() =>
     isEdit
       ? {
@@ -125,7 +126,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
           sku: product.sku ?? "",
           notes: product.notes ?? "",
         }
-      : emptyForm(company.warehouse_type)
+      : emptyForm(type)
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -181,21 +182,25 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
         low_stock_threshold: form.low_stock_threshold !== "" ? Number(form.low_stock_threshold) : null,
         notes: form.notes || null,
       };
-      if (company.warehouse_type === "clothing") {
+      if (type === "clothing") {
         payload.size = form.size || null;
         payload.color = form.color || null;
       }
-      if (company.warehouse_type === "food") {
+      if (type === "food") {
         payload.expiry_date = form.expiry_date || null;
       }
-      if (company.warehouse_type === "technology") {
+      if (type === "technology") {
         payload.sku = form.sku || null;
       }
 
       if (isEdit) {
         await api.updateWarehouseProduct(company.id, product.id, payload);
       } else {
-        await api.createWarehouseProduct(company.id, { ...payload, quantity });
+        await api.createWarehouseProduct(company.id, {
+          ...payload,
+          quantity,
+          ...(warehouseId ? { warehouse_id: warehouseId } : {}),
+        });
       }
       onSaved();
       onClose();
@@ -258,7 +263,7 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
           </div>
         )}
 
-        {company.warehouse_type === "clothing" && (
+        {type === "clothing" && (
           <div className="wh-form-row">
             <div>
               <label>O‘lcham</label>
@@ -270,13 +275,13 @@ function ProductModal({ company, product, products, onClose, onSaved }) {
             </div>
           </div>
         )}
-        {company.warehouse_type === "food" && (
+        {type === "food" && (
           <>
             <label>Yaroqlilik muddati</label>
             <input type="date" value={form.expiry_date} onChange={(e) => setField("expiry_date", e.target.value)} />
           </>
         )}
-        {company.warehouse_type === "technology" && (
+        {type === "technology" && (
           <>
             <label>SKU / model</label>
             <input type="text" placeholder="SKU / model raqami" value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
@@ -374,7 +379,7 @@ function StockModal({ company, product, onClose, onSaved }) {
   );
 }
 
-function WarehouseDashboard({ company }) {
+function WarehouseDashboard({ company, warehouseId, multi }) {
   const [period, setPeriod] = useState("month");
   const [chartType, setChartType] = useState("3d");
   const [view, setView] = useState("current");
@@ -383,10 +388,10 @@ function WarehouseDashboard({ company }) {
 
   useEffect(() => {
     api
-      .getWarehouseDashboard(company.id, period)
+      .getWarehouseDashboard(company.id, period, warehouseId)
       .then(setData)
       .catch((err) => setError(err.message));
-  }, [company.id, period]);
+  }, [company.id, period, warehouseId]);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="wh-empty-inline">Yuklanmoqda...</p>;
@@ -396,6 +401,7 @@ function WarehouseDashboard({ company }) {
   const maxReceived = Math.max(1, ...data.by_product.map((p) => p.received));
   const maxBudget = Math.max(1, ...(data.by_product_budget || []).map((p) => p.value));
   const tooltipStyle = { background: "#0f172a", border: "1px solid rgba(148,163,184,0.25)", borderRadius: 10, color: "#f8fafc" };
+  const budgetLabel = multi && !warehouseId ? "Umumiy byudjet qiymati (barcha omborlar)" : "Umumiy byudjet qiymati";
 
   return (
     <div className="wh-dashboard">
@@ -495,7 +501,7 @@ function WarehouseDashboard({ company }) {
       {view === "budget" && (
         <>
           <article className="wh-hero-metric">
-            <span>Umumiy byudjet qiymati</span>
+            <span>{budgetLabel}</span>
             <strong>{money(data.total_budget_value)}</strong>
             <p>Narx × soni — turli birliklarni bitta qiymatda solishtirish mumkin.</p>
           </article>
@@ -715,6 +721,8 @@ function MarketplaceTab({ company, onOrdered }) {
 export default function Warehouse() {
   const navigate = useNavigate();
   const [company, setCompany] = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState(null); // null = all (multi only)
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -727,19 +735,42 @@ export default function Warehouse() {
   const [sortBy, setSortBy] = useState("recent");
 
   useEffect(() => {
-    api.getMyCompanies().then((list) => setCompany(pickActiveCompany(list))).catch(() => {});
+    api
+      .getMyCompanies()
+      .then((list) => {
+        const active = pickActiveCompany(list);
+        setCompany(active);
+        const rows = active?.warehouses || [];
+        setWarehouses(rows);
+        if (rows.length === 1) setSelectedWarehouseId(rows[0].id);
+        else setSelectedWarehouseId(null);
+      })
+      .catch(() => {});
   }, []);
+
+  const multi = warehouses.length > 1;
+  const activeWarehouse =
+    selectedWarehouseId
+      ? warehouses.find((w) => w.id === selectedWarehouseId)
+      : warehouses.length === 1
+        ? warehouses[0]
+        : null;
+  const activeWarehouseType =
+    activeWarehouse?.warehouse_type || editProduct?.warehouse_type || company?.warehouse_type || null;
+  const productWarehouseId = selectedWarehouseId || (warehouses.length === 1 ? warehouses[0]?.id : null);
 
   useEffect(() => {
     if (!company) return;
     refreshProducts();
-  }, [company]);
+  }, [company, selectedWarehouseId]);
 
   function refreshProducts() {
     if (!company) return;
     setLoading(true);
+    // When multi and "all" selected, fetch without warehouse_id (aggregate list).
+    const scopeId = multi ? selectedWarehouseId : productWarehouseId;
     api
-      .getWarehouseProducts(company.id)
+      .getWarehouseProducts(company.id, scopeId)
       .then(setProducts)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -823,14 +854,14 @@ export default function Warehouse() {
     );
   }
 
-  if (!company.has_warehouse) {
+  if (!company.has_warehouse && warehouses.length === 0) {
     return (
       <AppShell>
         <div className="wh-page">
           <WarehouseHeading companyName={company.name} />
           <div className="wh-empty">
             <p>Bu kompaniyada ombor hali yoqilmagan.</p>
-            <p className="wh-hint">Profil → Sozlamalar → Kompaniya → Ombor bo‘limidan yoqing.</p>
+            <p className="wh-hint">Profil → Sozlamalar → Ombor bo‘limidan 1–3 ta ombor qo‘shing.</p>
           </div>
         </div>
       </AppShell>
@@ -840,7 +871,11 @@ export default function Warehouse() {
   const subtitle =
     company.company_type === "distributor"
       ? "Distributiv firma — boshqa kompaniyalar omboridan buyurtma qiladi"
-      : `Ishlab chiqarish turi: ${TYPE_LABELS[company.warehouse_type] || company.warehouse_type}`;
+      : multi
+        ? selectedWarehouseId
+          ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
+          : `Umumiy ko‘rinish — ${warehouses.length} ta ombor`
+        : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
 
   return (
     <AppShell>
@@ -862,19 +897,54 @@ export default function Warehouse() {
               </button>
             ))}
           </div>
-          <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/dashboard")}>
-            Korxonaga qaytish
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {multi && (
+              <select
+                className="wh-warehouse-select"
+                value={selectedWarehouseId || ""}
+                onChange={(e) => setSelectedWarehouseId(e.target.value || null)}
+                aria-label="Ombor tanlash"
+              >
+                <option value="">Umumiy (barcha omborlar)</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name || TYPE_LABELS[w.warehouse_type] || w.warehouse_type}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/dashboard")}>
+              Korxonaga qaytish
+            </button>
+          </div>
         </div>
 
-        {tab === "dashboard" && <WarehouseDashboard company={company} />}
+        {tab === "dashboard" && (
+          <WarehouseDashboard
+            company={company}
+            warehouseId={multi ? selectedWarehouseId : productWarehouseId}
+            multi={multi}
+          />
+        )}
         {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
 
         {tab === "products" && (
           <section className="wh-products">
             <div className="wh-tools">
               {company.company_type !== "distributor" && (
-                <button type="button" className="wh-cta" onClick={() => setShowAdd(true)}>Yangi mahsulot</button>
+                <button
+                  type="button"
+                  className="wh-cta"
+                  onClick={() => {
+                    if (multi && !selectedWarehouseId) {
+                      setError("Mahsulot qo‘shish uchun avval bitta omborni tanlang");
+                      return;
+                    }
+                    setShowAdd(true);
+                  }}
+                >
+                  Yangi mahsulot
+                </button>
               )}
               <input
                 className="wh-search"
@@ -952,8 +1022,27 @@ export default function Warehouse() {
         )}
       </div>
 
-      {showAdd && <ProductModal company={company} products={products} onClose={() => setShowAdd(false)} onSaved={refreshProducts} />}
-      {editProduct && <ProductModal company={company} product={editProduct} products={products} onClose={() => setEditProduct(null)} onSaved={refreshProducts} />}
+      {showAdd && (
+        <ProductModal
+          company={company}
+          products={products}
+          warehouseType={activeWarehouseType}
+          warehouseId={productWarehouseId}
+          onClose={() => setShowAdd(false)}
+          onSaved={refreshProducts}
+        />
+      )}
+      {editProduct && (
+        <ProductModal
+          company={company}
+          product={editProduct}
+          products={products}
+          warehouseType={editProduct.warehouse_type || activeWarehouseType}
+          warehouseId={editProduct.warehouse_id || productWarehouseId}
+          onClose={() => setEditProduct(null)}
+          onSaved={refreshProducts}
+        />
+      )}
       {stockProduct && <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />}
     </AppShell>
   );

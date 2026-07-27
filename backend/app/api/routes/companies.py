@@ -9,9 +9,27 @@ from app.models.company import Company, MemberRole, TeamMembership
 from app.models.role import DEFAULT_ROLE_PERMISSIONS, Role
 from app.models.invite import Invite
 from app.models.user import User
+from app.models.warehouse import Warehouse
 from app.schemas.company import CompanyCreate, CompanyOut, TeamMemberOut
+from app.schemas.warehouse import WarehouseOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+
+def _company_out(company: Company, warehouses: list[Warehouse] | None = None) -> CompanyOut:
+    whs = warehouses or []
+    return CompanyOut(
+        id=company.id,
+        name=company.name,
+        slug=company.slug,
+        owner_id=company.owner_id,
+        logo_url=company.logo_url,
+        company_type=company.company_type,
+        has_warehouse=bool(whs) or bool(company.has_warehouse),
+        warehouse_type=company.warehouse_type,
+        warehouses=[WarehouseOut.model_validate(w) for w in whs],
+        created_at=company.created_at,
+    )
 
 
 @router.post("", response_model=CompanyOut, status_code=201)
@@ -47,7 +65,7 @@ async def create_company(
     db.add(membership)
     await db.commit()
     await db.refresh(company)
-    return company
+    return _company_out(company, [])
 
 
 @router.get("/mine", response_model=list[CompanyOut])
@@ -63,7 +81,21 @@ async def my_companies(
             or_(TeamMembership.approved == True, Company.owner_id == current_user.id),  # noqa: E712
         )
     )
-    return result.scalars().all()
+    companies = list(result.scalars().all())
+    if not companies:
+        return []
+
+    company_ids = [c.id for c in companies]
+    wh_result = await db.execute(
+        select(Warehouse)
+        .where(Warehouse.company_id.in_(company_ids))
+        .order_by(Warehouse.created_at.asc())
+    )
+    by_company: dict[str, list[Warehouse]] = {str(cid): [] for cid in company_ids}
+    for wh in wh_result.scalars().all():
+        by_company.setdefault(str(wh.company_id), []).append(wh)
+
+    return [_company_out(c, by_company.get(str(c.id), [])) for c in companies]
 
 
 @router.get("/{company_id}/members", response_model=list[TeamMemberOut])

@@ -71,14 +71,34 @@ export const api = {
       method: "PATCH",
       body: { has_warehouse: hasWarehouse, warehouse_type: warehouseType },
     }),
-  getWarehouseProducts: (companyId) => request(`/companies/${companyId}/warehouse/products`),
-  getWarehouseDashboard: (companyId, period) =>
-    request(`/companies/${companyId}/warehouse/dashboard?period=${period}`),
+  getWarehouses: (companyId) => request(`/companies/${companyId}/warehouse/list`),
+  createWarehouse: (companyId, warehouseType, name = null) =>
+    request(`/companies/${companyId}/warehouse/list`, {
+      method: "POST",
+      body: { warehouse_type: warehouseType, name },
+    }),
+  deleteWarehouse: (companyId, warehouseId) =>
+    request(`/companies/${companyId}/warehouse/list/${warehouseId}`, { method: "DELETE" }),
+  getWarehouseProducts: (companyId, warehouseId = null) =>
+    request(
+      `/companies/${companyId}/warehouse/products${warehouseId ? `?warehouse_id=${warehouseId}` : ""}`
+    ),
+  getWarehouseDashboard: (companyId, period, warehouseId = null) =>
+    request(
+      `/companies/${companyId}/warehouse/dashboard?period=${period}${
+        warehouseId ? `&warehouse_id=${warehouseId}` : ""
+      }`
+    ),
   getWarehouseMarketplace: (companyId) => request(`/companies/${companyId}/warehouse/marketplace`),
-  placeWarehouseOrder: (companyId, sellerCompanyId, productId, quantity) =>
+  placeWarehouseOrder: (companyId, sellerCompanyId, productId, quantity, warehouseId = null) =>
     request(`/companies/${companyId}/warehouse/marketplace/order`, {
       method: "POST",
-      body: { seller_company_id: sellerCompanyId, product_id: productId, quantity },
+      body: {
+        seller_company_id: sellerCompanyId,
+        product_id: productId,
+        quantity,
+        ...(warehouseId ? { warehouse_id: warehouseId } : {}),
+      },
     }),
   getWarehouseOrders: (companyId) => request(`/companies/${companyId}/warehouse/orders`),
   createWarehouseProduct: (companyId, data) =>

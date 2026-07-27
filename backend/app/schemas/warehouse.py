@@ -5,8 +5,27 @@ from pydantic import BaseModel
 
 
 class WarehouseSettingsUpdate(BaseModel):
+    """Legacy single-warehouse toggle — still accepted for backward compat.
+    Prefer POST/DELETE /warehouses for multi-warehouse management."""
+
     has_warehouse: bool
     warehouse_type: str | None = None  # "technology" | "clothing" | "food"
+
+
+class WarehouseCreate(BaseModel):
+    warehouse_type: str  # "technology" | "clothing" | "food"
+    name: str | None = None
+
+
+class WarehouseOut(BaseModel):
+    id: uuid.UUID
+    company_id: uuid.UUID
+    warehouse_type: str
+    name: str | None = None
+    created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
 
 
 class ProductCreate(BaseModel):
@@ -14,6 +33,7 @@ class ProductCreate(BaseModel):
     price: float = 0
     quantity: float = 0
     unit: str = "dona"  # "dona" | "kg" | "litr"
+    warehouse_id: uuid.UUID | None = None
     image_url: str | None = None
     low_stock_threshold: float | None = None
     size: str | None = None
@@ -39,6 +59,8 @@ class ProductUpdate(BaseModel):
 class ProductOut(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
+    warehouse_id: uuid.UUID | None = None
+    warehouse_type: str | None = None
     name: str
     price: float
     quantity: float
@@ -63,6 +85,8 @@ class MarketplaceProductOut(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
     company_name: str
+    warehouse_id: uuid.UUID | None = None
+    warehouse_type: str | None = None
     name: str
     price: float
     quantity: float
@@ -77,6 +101,7 @@ class OrderCreate(BaseModel):
     seller_company_id: uuid.UUID
     product_id: uuid.UUID
     quantity: float
+    warehouse_id: uuid.UUID | None = None  # buyer's target warehouse (optional)
 
 
 class OrderOut(BaseModel):
