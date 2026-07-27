@@ -129,13 +129,7 @@ export default function Landing() {
           </div>
         </div>
 
-        <div className="hero-stage">
-          <div className="hero-ziyo-full">
-            <img src="/ziyo-standing.webp" alt="AI Ziyo — to'liq bo'yli robot" />
-            <span className="hero-ziyo-glow" aria-hidden />
-          </div>
-          <RafiqWidget />
-        </div>
+        <RafiqWidget />
       </section>
 
       <div className="badge-strip">
