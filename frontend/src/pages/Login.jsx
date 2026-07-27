@@ -55,6 +55,7 @@ export default function Login() {
       kicker="Orbit Gate"
       title="Galaktikangizga qayting"
       subtitle="Ziyo kutmoqda — virtual ofis, jamoa va AI bitta stansiyada."
+      visual="widget"
       footer={
         <p className="auth-footer">
           Hisobingiz yo'qmi? <Link to="/register">Ro'yxatdan o'ting</Link>
