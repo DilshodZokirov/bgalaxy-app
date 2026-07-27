@@ -658,7 +658,29 @@ function OrderModal({ product, onClose, onOrdered }) {
   );
 }
 
-function OrderPipelineCard({ order, actions, highlight }) {
+function orderNextHint(order, { isDistributor }) {
+  if (order.status === "cancelled" || order.status === "completed") return null;
+  if (isDistributor) {
+    if (order.status === "awaiting_receipt") {
+      return "Yuk yetib keldi — «Qabul qilish» bo‘limida tasdiqlang.";
+    }
+    if (["ordered", "loading", "loaded", "on_road", "courier_accepted"].includes(order.status)) {
+      return `Keyingi qadam sotuvchi (${order.seller_company_name || "ombor"}) tomonida. Bu yerda faqat kuzatish / bekor qilish mumkin.`;
+    }
+  } else {
+    if (order.status === "ordered") return "Buyurtmani tasdiqlab, yuklashni boshlang.";
+    if (order.status === "loading") return "Yuklovchi yuklashni tasdiqlashi kerak.";
+    if (order.status === "loaded") return "Yuklangan — yo‘lga chiqarishni tasdiqlang.";
+    if (order.status === "on_road") return "Yetkazuvchi arizani qabul qilishi kerak.";
+    if (order.status === "courier_accepted") return "Yetkazuvchi yetib kelganini tasdiqlashi kerak.";
+    if (order.status === "awaiting_receipt") {
+      return `Distributiv (${order.buyer_company_name || "xaridor"}) qabul qilishni kutmoqda.`;
+    }
+  }
+  return null;
+}
+
+function OrderPipelineCard({ order, actions, highlight, nextHint }) {
   const stepIdx = ORDER_STEPS.indexOf(order.status);
   return (
     <article className={`wh-order-card ${highlight ? "is-highlight" : ""}`}>
@@ -674,6 +696,7 @@ function OrderPipelineCard({ order, actions, highlight }) {
           </p>
           {order.courier_name && <p className="wh-hint">Yetkazuvchi: {order.courier_name}</p>}
           {order.status_note && <p className="wh-hint">{order.status_note}</p>}
+          {nextHint && <p className="wh-order-next">{nextHint}</p>}
         </div>
         <span className={`wh-order-status status-${order.status}`}>
           {ORDER_STATUS_LABELS[order.status] || order.status}
@@ -769,7 +792,12 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
     const busy = busyId === order.id;
     const list = [];
     if (!isDistributor && scope === "sales" && canManage && order.status === "ordered") {
-      list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
+      list.push({
+        action: "start_loading",
+        label: "Tasdiqlash — yuklashni boshlash",
+        busy,
+        onClick: () => runAction(order.id, "start_loading"),
+      });
     }
     if (!isDistributor && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
       list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(order.id, "confirm_loaded") });
@@ -832,6 +860,7 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
             key={o.id}
             order={o}
             highlight={focusOrderId && focusOrderId === o.id}
+            nextHint={orderNextHint(o, { isDistributor })}
             actions={actionsFor(o)}
           />
         ))}

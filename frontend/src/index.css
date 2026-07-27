@@ -11031,3 +11031,10 @@ html[data-custom-bg="1"] .galaxy-sky {
   gap: 8px;
   margin-top: 12px;
 }
+
+.wh-order-next {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #7dd3fc;
+}
