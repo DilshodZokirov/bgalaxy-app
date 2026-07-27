@@ -1,12 +1,13 @@
 import uuid as uuid_lib
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.database import get_db
+from app.models.accounting import Transaction
 from app.models.company import Company
 from app.models.user import User
 from app.models.warehouse import StockMovement, Warehouse, WarehouseOrder, WarehouseProduct
@@ -15,6 +16,7 @@ from app.schemas.warehouse import (
     MarketplaceProductOut,
     OrderCreate,
     OrderOut,
+    OrderTransition,
     ProductCreate,
     ProductOut,
     ProductUpdate,
@@ -24,7 +26,13 @@ from app.schemas.warehouse import (
     WarehouseOut,
     WarehouseSettingsUpdate,
 )
-from app.services.permissions import require_any_permission, require_permission
+from app.services.order_pipeline import (
+    ORDER_STATUS_LABELS,
+    available_qty,
+    notify_users,
+    users_with_permission,
+)
+from app.services.permissions import get_permissions, require_any_permission, require_permission
 
 router = APIRouter(prefix="/companies/{company_id}/warehouse", tags=["warehouse"])
 
@@ -35,7 +43,7 @@ WAREHOUSE_TYPE_NAMES = {
     "food": "Oziq-ovqat ombori",
 }
 MAX_WAREHOUSES = 3
-VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi"]
+VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi", "warehouse_loader", "warehouse_courier"]
 
 
 def _day_key(d: date) -> str:
@@ -232,6 +240,8 @@ async def _get_warehouse(
 
 def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) -> ProductOut:
     wh_type = warehouse.warehouse_type if warehouse else None
+    qty = float(product.quantity)
+    reserved = float(getattr(product, "reserved_quantity", 0) or 0)
     return ProductOut(
         id=product.id,
         company_id=product.company_id,
@@ -239,7 +249,9 @@ def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) 
         warehouse_type=wh_type,
         name=product.name,
         price=float(product.price),
-        quantity=float(product.quantity),
+        quantity=qty,
+        reserved_quantity=reserved,
+        available_quantity=max(0.0, qty - reserved),
         unit=product.unit,
         image_url=product.image_url,
         low_stock_threshold=float(product.low_stock_threshold) if product.low_stock_threshold is not None else None,
@@ -253,6 +265,51 @@ def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) 
         created_at=product.created_at,
         updated_at=product.updated_at,
     )
+
+
+async def _order_out(db: AsyncSession, order: WarehouseOrder) -> OrderOut:
+    buyer_name = None
+    seller_name = None
+    courier_name = None
+    buyer = (await db.execute(select(Company).where(Company.id == order.buyer_company_id))).scalar_one_or_none()
+    seller = (await db.execute(select(Company).where(Company.id == order.seller_company_id))).scalar_one_or_none()
+    if buyer:
+        buyer_name = buyer.name
+    if seller:
+        seller_name = seller.name
+    if order.courier_user_id:
+        courier = (await db.execute(select(User).where(User.id == order.courier_user_id))).scalar_one_or_none()
+        if courier:
+            courier_name = courier.full_name
+    return OrderOut(
+        id=order.id,
+        buyer_company_id=order.buyer_company_id,
+        seller_company_id=order.seller_company_id,
+        seller_product_id=order.seller_product_id,
+        buyer_warehouse_id=order.buyer_warehouse_id,
+        product_name=order.product_name,
+        unit=order.unit,
+        quantity=float(order.quantity),
+        unit_price=float(order.unit_price),
+        total_price=float(order.total_price),
+        status=order.status,
+        status_note=order.status_note,
+        ordered_by_user_id=order.ordered_by_user_id,
+        courier_user_id=order.courier_user_id,
+        buyer_company_name=buyer_name,
+        seller_company_name=seller_name,
+        courier_name=courier_name,
+        loaded_at=order.loaded_at,
+        dispatched_at=order.dispatched_at,
+        courier_accepted_at=order.courier_accepted_at,
+        arrived_at=order.arrived_at,
+        completed_at=order.completed_at,
+        created_at=order.created_at,
+    )
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 async def _warehouse_map(db: AsyncSession, company_id: str) -> dict[str, Warehouse]:
@@ -567,6 +624,11 @@ async def delete_product(
     product = result.scalar_one_or_none()
     if product is None:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    if float(getattr(product, "reserved_quantity", 0) or 0) > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Bu mahsulotda band qilingan buyurtmalar bor — o'chirib bo'lmaydi",
+        )
 
     await db.execute(StockMovement.__table__.delete().where(StockMovement.product_id == product_id))
     await db.delete(product)
@@ -597,8 +659,14 @@ async def adjust_stock(
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
     new_quantity = float(product.quantity) + payload.change
+    reserved = float(getattr(product, "reserved_quantity", 0) or 0)
     if new_quantity < 0:
         raise HTTPException(status_code=400, detail="Omborda yetarli mahsulot yo'q")
+    if new_quantity < reserved:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Band qilingan zaxira bor ({reserved}). Chiqim qilish mumkin emas",
+        )
 
     product.quantity = new_quantity
     db.add(
@@ -667,7 +735,11 @@ async def get_warehouse_dashboard(
     sold_query = (
         select(WarehouseOrder.created_at, WarehouseOrder.total_price, WarehouseOrder.quantity)
         .join(WarehouseProduct, WarehouseProduct.id == WarehouseOrder.seller_product_id)
-        .where(WarehouseOrder.seller_company_id == company_id, WarehouseOrder.created_at >= start)
+        .where(
+            WarehouseOrder.seller_company_id == company_id,
+            WarehouseOrder.status == "completed",
+            WarehouseOrder.created_at >= start,
+        )
     )
     if warehouse_id:
         sold_query = sold_query.where(WarehouseProduct.warehouse_id == warehouse_id)
@@ -776,7 +848,8 @@ async def browse_marketplace(
     current_user: User = Depends(get_current_user),
 ):
     """Faqat Distributiv firmalar uchun — boshqa (ishlab chiqaruvchi)
-    kompaniyalarning ombordagi, zaxirasi bor mahsulotlarini ko'rsatadi."""
+    kompaniyalarning ombordagi, zaxirasi bor mahsulotlarini ko'rsatadi.
+    Mavjud miqdor = quantity - reserved (boshqa buyurtmalar band qilgan zaxira)."""
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     buyer = await _get_company(db, company_id)
     if buyer.company_type != "distributor":
@@ -795,6 +868,10 @@ async def browse_marketplace(
     )
     out = []
     for product, company_name, wh_type in result.all():
+        avail = await available_qty(product)
+        if avail <= 0:
+            continue
+        reserved = float(getattr(product, "reserved_quantity", 0) or 0)
         out.append(
             MarketplaceProductOut(
                 id=product.id,
@@ -804,7 +881,8 @@ async def browse_marketplace(
                 warehouse_type=wh_type,
                 name=product.name,
                 price=float(product.price),
-                quantity=float(product.quantity),
+                quantity=avail,
+                reserved_quantity=reserved,
                 unit=product.unit,
                 image_url=product.image_url,
             )
@@ -819,7 +897,8 @@ async def place_marketplace_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Distributiv firma boshqa kompaniyaning omboridan buyurtma beradi."""
+    """Distributiv firma buyurtma beradi — zaxira band qilinadi, omborga
+    o'tkazish va byudjet faqat yetkazib berish yakunlanganda amalga oshadi."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
     if buyer.company_type != "distributor":
@@ -842,7 +921,8 @@ async def place_marketplace_order(
     seller_product = product_result.scalar_one_or_none()
     if seller_product is None:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
-    if float(seller_product.quantity) < payload.quantity:
+    avail = await available_qty(seller_product)
+    if avail < payload.quantity:
         raise HTTPException(status_code=400, detail="Sotuvchida yetarli zaxira yo'q")
 
     target_warehouse: Warehouse | None = None
@@ -859,21 +939,90 @@ async def place_marketplace_order(
         if target_warehouse is None:
             target_warehouse = buyer_warehouses[0]
 
-    seller_product.quantity = float(seller_product.quantity) - payload.quantity
+    seller_product.reserved_quantity = float(getattr(seller_product, "reserved_quantity", 0) or 0) + payload.quantity
+
+    order = WarehouseOrder(
+        id=uuid_lib.uuid4(),
+        buyer_company_id=company_id,
+        seller_company_id=seller.id,
+        seller_product_id=seller_product.id,
+        buyer_warehouse_id=target_warehouse.id,
+        product_name=seller_product.name,
+        unit=seller_product.unit,
+        quantity=payload.quantity,
+        unit_price=float(seller_product.price),
+        total_price=float(seller_product.price) * payload.quantity,
+        status="ordered",
+        ordered_by_user_id=current_user.id,
+    )
+    db.add(order)
+    await db.flush()
+
+    seller_notify = await users_with_permission(db, seller.id, "manage_warehouse")
+    await notify_users(
+        db,
+        user_ids=seller_notify,
+        ntype="warehouse_order",
+        message=(
+            f"Yangi buyurtma: {buyer.name} — {seller_product.name} "
+            f"× {payload.quantity} {seller_product.unit} ({ORDER_STATUS_LABELS['ordered']})"
+        ),
+        company_id=seller.id,
+        invite_token=str(order.id),
+        related_user_id=current_user.id,
+    )
+
+    await db.commit()
+    await db.refresh(order)
+    return await _order_out(db, order)
+
+
+async def _complete_order(
+    db: AsyncSession,
+    order: WarehouseOrder,
+    *,
+    actor: User,
+    buyer: Company,
+    seller: Company,
+) -> None:
+    """Finalize stock transfer + seller income after distributor confirms receipt."""
+    product_result = await db.execute(
+        select(WarehouseProduct).where(WarehouseProduct.id == order.seller_product_id)
+    )
+    seller_product = product_result.scalar_one_or_none()
+    if seller_product is None:
+        raise HTTPException(status_code=404, detail="Sotuvchi mahsuloti topilmadi")
+
+    qty = float(order.quantity)
+    reserved = float(getattr(seller_product, "reserved_quantity", 0) or 0)
+    if reserved < qty:
+        raise HTTPException(status_code=400, detail="Band qilingan zaxira yetarli emas")
+    if float(seller_product.quantity) < qty:
+        raise HTTPException(status_code=400, detail="Sotuvchi omborida mahsulot yetarli emas")
+
+    seller_product.reserved_quantity = reserved - qty
+    seller_product.quantity = float(seller_product.quantity) - qty
     db.add(
         StockMovement(
             id=uuid_lib.uuid4(),
             product_id=seller_product.id,
-            user_id=current_user.id,
-            change=-payload.quantity,
-            note=f"Sotildi — {buyer.name} (Distributiv)",
+            user_id=actor.id,
+            change=-qty,
+            note=f"Sotildi — {buyer.name} (Distributiv, yetkazildi)",
         )
     )
 
+    target_wh_id = order.buyer_warehouse_id
+    if target_wh_id is None:
+        buyer_warehouses = await _list_warehouses(db, str(buyer.id))
+        if not buyer_warehouses:
+            raise HTTPException(status_code=400, detail="Xaridor ombori topilmadi")
+        target_wh_id = buyer_warehouses[0].id
+
     existing_result = await db.execute(
         select(WarehouseProduct).where(
-            WarehouseProduct.company_id == company_id,
-            WarehouseProduct.warehouse_id == target_warehouse.id,
+            WarehouseProduct.company_id == buyer.id,
+            WarehouseProduct.warehouse_id == target_wh_id,
             func.lower(WarehouseProduct.name) == seller_product.name.strip().lower(),
             WarehouseProduct.unit == seller_product.unit,
             WarehouseProduct.source_company_id == seller.id,
@@ -881,19 +1030,23 @@ async def place_marketplace_order(
     )
     buyer_product = existing_result.scalar_one_or_none()
     if buyer_product is not None:
-        buyer_product.quantity = float(buyer_product.quantity) + payload.quantity
+        buyer_product.quantity = float(buyer_product.quantity) + qty
     else:
         buyer_product = WarehouseProduct(
             id=uuid_lib.uuid4(),
-            company_id=company_id,
-            warehouse_id=target_warehouse.id,
+            company_id=buyer.id,
+            warehouse_id=target_wh_id,
             name=seller_product.name,
             price=seller_product.price,
-            quantity=payload.quantity,
+            quantity=qty,
             unit=seller_product.unit,
             image_url=seller_product.image_url,
             source_company_id=seller.id,
             source_company_name=seller.name,
+            size=seller_product.size,
+            color=seller_product.color,
+            expiry_date=seller_product.expiry_date,
+            sku=seller_product.sku,
         )
         db.add(buyer_product)
     await db.flush()
@@ -901,42 +1054,327 @@ async def place_marketplace_order(
         StockMovement(
             id=uuid_lib.uuid4(),
             product_id=buyer_product.id,
-            user_id=current_user.id,
-            change=payload.quantity,
-            note=f"Sotib olindi — {seller.name}",
+            user_id=actor.id,
+            change=qty,
+            note=f"Sotib olindi — {seller.name} (qabul qilindi)",
         )
     )
 
-    order = WarehouseOrder(
-        id=uuid_lib.uuid4(),
-        buyer_company_id=company_id,
-        seller_company_id=seller.id,
-        seller_product_id=seller_product.id,
-        product_name=seller_product.name,
-        unit=seller_product.unit,
-        quantity=payload.quantity,
-        unit_price=float(seller_product.price),
-        total_price=float(seller_product.price) * payload.quantity,
-        ordered_by_user_id=current_user.id,
+    db.add(
+        Transaction(
+            id=uuid_lib.uuid4(),
+            company_id=seller.id,
+            type="income",
+            category="Ombor sotuv",
+            amount=float(order.total_price),
+            description=(
+                f"Yetkazib berildi: {order.product_name} × {qty} {order.unit} — {buyer.name}"
+            ),
+            occurred_on=date.today(),
+            created_by=actor.id,
+        )
     )
-    db.add(order)
 
-    await db.commit()
-    await db.refresh(order)
-    return order
+    order.status = "completed"
+    order.completed_at = _utcnow()
+    order.status_note = "Mahsulot qabul qilindi va omborga qo'shildi"
+
+
+async def _cancel_order(db: AsyncSession, order: WarehouseOrder) -> None:
+    if order.status not in {"ordered", "loading"}:
+        raise HTTPException(status_code=400, detail="Bu bosqichda bekor qilib bo'lmaydi")
+    product = (
+        await db.execute(select(WarehouseProduct).where(WarehouseProduct.id == order.seller_product_id))
+    ).scalar_one_or_none()
+    if product is not None:
+        reserved = float(getattr(product, "reserved_quantity", 0) or 0)
+        product.reserved_quantity = max(0.0, reserved - float(order.quantity))
+    order.status = "cancelled"
+    order.status_note = "Buyurtma bekor qilindi"
+    order.completed_at = _utcnow()
 
 
 @router.get("/orders", response_model=list[OrderOut])
 async def list_orders(
     company_id: str,
+    scope: str = Query(default="auto"),
+    status: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Shu kompaniya XARIDOR sifatida bergan barcha buyurtmalar tarixi."""
+    """Buyurtmalar ro'yxati.
+
+    scope:
+      - purchases — distributor (xaridor) buyurtmalari
+      - sales — ishlab chiqaruvchi ombor kuzatuvi
+      - loader — yuklash navbati (loading)
+      - courier — yo'ldagi / yetkazib beruvchi arizalari
+      - receipt — qabul qilish kutilayotganlar
+      - auto — kompaniya turiga qarab (distributor→purchases, else→sales)
+    """
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
-    result = await db.execute(
-        select(WarehouseOrder)
-        .where(WarehouseOrder.buyer_company_id == company_id)
-        .order_by(WarehouseOrder.created_at.desc())
-    )
-    return result.scalars().all()
+    company = await _get_company(db, company_id)
+    perms = await get_permissions(db, company_id, current_user.id)
+
+    resolved = scope
+    if scope == "auto":
+        resolved = "purchases" if company.company_type == "distributor" else "sales"
+
+    query = select(WarehouseOrder)
+    if resolved == "purchases":
+        query = query.where(WarehouseOrder.buyer_company_id == company_id)
+    elif resolved == "sales":
+        await require_any_permission(
+            db, company_id, current_user.id, ["manage_warehouse", "ombor_ishchi", "warehouse_loader"]
+        )
+        query = query.where(WarehouseOrder.seller_company_id == company_id)
+    elif resolved == "loader":
+        await require_any_permission(
+            db, company_id, current_user.id, ["warehouse_loader", "manage_warehouse"]
+        )
+        query = query.where(
+            WarehouseOrder.seller_company_id == company_id,
+            WarehouseOrder.status == "loading",
+        )
+    elif resolved == "courier":
+        await require_any_permission(
+            db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
+        )
+        # Couriers see open road jobs + ones they already accepted
+        query = query.where(
+            WarehouseOrder.seller_company_id == company_id,
+            or_(
+                WarehouseOrder.status == "on_road",
+                WarehouseOrder.status.in_(["courier_accepted", "awaiting_receipt"]),
+            ),
+        )
+        # Non-managers only see unclaimed or their own accepted jobs
+        if not perms["is_owner"] and not perms["permissions"].get("manage_warehouse"):
+            query = query.where(
+                or_(
+                    WarehouseOrder.courier_user_id.is_(None),
+                    WarehouseOrder.courier_user_id == current_user.id,
+                )
+            )
+    elif resolved == "receipt":
+        await require_any_permission(
+            db, company_id, current_user.id, ["manage_warehouse", "ombor_ishchi"]
+        )
+        query = query.where(
+            WarehouseOrder.buyer_company_id == company_id,
+            WarehouseOrder.status == "awaiting_receipt",
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Noto'g'ri scope")
+
+    if status:
+        query = query.where(WarehouseOrder.status == status)
+
+    result = await db.execute(query.order_by(WarehouseOrder.created_at.desc()))
+    orders = list(result.scalars().all())
+    return [await _order_out(db, o) for o in orders]
+
+
+@router.get("/orders/{order_id}", response_model=OrderOut)
+async def get_order(
+    company_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
+    order = (
+        await db.execute(select(WarehouseOrder).where(WarehouseOrder.id == order_id))
+    ).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+    if str(order.buyer_company_id) != company_id and str(order.seller_company_id) != company_id:
+        raise HTTPException(status_code=403, detail="Bu buyurtmaga ruxsat yo'q")
+    return await _order_out(db, order)
+
+
+@router.post("/orders/{order_id}/transition", response_model=OrderOut)
+async def transition_order(
+    company_id: str,
+    order_id: str,
+    payload: OrderTransition,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Buyurtma bosqichini o'tkazish."""
+    order = (
+        await db.execute(select(WarehouseOrder).where(WarehouseOrder.id == order_id))
+    ).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+
+    buyer = await _get_company(db, str(order.buyer_company_id))
+    seller = await _get_company(db, str(order.seller_company_id))
+    action = payload.action.strip().lower()
+    now = _utcnow()
+
+    if action == "cancel":
+        if str(company_id) not in {str(order.buyer_company_id), str(order.seller_company_id)}:
+            raise HTTPException(status_code=403, detail="Bu amal uchun ruxsat yo'q")
+        await require_permission(db, company_id, current_user.id, "manage_warehouse")
+        await _cancel_order(db, order)
+        notify_ids = await users_with_permission(db, order.buyer_company_id, "manage_warehouse")
+        notify_ids += await users_with_permission(db, order.seller_company_id, "manage_warehouse")
+        await notify_users(
+            db,
+            user_ids=notify_ids,
+            ntype="warehouse_order",
+            message=f"Buyurtma bekor qilindi: {order.product_name}",
+            company_id=company_id,
+            invite_token=str(order.id),
+        )
+        await db.commit()
+        await db.refresh(order)
+        return await _order_out(db, order)
+
+    if action == "start_loading":
+        if str(company_id) != str(order.seller_company_id):
+            raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
+        await require_permission(db, company_id, current_user.id, "manage_warehouse")
+        if order.status != "ordered":
+            raise HTTPException(status_code=400, detail="Buyurtma 'Buyurtma qilindi' holatida emas")
+        order.status = "loading"
+        order.status_note = payload.note or "Yuklash boshlandi"
+        loader_ids = await users_with_permission(db, seller.id, "warehouse_loader")
+        await notify_users(
+            db,
+            user_ids=loader_ids,
+            ntype="warehouse_order",
+            message=f"Yuklash: {order.product_name} → {buyer.name} ({order.quantity} {order.unit})",
+            company_id=seller.id,
+            invite_token=str(order.id),
+        )
+
+    elif action == "confirm_loaded":
+        if str(company_id) != str(order.seller_company_id):
+            raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
+        await require_any_permission(
+            db, company_id, current_user.id, ["warehouse_loader", "manage_warehouse"]
+        )
+        if order.status != "loading":
+            raise HTTPException(status_code=400, detail="Buyurtma yuklash holatida emas")
+        order.status = "loaded"
+        order.loaded_at = now
+        order.status_note = payload.note or "Yuklandi"
+        mgr_ids = await users_with_permission(db, seller.id, "manage_warehouse")
+        await notify_users(
+            db,
+            user_ids=mgr_ids,
+            ntype="warehouse_order",
+            message=f"Yuklandi — yo'lga chiqarish mumkin: {order.product_name} → {buyer.name}",
+            company_id=seller.id,
+            invite_token=str(order.id),
+        )
+
+    elif action == "dispatch":
+        if str(company_id) != str(order.seller_company_id):
+            raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
+        await require_permission(db, company_id, current_user.id, "manage_warehouse")
+        if order.status != "loaded":
+            raise HTTPException(status_code=400, detail="Avval yuklashni tasdiqlang")
+        order.status = "on_road"
+        order.dispatched_at = now
+        order.status_note = payload.note or "Yo'lga chiqarildi"
+        courier_ids = await users_with_permission(db, seller.id, "warehouse_courier")
+        await notify_users(
+            db,
+            user_ids=courier_ids,
+            ntype="warehouse_order",
+            message=f"Yo'lda ariza: {order.product_name} → {buyer.name} ({order.quantity} {order.unit})",
+            company_id=seller.id,
+            invite_token=str(order.id),
+        )
+        buyer_ids = await users_with_permission(db, buyer.id, "manage_warehouse")
+        await notify_users(
+            db,
+            user_ids=buyer_ids,
+            ntype="warehouse_order",
+            message=f"Buyurtmangiz yo'lda: {order.product_name} ({seller.name})",
+            company_id=buyer.id,
+            invite_token=str(order.id),
+        )
+
+    elif action == "accept_courier":
+        if str(company_id) != str(order.seller_company_id):
+            raise HTTPException(status_code=403, detail="Faqat sotuvchi kompaniya yetkazuvchilari")
+        await require_any_permission(
+            db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
+        )
+        if order.status != "on_road":
+            raise HTTPException(status_code=400, detail="Buyurtma yo'lda emas")
+        if order.courier_user_id and str(order.courier_user_id) != str(current_user.id):
+            raise HTTPException(status_code=400, detail="Bu arizani boshqa yetkazuvchi olgan")
+        order.status = "courier_accepted"
+        order.courier_user_id = current_user.id
+        order.courier_accepted_at = now
+        order.status_note = payload.note or f"Yetkazuvchi: {current_user.full_name}"
+
+    elif action == "confirm_arrival":
+        if str(company_id) != str(order.seller_company_id):
+            raise HTTPException(status_code=403, detail="Faqat sotuvchi kompaniya yetkazuvchilari")
+        await require_any_permission(
+            db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
+        )
+        if order.status != "courier_accepted":
+            raise HTTPException(status_code=400, detail="Avval arizani qabul qiling")
+        if order.courier_user_id and str(order.courier_user_id) != str(current_user.id):
+            perms = await get_permissions(db, company_id, current_user.id)
+            if not perms["is_owner"] and not perms["permissions"].get("manage_warehouse"):
+                raise HTTPException(status_code=403, detail="Faqat o'z arizangizni tasdiqlashingiz mumkin")
+        order.status = "awaiting_receipt"
+        order.arrived_at = now
+        order.status_note = payload.note or "Korxonaga yetib keldi — qabul qilish kutilmoqda"
+        receipt_ids = await users_with_permission(db, buyer.id, "manage_warehouse")
+        await notify_users(
+            db,
+            user_ids=receipt_ids,
+            ntype="warehouse_receipt",
+            message=(
+                f"Qabul qilish: {order.product_name} × {order.quantity} {order.unit} "
+                f"({seller.name}) — tekshirish bo'limiga o'ting"
+            ),
+            company_id=buyer.id,
+            invite_token=str(order.id),
+        )
+
+    elif action == "confirm_receipt":
+        if str(company_id) != str(order.buyer_company_id):
+            raise HTTPException(status_code=403, detail="Faqat xaridor (distributiv) tasdiqlaydi")
+        await require_permission(db, company_id, current_user.id, "manage_warehouse")
+        if order.status != "awaiting_receipt":
+            raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
+        await _complete_order(db, order, actor=current_user, buyer=buyer, seller=seller)
+        seller_ids = await users_with_permission(db, seller.id, "manage_warehouse")
+        seller_ids += await users_with_permission(db, seller.id, "manage_accounting")
+        await notify_users(
+            db,
+            user_ids=seller_ids,
+            ntype="warehouse_order",
+            message=(
+                f"Muvaffaqiyatli sotildi va yetkazildi: {order.product_name} × {order.quantity} "
+                f"{order.unit} — {buyer.name}. Byudjetga +{float(order.total_price):,.0f} so'm"
+            ),
+            company_id=seller.id,
+            invite_token=str(order.id),
+        )
+        buyer_ids = await users_with_permission(db, buyer.id, "manage_warehouse")
+        await notify_users(
+            db,
+            user_ids=buyer_ids,
+            ntype="warehouse_order",
+            message=f"Mahsulot omboringizga qo'shildi: {order.product_name} × {order.quantity} {order.unit}",
+            company_id=buyer.id,
+            invite_token=str(order.id),
+        )
+
+    else:
+        raise HTTPException(status_code=400, detail="Noto'g'ri amal")
+
+    await db.commit()
+    await db.refresh(order)
+    return await _order_out(db, order)

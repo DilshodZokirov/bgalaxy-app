@@ -36,6 +36,8 @@ class WarehouseProduct(Base):
     name: Mapped[str] = mapped_column(String(255))
     price: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
+    # Marketplace orders reserve stock without deducting until delivery completes.
+    reserved_quantity: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
     unit: Mapped[str] = mapped_column(String(10), default="dona")  # "dona" | "kg" | "litr"
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     low_stock_threshold: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
@@ -57,10 +59,12 @@ class WarehouseProduct(Base):
 
 
 class WarehouseOrder(Base):
-    """A distributor buying stock straight out of a manufacturer's (kompaniya)
-    warehouse. Fulfilling one deducts from the seller's product and adds a
-    source-tagged product (or tops up an existing one) in the buyer's own
-    warehouse — see warehouse.py's /marketplace/order endpoint."""
+    """Distributor marketplace order with multi-stage fulfillment.
+
+    On place: seller stock is reserved (not deducted). On complete: seller
+    stock is finalized, buyer warehouse is credited, seller accounting
+    income is recorded. See warehouse routes order pipeline.
+    """
 
     __tablename__ = "warehouse_orders"
 
@@ -68,12 +72,26 @@ class WarehouseOrder(Base):
     buyer_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
     seller_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
     seller_product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("warehouse_products.id"))
+    buyer_warehouse_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("warehouses.id"), nullable=True
+    )
     product_name: Mapped[str] = mapped_column(String(255))
     unit: Mapped[str] = mapped_column(String(10))
     quantity: Mapped[float] = mapped_column(Numeric(12, 3))
     unit_price: Mapped[float] = mapped_column(Numeric(14, 2))
     total_price: Mapped[float] = mapped_column(Numeric(14, 2))
+    # ordered | loading | loaded | on_road | courier_accepted | awaiting_receipt | completed | cancelled
+    status: Mapped[str] = mapped_column(String(30), default="ordered", index=True)
+    status_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ordered_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    courier_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    loaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    courier_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    arrived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

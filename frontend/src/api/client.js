@@ -100,7 +100,19 @@ export const api = {
         ...(warehouseId ? { warehouse_id: warehouseId } : {}),
       },
     }),
-  getWarehouseOrders: (companyId) => request(`/companies/${companyId}/warehouse/orders`),
+  getWarehouseOrders: (companyId, scope = "auto", status = null) =>
+    request(
+      `/companies/${companyId}/warehouse/orders?scope=${encodeURIComponent(scope)}${
+        status ? `&status=${encodeURIComponent(status)}` : ""
+      }`
+    ),
+  getWarehouseOrder: (companyId, orderId) =>
+    request(`/companies/${companyId}/warehouse/orders/${orderId}`),
+  transitionWarehouseOrder: (companyId, orderId, action, note = null) =>
+    request(`/companies/${companyId}/warehouse/orders/${orderId}/transition`, {
+      method: "POST",
+      body: { action, ...(note ? { note } : {}) },
+    }),
   createWarehouseProduct: (companyId, data) =>
     request(`/companies/${companyId}/warehouse/products`, { method: "POST", body: data }),
   updateWarehouseProduct: (companyId, productId, data) =>

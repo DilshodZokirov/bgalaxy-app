@@ -64,6 +64,8 @@ class ProductOut(BaseModel):
     name: str
     price: float
     quantity: float
+    reserved_quantity: float = 0
+    available_quantity: float | None = None
     unit: str
     image_url: str | None = None
     low_stock_threshold: float | None = None
@@ -89,7 +91,8 @@ class MarketplaceProductOut(BaseModel):
     warehouse_type: str | None = None
     name: str
     price: float
-    quantity: float
+    quantity: float  # available for sale (quantity - reserved)
+    reserved_quantity: float = 0
     unit: str
     image_url: str | None = None
 
@@ -104,16 +107,34 @@ class OrderCreate(BaseModel):
     warehouse_id: uuid.UUID | None = None  # buyer's target warehouse (optional)
 
 
+class OrderTransition(BaseModel):
+    action: str  # start_loading | confirm_loaded | dispatch | accept_courier | confirm_arrival | confirm_receipt | cancel
+    note: str | None = None
+
+
 class OrderOut(BaseModel):
     id: uuid.UUID
     buyer_company_id: uuid.UUID
     seller_company_id: uuid.UUID
     seller_product_id: uuid.UUID
+    buyer_warehouse_id: uuid.UUID | None = None
     product_name: str
     unit: str
     quantity: float
     unit_price: float
     total_price: float
+    status: str
+    status_note: str | None = None
+    ordered_by_user_id: uuid.UUID | None = None
+    courier_user_id: uuid.UUID | None = None
+    buyer_company_name: str | None = None
+    seller_company_name: str | None = None
+    courier_name: str | None = None
+    loaded_at: datetime | None = None
+    dispatched_at: datetime | None = None
+    courier_accepted_at: datetime | None = None
+    arrived_at: datetime | None = None
+    completed_at: datetime | None = None
     created_at: datetime
 
     class Config:
