@@ -35,7 +35,7 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
         setCompanies(list);
         const id = getActiveCompanyId() || list[0]?.id;
         const active = list.find((c) => c.id === id) || list[0];
-        setHasWarehouse(!!active?.has_warehouse);
+        setHasWarehouse(!!active?.has_warehouse || (active?.warehouses?.length > 0));
       })
       .catch(() => {});
   }, []);
