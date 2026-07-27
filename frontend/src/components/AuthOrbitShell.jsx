@@ -3,8 +3,7 @@ import Logo from "./Logo";
 import RafiqWidget from "./RafiqWidget";
 
 /**
- * Fantastical split auth layout: brand outside the form card.
- * `visual="widget"` shows the same landing AI Ziyo chat bot.
+ * Fantastical split auth layout: brand outside + small AI Ziyo chat widget.
  */
 export default function AuthOrbitShell({
   kicker = "Business Galaxy",
@@ -12,7 +11,6 @@ export default function AuthOrbitShell({
   subtitle,
   children,
   footer,
-  visual = "robot",
 }) {
   return (
     <div className="auth-orbit">
@@ -31,16 +29,9 @@ export default function AuthOrbitShell({
           <p className="auth-orbit-kicker">{kicker}</p>
           <h1>{title}</h1>
           <p>{subtitle}</p>
-          {visual === "widget" ? (
-            <div className="auth-orbit-widget">
-              <RafiqWidget />
-            </div>
-          ) : (
-            <div className="auth-orbit-robot-wrap">
-              <img src="/ziyo-standing.webp" alt="AI Ziyo" className="auth-orbit-robot" />
-              <span className="auth-orbit-robot-glow" aria-hidden />
-            </div>
-          )}
+          <div className="auth-orbit-widget">
+            <RafiqWidget />
+          </div>
         </aside>
 
         <section className="auth-orbit-panel">
