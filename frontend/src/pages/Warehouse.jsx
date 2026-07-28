@@ -686,13 +686,28 @@ function groupOrdersByBatch(orders) {
   return groups;
 }
 
+/** Furthest-behind line drives status/actions so lagging cart items are not hidden. */
+function furthestBehindLine(lines) {
+  const active = lines.filter((o) => o.status !== "cancelled");
+  const pool = active.length ? active : lines;
+  return pool.reduce((a, b) => {
+    const ia = ORDER_STEPS.indexOf(a.status);
+    const ib = ORDER_STEPS.indexOf(b.status);
+    const sa = ia < 0 ? 99 : ia;
+    const sb = ib < 0 ? 99 : ib;
+    return sa <= sb ? a : b;
+  });
+}
+
 function OrderPipelineCard({ orders, actions, highlight }) {
   const lines = Array.isArray(orders) ? orders : [orders];
   const primary = lines[0];
   if (!primary) return null;
+  const statusLine = furthestBehindLine(lines);
   const isBatch = lines.length > 1 || !!primary.batch_id;
   const total = lines.reduce((s, o) => s + Number(o.total_price || 0), 0);
-  const stepIdx = ORDER_STEPS.indexOf(primary.status);
+  const stepIdx = ORDER_STEPS.indexOf(statusLine.status);
+  const mixed = lines.some((o) => o.status !== statusLine.status && o.status !== "cancelled");
   return (
     <article className={`wh-order-card ${highlight ? "is-highlight" : ""}`}>
       <div className="wh-order-top">
@@ -704,7 +719,12 @@ function OrderPipelineCard({ orders, actions, highlight }) {
             <ul className="wh-order-lines">
               {lines.map((o) => (
                 <li key={o.id}>
-                  <span>{o.product_name}</span>
+                  <span>
+                    {o.product_name}
+                    {o.status !== statusLine.status && (
+                      <em className="wh-line-status"> · {ORDER_STATUS_LABELS[o.status] || o.status}</em>
+                    )}
+                  </span>
                   <span>
                     {o.quantity} {UNIT_LABELS[o.unit] || o.unit} · {money(o.total_price)}
                   </span>
@@ -718,19 +738,20 @@ function OrderPipelineCard({ orders, actions, highlight }) {
           )}
           <p className="wh-hint">
             Jami: <strong>{money(total)}</strong>
+            {mixed && <em> · baʼzi mahsulotlar hali orqada</em>}
           </p>
           <p className="wh-hint">
             {primary.buyer_company_name && <>Xaridor: <strong>{primary.buyer_company_name}</strong> · </>}
             {primary.seller_company_name && <>Sotuvchi: <strong>{primary.seller_company_name}</strong></>}
           </p>
-          {primary.courier_name && <p className="wh-hint">Yetkazuvchi: {primary.courier_name}</p>}
-          {primary.status_note && <p className="wh-hint">{primary.status_note}</p>}
+          {statusLine.courier_name && <p className="wh-hint">Yetkazuvchi: {statusLine.courier_name}</p>}
+          {statusLine.status_note && <p className="wh-hint">{statusLine.status_note}</p>}
         </div>
-        <span className={`wh-order-status status-${primary.status}`}>
-          {ORDER_STATUS_LABELS[primary.status] || primary.status}
+        <span className={`wh-order-status status-${statusLine.status}`}>
+          {ORDER_STATUS_LABELS[statusLine.status] || statusLine.status}
         </span>
       </div>
-      {primary.status !== "cancelled" && (
+      {statusLine.status !== "cancelled" && (
         <div className="wh-order-steps" aria-hidden>
           {ORDER_STEPS.map((s, i) => (
             <span key={s} className={stepIdx >= i ? "done" : ""} title={ORDER_STATUS_LABELS[s]} />
@@ -981,33 +1002,36 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
   }
 
   function actionsFor(lines) {
-    const order = lines[0];
-    const busy = lines.some((o) => busyId === o.id) || busyId === order?.batch_id;
+    const statusLine = furthestBehindLine(lines);
+    const busy = lines.some((o) => busyId === o.id) || busyId === statusLine?.batch_id;
     const list = [];
-    if (canSell && scope === "sales" && canManage && order.status === "ordered") {
-      list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
+    // Always act on a line that is actually at the actionable status
+    const idFor = (status) => (lines.find((o) => o.status === status) || statusLine).id;
+
+    if (canSell && scope === "sales" && canManage && statusLine.status === "ordered") {
+      list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(idFor("ordered"), "start_loading") });
     }
-    if (canSell && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
-      list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(order.id, "confirm_loaded") });
+    if (canSell && (scope === "loader" || scope === "sales") && canLoad && (statusLine.status === "loading" || lines.some((o) => o.status === "ordered"))) {
+      list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(idFor("loading") || idFor("ordered"), "confirm_loaded") });
     }
-    if (canSell && scope === "sales" && canManage && order.status === "loaded") {
-      list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(order.id, "dispatch") });
+    if (canSell && scope === "sales" && canManage && statusLine.status === "loaded") {
+      list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(idFor("loaded"), "dispatch") });
     }
-    if (canSell && scope === "courier" && canCourier && order.status === "on_road") {
-      list.push({ action: "accept_courier", label: "Arizani qabul qilish", busy, onClick: () => runAction(order.id, "accept_courier") });
+    if (canSell && scope === "courier" && canCourier && statusLine.status === "on_road") {
+      list.push({ action: "accept_courier", label: "Arizani qabul qilish", busy, onClick: () => runAction(idFor("on_road"), "accept_courier") });
     }
-    if (canSell && scope === "courier" && canCourier && order.status === "courier_accepted") {
-      list.push({ action: "confirm_arrival", label: "Yetib keldim", busy, onClick: () => runAction(order.id, "confirm_arrival") });
+    if (canSell && scope === "courier" && canCourier && statusLine.status === "courier_accepted") {
+      list.push({ action: "confirm_arrival", label: "Yetib keldim", busy, onClick: () => runAction(idFor("courier_accepted"), "confirm_arrival") });
     }
-    if (isPurchaseBuyer && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
+    if (isPurchaseBuyer && (scope === "receipt" || scope === "purchases") && canManage && statusLine.status === "awaiting_receipt") {
       list.push({
         action: "confirm_receipt",
         label: "Checklist / Tasdiqlash",
         busy,
-        onClick: () => openReceiptChecklist(order),
+        onClick: () => openReceiptChecklist(statusLine),
       });
     }
-    if (canManage && (order.status === "ordered" || order.status === "loading")) {
+    if (canManage && lines.some((o) => o.status === "ordered" || o.status === "loading")) {
       list.push({
         action: "cancel",
         label: "Bekor qilish",
@@ -1018,7 +1042,7 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
             ? `Savatchadagi ${lines.length} ta mahsulot bekor qilinsinmi? Band zaxira qaytariladi.`
             : "Buyurtmani bekor qilasizmi? Band zaxira qaytariladi.";
           if (window.confirm(msg)) {
-            runAction(order.id, "cancel");
+            runAction(idFor("ordered") || idFor("loading"), "cancel");
           }
         },
       });

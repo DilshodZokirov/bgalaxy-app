@@ -164,7 +164,12 @@ export function MarketplaceTab({ company, onOrdered, onGoToOrders }) {
           throw new Error("Har bir mahsulot uchun miqdor kiriting");
         }
       }
-      await api.placeWarehouseCartOrder(company.id, cartSellerId, items);
+      const created = await api.placeWarehouseCartOrder(company.id, cartSellerId, items);
+      if (!Array.isArray(created) || created.length !== items.length) {
+        throw new Error(
+          `Savatchadan faqat ${Array.isArray(created) ? created.length : 0}/${items.length} ta mahsulot buyurtma qilindi. Qayta urinib ko‘ring.`
+        );
+      }
       setCart([]);
       setCartSellerId(null);
       setShowCart(false);

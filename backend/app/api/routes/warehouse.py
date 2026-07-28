@@ -1247,7 +1247,13 @@ async def place_cart_order(
         related_user_id=current_user.id,
     )
     await db.commit()
-    return [await _order_out(db, o) for o in orders]
+    if len(orders) != len(payload.items):
+        raise HTTPException(status_code=500, detail="Savatcha buyurtmasi to'liq yaratilmadi")
+    out = []
+    for o in orders:
+        await db.refresh(o)
+        out.append(await _order_out(db, o))
+    return out
 
 
 @router.post("/products/{product_id}/list-marketplace", response_model=ProductOut)
@@ -1616,22 +1622,47 @@ async def _batch_lines(
     *,
     status: str | None = None,
 ) -> list[WarehouseOrder]:
-    """Return cart siblings sharing batch_id (or just the order)."""
+    """Return cart siblings sharing batch_id (or just the order).
+
+    When ``status`` is set, only lines in that status are returned — never
+    fall back to a line that does not match (that previously hid lagging
+    siblings and completed only one product from a cart).
+    """
     if order.batch_id is None:
-        return [order]
+        if status is None or order.status == status:
+            return [order]
+        return []
     query = select(WarehouseOrder).where(WarehouseOrder.batch_id == order.batch_id)
     if status is not None:
         query = query.where(WarehouseOrder.status == status)
-    lines = list((await db.execute(query)).scalars().all())
-    return lines or [order]
+    return list((await db.execute(query)).scalars().all())
 
 
 def _batch_label(lines: list[WarehouseOrder]) -> str:
+    if not lines:
+        return "Savatcha"
     if len(lines) == 1:
         return f"{lines[0].product_name} × {lines[0].quantity} {lines[0].unit}"
     names = ", ".join(f"{o.product_name}" for o in lines[:3])
     extra = f" (+{len(lines) - 3})" if len(lines) > 3 else ""
     return f"Savatcha ({len(lines)} ta): {names}{extra}"
+
+
+def _earliest_pipeline_status(lines: list[WarehouseOrder]) -> str | None:
+    """Furthest-behind non-cancelled status in a cart batch."""
+    steps = [
+        "ordered",
+        "loading",
+        "loaded",
+        "on_road",
+        "courier_accepted",
+        "awaiting_receipt",
+        "completed",
+    ]
+    active = [o for o in lines if o.status != "cancelled"]
+    if not active:
+        return lines[0].status if lines else None
+    return min(active, key=lambda o: steps.index(o.status) if o.status in steps else 99).status
 
 
 @router.post("/orders/{order_id}/transition", response_model=OrderOut)
@@ -1704,6 +1735,13 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_loader", "manage_warehouse"]
         )
+        # Catch siblings still stuck at "ordered" (legacy desync) then load all
+        lagging = await _batch_lines(db, order, status="ordered")
+        for line in lagging:
+            line.status = "loading"
+            line.status_note = payload.note or "Yuklash boshlandi"
+        if lagging:
+            await db.flush()
         lines = await _batch_lines(db, order, status="loading")
         if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma yuklash holatida emas")
@@ -1802,14 +1840,33 @@ async def transition_order(
         if str(company_id) != str(order.buyer_company_id):
             raise HTTPException(status_code=403, detail="Faqat xaridor tasdiqlaydi")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        if order.status != "awaiting_receipt":
-            raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
 
         to_complete = await _batch_lines(db, order, status="awaiting_receipt")
+        if not to_complete:
+            raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
+
+        # Block if other cart lines are still in transit
+        if order.batch_id is not None:
+            all_lines = await _batch_lines(db, order)
+            stuck = [
+                o
+                for o in all_lines
+                if o.status not in {"awaiting_receipt", "completed", "cancelled"}
+            ]
+            if stuck:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Savatchada hali yo'lda/yuklanayotgan mahsulotlar bor "
+                        f"({_batch_label(stuck)}). Avval ularni yetkazib bering."
+                    ),
+                )
+
         total_amount = 0.0
         for line in to_complete:
             await _complete_order(db, line, actor=current_user, buyer=buyer, seller=seller)
             total_amount += float(line.total_price)
+            await db.flush()
 
         seller_ids = await users_with_permission(db, seller.id, "manage_warehouse")
         seller_ids += await users_with_permission(db, seller.id, "manage_accounting")
