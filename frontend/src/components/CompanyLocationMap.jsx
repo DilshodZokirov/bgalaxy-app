@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import { api } from "../api/client";
 
 // Vite breaks Leaflet's default icon URLs — pin them explicitly.
 delete L.Icon.Default.prototype._getIconUrl;
@@ -36,13 +37,8 @@ const REGION_COORDS = {
 
 async function reverseLabel(lat, lng) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=uz`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.display_name || null;
+    const place = await api.geoReverse(lat, lng);
+    return place?.label || null;
   } catch {
     return null;
   }
@@ -51,15 +47,11 @@ async function reverseLabel(lat, lng) {
 async function searchPlaces(query) {
   const q = query.trim();
   if (q.length < 2) return [];
-  const url =
-    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=uz&q=${encodeURIComponent(q)}&accept-language=uz`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await api.geoSearch(q);
   return (data || []).map((item) => ({
     lat: Number(item.lat),
-    lng: Number(item.lon),
-    label: item.display_name,
+    lng: Number(item.lng),
+    label: item.label,
   }));
 }
 
@@ -137,7 +129,6 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       });
     }
 
-    // Leaflet needs a tick after mount in flex layouts
     const t = setTimeout(() => map.invalidateSize(), 80);
     return () => {
       clearTimeout(t);
@@ -161,16 +152,15 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     return () => clearTimeout(t);
   }, [value?.latitude, regionHint]);
 
-  async function handleSearch(e) {
-    e.preventDefault();
+  async function runSearch() {
     setSearchError(null);
     setSearching(true);
     try {
       const hits = await searchPlaces(query);
       setResults(hits);
       if (!hits.length) setSearchError("Natija topilmadi — boshqacha yozing yoki kartani bosing");
-    } catch {
-      setSearchError("Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
+    } catch (err) {
+      setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
     } finally {
       setSearching(false);
     }
@@ -178,18 +168,30 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
 
   return (
     <div className="os-geo">
-      <form className="os-geo-search" onSubmit={handleSearch}>
+      {/* Must NOT be a nested <form> inside company create form — browsers ignore it and Qidirish submits create */}
+      <div className="os-geo-search">
         <input
           type="search"
           placeholder="Manzil yoki joy nomini qidirish..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (!searching && query.trim().length >= 2) runSearch();
+            }
+          }}
           aria-label="Joylashuv qidirish"
         />
-        <button type="submit" className="os-btn-ghost" disabled={searching || query.trim().length < 2}>
+        <button
+          type="button"
+          className="os-btn-ghost"
+          disabled={searching || query.trim().length < 2}
+          onClick={runSearch}
+        >
           {searching ? "..." : "Qidirish"}
         </button>
-      </form>
+      </div>
       {results.length > 0 && (
         <ul className="os-geo-results">
           {results.map((r) => (
