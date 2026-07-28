@@ -47,7 +47,6 @@ const DASHBOARD_VIEWS = [
   { key: "current", label: "Mahsulotlar" },
   { key: "budget", label: "Byudjet" },
   { key: "sold", label: "Aylanma" },
-  { key: "stats", label: "Statistika" },
 ];
 
 /** Distributor + market: no manual inventoy — order via Marketplace only. */
@@ -444,10 +443,6 @@ function WarehouseDashboard({ company, warehouseId, multi }) {
           </button>
         ))}
       </div>
-
-      {view === "stats" && (
-        <WarehouseFinanceStats companyId={company.id} warehouseId={warehouseId} multi={multi} />
-      )}
 
       {view === "current" && (
         <>
@@ -1275,6 +1270,7 @@ export default function Warehouse() {
 
   const tabs = [
     { key: "dashboard", label: "Dashboard" },
+    { key: "stats", label: "Statistika" },
     { key: "products", label: "Mahsulotlar" },
   ];
   if (isBuyerOnlyCompany(company)) {
@@ -1385,6 +1381,15 @@ export default function Warehouse() {
             warehouseId={multi ? selectedWarehouseId : productWarehouseId}
             multi={multi}
           />
+        )}
+        {tab === "stats" && (
+          <section className="wh-dashboard">
+            <WarehouseFinanceStats
+              companyId={company.id}
+              warehouseId={multi ? selectedWarehouseId : productWarehouseId}
+              multi={multi}
+            />
+          </section>
         )}
         {tab === "marketplace" && buyerOnly && (
           <MarketplaceTab
