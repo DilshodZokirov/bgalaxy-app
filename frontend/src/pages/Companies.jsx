@@ -464,9 +464,14 @@ export default function Companies() {
                       onChange={(e) => setName(e.target.value)}
                       required
                     />
+                    {name.trim() && (
+                      <em className="os-field-hint">
+                        Ichki identifikator: /{slugify(name)} — URL va tizim uchun avtomatik
+                      </em>
+                    )}
                   </label>
 
-                  <label className="os-field">
+                  <label className="os-field os-field-span">
                     <span>INN (STIR)</span>
                     <input
                       type="text"
@@ -479,11 +484,6 @@ export default function Companies() {
                       autoComplete="off"
                     />
                     <em className="os-field-hint">9 raqam — yuridik shaxs STIR</em>
-                  </label>
-
-                  <label className="os-field">
-                    <span>Slug</span>
-                    <input type="text" value={name ? slugify(name) : "—"} readOnly tabIndex={-1} />
                   </label>
                 </div>
 

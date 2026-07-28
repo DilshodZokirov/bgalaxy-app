@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, scheduled_meetings, tasks, users, warehouse
+from app.api.routes import accounting, analytics, auth, avatar, channels, chat, companies, complaints, developers, direct_chat, geo, group_meeting, invites, logs, meetings, notification_ws, notifications, office, partner_meeting, rafiq, roles, scheduled_meetings, tasks, users, warehouse
 from app.core.config import settings
 from app.services.scheduled_meeting_notifier import scheduled_meeting_loop
 
@@ -77,6 +77,7 @@ async def log_unhandled_exceptions(request: Request, exc: Exception):
 
 app.include_router(auth.router)
 app.include_router(companies.router)
+app.include_router(geo.router)
 app.include_router(chat.router)
 app.include_router(channels.router)
 app.include_router(tasks.router)
