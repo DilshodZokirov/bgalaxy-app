@@ -17,6 +17,7 @@ import {
 import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
+import WarehouseFinanceStats from "../components/WarehouseFinanceStats";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(Number(n) || 0)) + " so'm";
@@ -60,6 +61,7 @@ const TABS = [
   { key: "tasks", label: "Vazifalar" },
   { key: "team", label: "Jamoa" },
   { key: "finance", label: "Moliya" },
+  { key: "ombor", label: "Ombor" },
 ];
 
 const TOOLTIP = {
@@ -486,12 +488,12 @@ function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
       </div>
 
       <ChartPanel
-        title="Moliyaviy tendensiya"
+        title="Buxgalteriya tendensiyasi"
         period={period}
         setPeriod={setPeriod}
         chartType={chartType}
         setChartType={setChartType}
-        hint="Buxgalteriya kirim/chiqimlari va to‘langan hisob-fakturalar asosida."
+        hint="Faqat buxgalteriya kirim/chiqimlari va to‘langan hisob-fakturalar. Ombor sotuv/xarid — pastdagi Ombor blokida yoki «Ombor» tabida."
       >
         {!hasTrend ? (
           <EmptyTrend text="Bu davrda moliyaviy harakat yoʻq." />
@@ -696,7 +698,7 @@ export default function Analytics() {
         <div className="galaxy-page-heading">
           <p className="galaxy-page-kicker">Stats Orbit</p>
           <h1>Statistika{company.name ? ` — ${company.name}` : ""}</h1>
-          <p>Jamoa pulsi, vazifalar oqimi va moliyaviy tendensiya — bitta stansiyada.</p>
+          <p>Jamoa, vazifalar, buxgalteriya va ombor kirim/chiqim — barchasi shu sahifada.</p>
         </div>
 
         <div className="wh-toolbar">
@@ -812,6 +814,12 @@ export default function Analytics() {
                   chartType={finChartType}
                   setChartType={setFinChartType}
                 />
+
+                {company.has_warehouse && (
+                  <section className="wh-dashboard st-panel-rise" style={{ marginTop: 18 }}>
+                    <WarehouseFinanceStats companyId={company.id} warehouseId={null} multi />
+                  </section>
+                )}
               </>
             )}
 
@@ -897,6 +905,19 @@ export default function Analytics() {
                 chartType={finChartType}
                 setChartType={setFinChartType}
               />
+            )}
+
+            {tab === "ombor" && (
+              company.has_warehouse ? (
+                <section className="wh-dashboard">
+                  <WarehouseFinanceStats companyId={company.id} warehouseId={null} multi />
+                </section>
+              ) : (
+                <p className="wh-empty-inline">
+                  Ombor yoqilmagan. Profil → Sozlamalar orqali ombor qo‘shing — keyin shu yerda ombor va
+                  buxgalteriya grafiklari chiqadi.
+                </p>
+              )
             )}
           </>
         )}
