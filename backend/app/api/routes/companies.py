@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +17,21 @@ from app.schemas.warehouse import WarehouseOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
+_INN_RE = re.compile(r"^\d{9}$")
+
+
+def _float_or_none(value) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
+def _normalize_inn(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    digits = re.sub(r"\D", "", str(raw).strip())
+    return digits or None
+
 
 def _company_out(company: Company, warehouses: list[Warehouse] | None = None) -> CompanyOut:
     whs = warehouses or []
@@ -26,6 +43,10 @@ def _company_out(company: Company, warehouses: list[Warehouse] | None = None) ->
         logo_url=company.logo_url,
         location_region=getattr(company, "location_region", None),
         location_address=getattr(company, "location_address", None),
+        inn=getattr(company, "inn", None),
+        latitude=_float_or_none(getattr(company, "latitude", None)),
+        longitude=_float_or_none(getattr(company, "longitude", None)),
+        geo_label=getattr(company, "geo_label", None),
         company_type=company.company_type,
         has_warehouse=bool(whs) or bool(company.has_warehouse),
         warehouse_type=company.warehouse_type,
@@ -67,7 +88,9 @@ async def create_company(
         raise HTTPException(status_code=400, detail="Noto'g'ri kompaniya turi")
 
     region = (payload.location_region or "").strip() or None
-    if region and region not in UZ_REGIONS:
+    if not region:
+        raise HTTPException(status_code=400, detail="Joylashuv (viloyat/shahar) majburiy")
+    if region not in UZ_REGIONS:
         raise HTTPException(status_code=400, detail="Noto'g'ri joylashuv (viloyat/shahar)")
     address = (payload.location_address or "").strip() or None
     if address and len(address) > 255:
@@ -75,6 +98,26 @@ async def create_company(
     logo = (payload.logo_url or "").strip() or None
     if logo and not (logo.startswith("data:image/") or logo.startswith("http://") or logo.startswith("https://")):
         raise HTTPException(status_code=400, detail="Brand rasm formati noto'g'ri")
+
+    inn = _normalize_inn(payload.inn)
+    if not inn or not _INN_RE.match(inn):
+        raise HTTPException(status_code=400, detail="INN (STIR) 9 ta raqam bo‘lishi kerak")
+
+    lat = payload.latitude
+    lng = payload.longitude
+    if lat is None or lng is None:
+        raise HTTPException(status_code=400, detail="Kartadan aniq joylashuvni tanlang")
+    if not (-90 <= float(lat) <= 90) or not (-180 <= float(lng) <= 180):
+        raise HTTPException(status_code=400, detail="Noto‘g‘ri geolokatsiya")
+    # Rough Uzbekistan bounding box — soft check for delivery accuracy
+    if not (37.0 <= float(lat) <= 46.0) or not (55.5 <= float(lng) <= 73.5):
+        raise HTTPException(
+            status_code=400,
+            detail="Joylashuv O‘zbekiston hududida bo‘lishi kerak",
+        )
+    geo_label = (payload.geo_label or "").strip() or None
+    if geo_label and len(geo_label) > 500:
+        geo_label = geo_label[:500]
 
     company = Company(
         name=payload.name,
@@ -84,6 +127,10 @@ async def create_company(
         logo_url=logo,
         location_region=region,
         location_address=address,
+        inn=inn,
+        latitude=float(lat),
+        longitude=float(lng),
+        geo_label=geo_label,
     )
     db.add(company)
     await db.flush()

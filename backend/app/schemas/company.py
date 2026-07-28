@@ -14,6 +14,10 @@ class CompanyCreate(BaseModel):
     logo_url: str | None = None
     location_region: str | None = None
     location_address: str | None = None
+    inn: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    geo_label: str | None = None
 
 
 class CompanyOut(BaseModel):
@@ -24,6 +28,10 @@ class CompanyOut(BaseModel):
     logo_url: str | None = None
     location_region: str | None = None
     location_address: str | None = None
+    inn: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    geo_label: str | None = None
     company_type: str = "kompaniya"
     has_warehouse: bool = False
     warehouse_type: str | None = None

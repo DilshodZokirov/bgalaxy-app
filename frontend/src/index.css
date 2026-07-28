@@ -7990,6 +7990,231 @@ html[data-custom-bg="1"] .galaxy-sky {
   max-width: 640px;
 }
 
+.os-create-pro {
+  max-width: 760px;
+  padding: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(165deg, rgba(15, 23, 42, 0.92) 0%, rgba(8, 15, 30, 0.88) 55%, rgba(12, 28, 48, 0.9) 100%);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.4) inset,
+    0 24px 48px rgba(2, 6, 23, 0.35);
+}
+
+.os-create-hero {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, rgba(37, 99, 235, 0.22), transparent 55%),
+    radial-gradient(ellipse 60% 80% at 100% 0%, rgba(14, 165, 233, 0.1), transparent 50%);
+}
+
+.os-create-kicker {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  font-weight: 600;
+}
+
+.os-create-pro h3,
+.os-create-hero h3 {
+  margin: 0 0 6px;
+  font-family: "Syne", "Poppins", sans-serif;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.os-create-hero p {
+  margin: 0;
+  max-width: 52ch;
+  color: #94a3b8;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.os-create-form {
+  padding: 8px 24px 22px;
+}
+
+.os-create-section {
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.os-create-section:last-of-type {
+  border-bottom: none;
+}
+
+.os-create-section-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.os-create-step {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.os-create-section-head h4 {
+  margin: 0 0 2px;
+  font-size: 0.98rem;
+  color: #e2e8f0;
+  font-family: "Syne", "Poppins", sans-serif;
+}
+
+.os-create-section-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.os-create-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.os-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.os-field-span {
+  grid-column: 1 / -1;
+}
+
+.os-field > span {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.os-field input,
+.os-field select,
+.os-create-pro input[type="text"],
+.os-create-pro input[type="search"],
+.os-create-pro select {
+  width: 100%;
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.55);
+  color: #f1f5f9;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.os-field input:focus,
+.os-field select:focus,
+.os-create-pro input:focus,
+.os-create-pro select:focus {
+  border-color: rgba(96, 165, 250, 0.65);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.os-field input[readonly] {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.os-field-hint {
+  font-style: normal;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.os-logo-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(2, 6, 23, 0.4);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.os-logo-drop:hover,
+.os-logo-drop.has-file {
+  border-color: rgba(96, 165, 250, 0.55);
+  border-style: solid;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.os-logo-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.os-logo-drop-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.os-logo-drop-copy strong {
+  color: #e2e8f0;
+  font-size: 0.95rem;
+}
+
+.os-logo-drop-copy span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.os-logo-drop-copy .os-text-danger {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #f87171;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.os-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.os-create-actions .os-btn-primary {
+  min-width: 200px;
+  padding: 12px 20px;
+  border-radius: 12px;
+}
+
 .os-create h3 {
   margin: 0 0 4px;
   font-family: "Syne", "Poppins", sans-serif;
@@ -8034,20 +8259,27 @@ html[data-custom-bg="1"] .galaxy-sky {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
 .os-type-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(2, 6, 23, 0.35);
   color: #e2e8f0;
   cursor: pointer;
   font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.os-type-card:hover {
+  border-color: rgba(148, 163, 184, 0.4);
+  transform: translateY(-1px);
 }
 
 .os-type-card.active {
@@ -8058,11 +8290,169 @@ html[data-custom-bg="1"] .galaxy-sky {
 .os-type-card strong {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #2563eb, #6366f1);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.35);
+  color: #fff;
   font-size: 12px;
+}
+
+.os-type-card span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.os-type-card small {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.os-type-card.active small {
+  color: #93c5fd;
+}
+
+/* Map picker */
+.os-geo {
+  margin-top: 4px;
+}
+
+.os-geo-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.os-geo-search input {
+  flex: 1;
+}
+
+.os-btn-ghost {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.os-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.os-geo-results {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.85);
+  max-height: 180px;
+  overflow: auto;
+}
+
+.os-geo-results button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.os-geo-results li:last-child button {
+  border-bottom: none;
+}
+
+.os-geo-results button:hover {
+  background: rgba(37, 99, 235, 0.18);
+  color: #f8fafc;
+}
+
+.os-geo-map {
+  height: 280px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #0b1220;
+  z-index: 0;
+}
+
+.os-geo-map .leaflet-control-attribution {
+  font-size: 10px;
+  background: rgba(15, 23, 42, 0.75) !important;
+  color: #94a3b8 !important;
+}
+
+.os-geo-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.os-geo-hint-warn {
+  color: #fbbf24;
+  margin-bottom: 6px;
+}
+
+.os-geo-coords {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+.os-geo-coords span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  color: #bfdbfe;
+}
+
+.os-geo-coords em {
+  font-style: normal;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .os-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .os-type-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .os-create-form {
+    padding: 8px 16px 18px;
+  }
+
+  .os-create-hero {
+    padding: 18px 16px 14px;
+  }
+
+  .os-geo-map {
+    height: 240px;
+  }
 }
 
 .os-panel {
@@ -8536,6 +8926,54 @@ html[data-custom-bg="1"] .galaxy-sky {
   background: rgba(255, 255, 255, 0.78);
   border-color: rgba(15, 23, 42, 0.08);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.galaxy-shell-day .os-create-pro {
+  background: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.galaxy-shell-day .os-create-hero {
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, rgba(37, 99, 235, 0.12), transparent 55%),
+    #f8fafc;
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.galaxy-shell-day .os-create-kicker {
+  color: #2563eb;
+}
+
+.galaxy-shell-day .os-create-section-head h4,
+.galaxy-shell-day .os-logo-drop-copy strong,
+.galaxy-shell-day .os-type-card {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .os-field input,
+.galaxy-shell-day .os-field select,
+.galaxy-shell-day .os-create-pro input,
+.galaxy-shell-day .os-create-pro select {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .os-logo-drop,
+.galaxy-shell-day .os-type-card,
+.galaxy-shell-day .os-geo-results,
+.galaxy-shell-day .os-btn-ghost {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.galaxy-shell-day .os-geo-coords {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.galaxy-shell-day .os-geo-coords span {
+  color: #1d4ed8;
 }
 
 .galaxy-shell-day .os-info-row,
