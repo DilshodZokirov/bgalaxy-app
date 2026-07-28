@@ -4,7 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { api } from "./api/client";
+import { initNativeShell } from "./native";
 import "./index.css";
+
+// Android/iOS qobiq: status bar, splash, orqaga tugmasi
+initNativeShell();
 
 // Catches errors React's own error boundary can't (async code, event
 // handlers, plain runtime errors) so nothing silently fails without a trace.

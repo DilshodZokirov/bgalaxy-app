@@ -1,0 +1,20 @@
+{
+  "appId": "com.bgalaxy.app",
+  "appName": "Business Galaxy",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0B1220",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0B1220"
+    }
+  }
+}
