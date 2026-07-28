@@ -16,6 +16,7 @@ L.Icon.Default.mergeOptions({
 
 const UZ_CENTER = [41.3111, 69.2797];
 const UZ_ZOOM = 6;
+const SUGGEST_DEBOUNCE_MS = 350;
 
 /** Approximate region centers for fly-to when user picks viloyat/shahar */
 const REGION_COORDS = {
@@ -52,19 +53,20 @@ async function searchPlaces(query, regionHint) {
     lat: Number(item.lat),
     lng: Number(item.lng),
     label: item.label,
+    title: item.title || item.label?.split(",")[0] || item.label,
+    subtitle: item.subtitle || null,
+    kind: item.kind || "place",
   }));
 }
 
 /**
- * Interactive map picker — search + click to pin.
- * value: { latitude, longitude, geo_label } | null
- * onChange(next)
- * regionHint: optional region name to fly the map
+ * Interactive map picker — live street suggestions (Google/Yandex-like) + click to pin.
  */
 export default function CompanyLocationMap({ value, onChange, regionHint }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const suggestSeq = useRef(0);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -152,46 +154,95 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     return () => clearTimeout(t);
   }, [value?.latitude, regionHint]);
 
+  // Live suggest while typing (Google/Yandex-like autocomplete)
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) {
+      if (q.length === 0) {
+        setResults([]);
+        setSearchError(null);
+      }
+      return undefined;
+    }
+    const seq = ++suggestSeq.current;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      setSearchError(null);
+      try {
+        const hits = await searchPlaces(q, regionHint);
+        if (seq !== suggestSeq.current) return;
+        setResults(hits);
+        if (!hits.length) {
+          setSearchError("O‘xshash joy topilmadi — boshqacha yozing yoki kartadan pin qo‘ying");
+        }
+      } catch (err) {
+        if (seq !== suggestSeq.current) return;
+        setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
+      } finally {
+        if (seq === suggestSeq.current) setSearching(false);
+      }
+    }, SUGGEST_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query, regionHint]);
+
   async function runSearch() {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const seq = ++suggestSeq.current;
     setSearchError(null);
     setSearching(true);
     try {
-      const hits = await searchPlaces(query, regionHint);
+      const hits = await searchPlaces(q, regionHint);
+      if (seq !== suggestSeq.current) return;
       setResults(hits);
       if (!hits.length) {
         setSearchError(
           regionHint
             ? "Natija topilmadi — viloyatni tekshiring yoki kartadan pin qo‘ying"
-            : "Avval viloyat/shaharni tanlang, keyin ko‘cha nomini qidiring — yoki kartani bosing"
+                    : "Avval yuqoridan viloyat/shaharni tanlang — qidiruv faqat shu hududdan chiqadi"
         );
       }
     } catch (err) {
+      if (seq !== suggestSeq.current) return;
       setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
     } finally {
-      setSearching(false);
+      if (seq === suggestSeq.current) setSearching(false);
     }
+  }
+
+  function pickResult(r) {
+    placePin(r.lat, r.lng, r.label);
+    setResults([]);
+    setQuery(r.title || r.label.split(",")[0] || "");
+    setSearchError(null);
   }
 
   return (
     <div className="os-geo">
-      {/* Must NOT be a nested <form> inside company create form — browsers ignore it and Qidirish submits create */}
+      {/* Must NOT be a nested <form> inside company create form */}
       <div className="os-geo-search">
         <input
           type="search"
           placeholder={
             regionHint
-              ? `Masalan: Rayxon ko'chasi (${regionHint})`
-              : "Avval viloyatni tanlang, keyin ko‘cha nomi..."
+              ? `Yozing: Rayxon kuchasi — o‘xshash ko‘chalar chiqadi`
+              : "Ko‘cha nomi (masalan Rayxon) — yozganingizcha takliflar"
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              if (!searching && query.trim().length >= 2) runSearch();
+              if (results[0]) pickResult(results[0]);
+              else if (!searching && query.trim().length >= 2) runSearch();
+            }
+            if (e.key === "Escape") {
+              setResults([]);
             }
           }}
           aria-label="Joylashuv qidirish"
+          aria-autocomplete="list"
+          autoComplete="off"
         />
         <button
           type="button"
@@ -203,18 +254,17 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
         </button>
       </div>
       {results.length > 0 && (
-        <ul className="os-geo-results">
+        <ul className="os-geo-results" role="listbox">
           {results.map((r) => (
             <li key={`${r.lat}-${r.lng}-${r.label}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  placePin(r.lat, r.lng, r.label);
-                  setResults([]);
-                  setQuery("");
-                }}
-              >
-                {r.label}
+              <button type="button" role="option" onClick={() => pickResult(r)}>
+                <span className={`os-geo-kind ${r.kind === "street" ? "is-street" : ""}`}>
+                  {r.kind === "street" ? "Ko‘cha" : "Joy"}
+                </span>
+                <span className="os-geo-result-text">
+                  <strong>{r.title}</strong>
+                  {r.subtitle && <em>{r.subtitle}</em>}
+                </span>
               </button>
             </li>
           ))}
@@ -223,7 +273,8 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       {searchError && <p className="os-geo-hint os-geo-hint-warn">{searchError}</p>}
       <div ref={mapEl} className="os-geo-map" role="application" aria-label="Kompaniya joylashuvi xaritasi" />
       <p className="os-geo-hint">
-        Kartani bosing yoki pinni suring — yetkazib berish uchun aniq koordinata saqlanadi.
+        Qidiruv tanlangan viloyat ichida ishlaydi (masalan Toshkent tanlansa Namangan/Farg‘ona chiqmaydi).
+        Yoki kartani bosing / pinni suring.
       </p>
       {value?.latitude != null && value?.longitude != null && (
         <div className="os-geo-coords">
