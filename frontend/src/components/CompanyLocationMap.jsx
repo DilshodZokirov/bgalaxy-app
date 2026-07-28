@@ -6,7 +6,6 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { api } from "../api/client";
 
-// Vite breaks Leaflet's default icon URLs — pin them explicitly.
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -18,7 +17,6 @@ const UZ_CENTER = [41.3111, 69.2797];
 const UZ_ZOOM = 6;
 const SUGGEST_DEBOUNCE_MS = 350;
 
-/** Approximate region centers for fly-to when user picks viloyat/shahar */
 const REGION_COORDS = {
   "Toshkent shahri": [41.3111, 69.2797],
   "Toshkent viloyati": [41.2213, 69.8597],
@@ -36,6 +34,37 @@ const REGION_COORDS = {
   "Qoraqalpog'iston Respublikasi": [43.7683, 59.0214],
 };
 
+const KIND_LABEL = {
+  metro: "Metro",
+  shop: "Do‘kon",
+  pharmacy: "Apteka",
+  bank: "Bank",
+  cafe: "Kafe",
+  fuel: "Yoqilg‘i",
+  mall: "TC",
+  street: "Ko‘cha",
+  place: "Joy",
+};
+
+const FALLBACK_CATEGORIES = [
+  { key: "metro", label: "Metro", hint: "Metro bekatlari" },
+  { key: "shop", label: "Do‘kon", hint: "Korzinka, supermarket…" },
+  { key: "pharmacy", label: "Apteka", hint: "Dorixonalar" },
+  { key: "bank", label: "Bank", hint: "Bank filiallari" },
+  { key: "cafe", label: "Kafe", hint: "Kafe va restoran" },
+  { key: "fuel", label: "Yoqilg‘i", hint: "Yoqilg‘i quyish" },
+  { key: "mall", label: "TC", hint: "Savdo markazlari" },
+];
+
+function kindIcon(kind) {
+  return L.divIcon({
+    className: "os-geo-poi-icon",
+    html: `<span class="os-geo-poi-dot kind-${kind || "place"}"></span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
+
 async function reverseLabel(lat, lng) {
   try {
     const place = await api.geoReverse(lat, lng);
@@ -45,10 +74,10 @@ async function reverseLabel(lat, lng) {
   }
 }
 
-async function searchPlaces(query, regionHint) {
-  const q = query.trim();
-  if (q.length < 2) return [];
-  const data = await api.geoSearch(q, regionHint || null);
+async function searchPlaces(query, regionHint, category) {
+  const q = (query || "").trim();
+  if (!category && q.length < 2) return [];
+  const data = await api.geoSearch(q, regionHint || null, category || null);
   return (data || []).map((item) => ({
     lat: Number(item.lat),
     lng: Number(item.lng),
@@ -60,19 +89,23 @@ async function searchPlaces(query, regionHint) {
 }
 
 /**
- * Interactive map picker — live street suggestions (Google/Yandex-like) + click to pin.
+ * Smart map picker — category chips + brand/POI clusters (Korzinka, metro…) like Google Maps.
  */
 export default function CompanyLocationMap({ value, onChange, regionHint }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const suggestLayerRef = useRef(null);
   const suggestSeq = useRef(0);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState(null);
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const pickRef = useRef(null);
 
   async function placePin(lat, lng, labelHint) {
     const map = mapRef.current;
@@ -91,7 +124,7 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
         });
       });
     }
-    map.setView([lat, lng], Math.max(map.getZoom(), 14));
+    map.setView([lat, lng], Math.max(map.getZoom(), 15));
     const label = labelHint || (await reverseLabel(lat, lng));
     onChangeRef.current?.({
       latitude: Number(lat.toFixed(7)),
@@ -99,6 +132,52 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       geo_label: label,
     });
   }
+
+  function pickResult(r) {
+    placePin(r.lat, r.lng, r.label);
+    setQuery(r.title || r.label.split(",")[0] || "");
+    setSearchError(null);
+  }
+  pickRef.current = pickResult;
+
+  function plotSuggestMarkers(hits) {
+    const map = mapRef.current;
+    if (!map) return;
+    if (suggestLayerRef.current) {
+      suggestLayerRef.current.clearLayers();
+    } else {
+      suggestLayerRef.current = L.layerGroup().addTo(map);
+    }
+    if (!hits?.length) return;
+
+    const latLngs = [];
+    hits.forEach((r) => {
+      const clustered = ["metro", "shop", "pharmacy", "bank", "cafe", "fuel", "mall"].includes(r.kind);
+      const m = L.marker([r.lat, r.lng], {
+        icon: clustered ? kindIcon(r.kind) : new L.Icon.Default(),
+        opacity: 0.95,
+        title: r.title,
+      });
+      m.bindTooltip(r.title, { direction: "top", offset: [0, -8] });
+      m.on("click", () => pickRef.current?.(r));
+      suggestLayerRef.current.addLayer(m);
+      latLngs.push([r.lat, r.lng]);
+    });
+
+    if (latLngs.length > 1) {
+      map.fitBounds(latLngs, { padding: [28, 28], maxZoom: 13 });
+    } else if (latLngs.length === 1) {
+      map.setView(latLngs[0], 14);
+    }
+  }
+
+  useEffect(() => {
+    api.geoCategories()
+      .then((list) => {
+        if (Array.isArray(list) && list.length) setCategories(list);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!mapEl.current || mapRef.current) return undefined;
@@ -117,6 +196,7 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     });
 
     mapRef.current = map;
+    suggestLayerRef.current = L.layerGroup().addTo(map);
 
     if (value?.latitude != null && value?.longitude != null) {
       markerRef.current = L.marker([value.latitude, value.longitude], { draggable: true }).addTo(map);
@@ -131,12 +211,13 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       });
     }
 
-    const t = setTimeout(() => map.invalidateSize(), 80);
+    const t = setTimeout(() => map.invalidateSize(), 120);
     return () => {
       clearTimeout(t);
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
+      suggestLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -154,52 +235,23 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     return () => clearTimeout(t);
   }, [value?.latitude, regionHint]);
 
-  // Live suggest while typing (Google/Yandex-like autocomplete)
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length < 3) {
-      if (q.length === 0) {
-        setResults([]);
-        setSearchError(null);
-      }
-      return undefined;
-    }
+  async function runLookup(nextQuery, nextCategory) {
+    const q = (nextQuery || "").trim();
+    const cat = nextCategory || null;
+    if (!cat && q.length < 2) return;
     const seq = ++suggestSeq.current;
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      setSearchError(null);
-      try {
-        const hits = await searchPlaces(q, regionHint);
-        if (seq !== suggestSeq.current) return;
-        setResults(hits);
-        if (!hits.length) {
-          setSearchError("O‘xshash joy topilmadi — boshqacha yozing yoki kartadan pin qo‘ying");
-        }
-      } catch (err) {
-        if (seq !== suggestSeq.current) return;
-        setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
-      } finally {
-        if (seq === suggestSeq.current) setSearching(false);
-      }
-    }, SUGGEST_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query, regionHint]);
-
-  async function runSearch() {
-    const q = query.trim();
-    if (q.length < 2) return;
-    const seq = ++suggestSeq.current;
-    setSearchError(null);
     setSearching(true);
+    setSearchError(null);
     try {
-      const hits = await searchPlaces(q, regionHint);
+      const hits = await searchPlaces(q, regionHint, cat);
       if (seq !== suggestSeq.current) return;
       setResults(hits);
+      plotSuggestMarkers(hits);
       if (!hits.length) {
         setSearchError(
           regionHint
-            ? "Natija topilmadi — viloyatni tekshiring yoki kartadan pin qo‘ying"
-                    : "Avval yuqoridan viloyat/shaharni tanlang — qidiruv faqat shu hududdan chiqadi"
+            ? "Natija topilmadi — boshqa kategoriya yoki so‘z sinab ko‘ring"
+            : "Avval yuqoridan viloyat/shaharni tanlang"
         );
       }
     } catch (err) {
@@ -210,34 +262,89 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     }
   }
 
-  function pickResult(r) {
-    placePin(r.lat, r.lng, r.label);
-    setResults([]);
-    setQuery(r.title || r.label.split(",")[0] || "");
-    setSearchError(null);
+  // Live suggest while typing
+  useEffect(() => {
+    const q = query.trim();
+    if (category) return undefined; // category chip drives its own fetch
+    if (q.length < 3) {
+      if (q.length === 0) {
+        setResults([]);
+        setSearchError(null);
+        plotSuggestMarkers([]);
+      }
+      return undefined;
+    }
+    const timer = setTimeout(() => runLookup(q, null), SUGGEST_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, regionHint]);
+
+  // Category chip → immediate cluster search
+  useEffect(() => {
+    if (!category) return undefined;
+    runLookup(query || category, category);
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, regionHint]);
+
+  function selectCategory(key) {
+    if (category === key) {
+      setCategory(null);
+      setResults([]);
+      plotSuggestMarkers([]);
+      return;
+    }
+    setCategory(key);
+    if (!query.trim()) {
+      const meta = categories.find((c) => c.key === key);
+      setQuery(meta?.hint?.split(",")[0] || key);
+    }
   }
+
+  const clusterCount = results.filter((r) =>
+    ["metro", "shop", "pharmacy", "bank", "cafe", "fuel", "mall"].includes(r.kind)
+  ).length;
 
   return (
     <div className="os-geo">
-      {/* Must NOT be a nested <form> inside company create form */}
+      <div className="os-geo-cats" role="toolbar" aria-label="Tezkor kategoriyalar">
+        {categories.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            className={`os-geo-cat ${category === c.key ? "active" : ""}`}
+            title={c.hint}
+            onClick={() => selectCategory(c.key)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       <div className="os-geo-search">
         <input
           type="search"
           placeholder={
             regionHint
-              ? `Yozing: Rayxon kuchasi — o‘xshash ko‘chalar chiqadi`
-              : "Ko‘cha nomi (masalan Rayxon) — yozganingizcha takliflar"
+              ? "Korzinka, metro, apteka, ko‘cha… — aqlli qidiruv"
+              : "Avval viloyatni tanlang, keyin qidiruv"
           }
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (category) setCategory(null);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               if (results[0]) pickResult(results[0]);
-              else if (!searching && query.trim().length >= 2) runSearch();
+              else if (!searching && (category || query.trim().length >= 2)) {
+                runLookup(query, category);
+              }
             }
             if (e.key === "Escape") {
               setResults([]);
+              setCategory(null);
             }
           }}
           aria-label="Joylashuv qidirish"
@@ -247,20 +354,25 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
         <button
           type="button"
           className="os-btn-ghost"
-          disabled={searching || query.trim().length < 2}
-          onClick={runSearch}
+          disabled={searching || (!category && query.trim().length < 2)}
+          onClick={() => runLookup(query, category)}
         >
           {searching ? "..." : "Qidirish"}
         </button>
       </div>
+
+      {clusterCount > 0 && (
+        <p className="os-geo-hint os-geo-hint-ok">
+          Xaritada {clusterCount} ta joy belgilangan — birini tanlang (Google Maps uslubida).
+        </p>
+      )}
+
       {results.length > 0 && (
         <ul className="os-geo-results" role="listbox">
           {results.map((r) => (
             <li key={`${r.lat}-${r.lng}-${r.label}`}>
               <button type="button" role="option" onClick={() => pickResult(r)}>
-                <span className={`os-geo-kind ${r.kind === "street" ? "is-street" : ""}`}>
-                  {r.kind === "street" ? "Ko‘cha" : "Joy"}
-                </span>
+                <span className={`os-geo-kind kind-${r.kind}`}>{KIND_LABEL[r.kind] || "Joy"}</span>
                 <span className="os-geo-result-text">
                   <strong>{r.title}</strong>
                   {r.subtitle && <em>{r.subtitle}</em>}
@@ -270,11 +382,11 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
           ))}
         </ul>
       )}
+
       {searchError && <p className="os-geo-hint os-geo-hint-warn">{searchError}</p>}
       <div ref={mapEl} className="os-geo-map" role="application" aria-label="Kompaniya joylashuvi xaritasi" />
       <p className="os-geo-hint">
-        Qidiruv tanlangan viloyat ichida ishlaydi (masalan Toshkent tanlansa Namangan/Farg‘ona chiqmaydi).
-        Yoki kartani bosing / pinni suring.
+        Tezkor chip yoki brend nomi (masalan Korzinka) — barcha filiallar xaritada chiqadi. Yoki pinni bosing.
       </p>
       {value?.latitude != null && value?.longitude != null && (
         <div className="os-geo-coords">

@@ -66,11 +66,14 @@ export const api = {
   createCompany: (data) => request("/companies", { method: "POST", body: data }),
   deleteCompany: (companyId) => request(`/companies/${companyId}`, { method: "DELETE" }),
   getMyCompanies: () => request("/companies/mine"),
-  geoSearch: (q, region = null) => {
-    const params = new URLSearchParams({ q });
+  geoSearch: (q, region = null, category = null) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
     if (region) params.set("region", region);
+    if (category) params.set("category", category);
     return request(`/geo/search?${params}`);
   },
+  geoCategories: () => request("/geo/categories"),
   geoReverse: (lat, lng) =>
     request(`/geo/reverse?${new URLSearchParams({ lat: String(lat), lng: String(lng) })}`),
   updateWarehouseSettings: (companyId, hasWarehouse, warehouseType) =>
