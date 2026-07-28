@@ -113,23 +113,37 @@ export function MarketplaceTab({ company, onOrdered, onGoToOrders }) {
     });
   }, [sellers, search, filter]);
 
-  const cartSeller = sellers.find((s) => s.company_id === cartSellerId) || seller;
+  const cartSeller = sellers.find((s) => String(s.company_id) === String(cartSellerId)) || seller;
   const cartCount = cart.length;
 
   function addToCart(product) {
-    if (cartSellerId && cartSellerId !== product.company_id) {
+    const sellerId = String(product.company_id);
+    if (cartSellerId && String(cartSellerId) !== sellerId) {
       const ok = window.confirm(
         "Savatchada boshqa sotuvchi mahsulotlari bor. Yangi savatcha ochilsinmi?"
       );
       if (!ok) return;
-      setCart([]);
+      setCartSellerId(sellerId);
+      setCart([
+        {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          unit: product.unit,
+          max: product.quantity,
+          quantity: 1,
+          company_id: product.company_id,
+        },
+      ]);
+      setShowCart(true);
+      return;
     }
-    setCartSellerId(product.company_id);
+    setCartSellerId(sellerId);
     setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
+      const existing = prev.find((i) => String(i.id) === String(product.id));
       if (existing) {
         return prev.map((i) =>
-          i.id === product.id
+          String(i.id) === String(product.id)
             ? { ...i, quantity: Math.min(Number(i.max), Number(i.quantity) + 1) }
             : i
         );
@@ -155,19 +169,29 @@ export function MarketplaceTab({ company, onOrdered, onGoToOrders }) {
     setCheckoutBusy(true);
     setCheckoutError(null);
     try {
-      const items = cart.map((i) => ({
-        product_id: i.id,
-        quantity: Number(i.quantity),
-      }));
-      for (const item of items) {
-        if (!item.quantity || item.quantity <= 0) {
-          throw new Error("Har bir mahsulot uchun miqdor kiriting");
-        }
+      const items = cart
+        .map((i) => ({
+          product_id: i.id,
+          quantity: Number(i.quantity),
+          name: i.name,
+        }))
+        .filter((i) => i.quantity > 0);
+      if (items.length === 0) {
+        throw new Error("Har bir mahsulot uchun miqdor kiriting");
       }
-      const created = await api.placeWarehouseCartOrder(company.id, cartSellerId, items);
+      if (items.length !== cart.length) {
+        throw new Error("Savatchada miqdori 0 bo‘lgan mahsulot bor — olib tashlang yoki miqdor kiriting");
+      }
+      const created = await api.placeWarehouseCartOrder(
+        company.id,
+        cartSellerId,
+        items.map(({ product_id, quantity }) => ({ product_id, quantity }))
+      );
       if (!Array.isArray(created) || created.length !== items.length) {
         throw new Error(
-          `Savatchadan faqat ${Array.isArray(created) ? created.length : 0}/${items.length} ta mahsulot buyurtma qilindi. Qayta urinib ko‘ring.`
+          `Savatchadan faqat ${Array.isArray(created) ? created.length : 0}/${items.length} ta mahsulot buyurtma qilindi (${items
+            .map((i) => i.name)
+            .join(", ")}). Qayta urinib ko‘ring.`
         );
       }
       setCart([]);

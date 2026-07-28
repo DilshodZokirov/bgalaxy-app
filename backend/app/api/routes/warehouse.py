@@ -1192,7 +1192,11 @@ async def place_cart_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Multi-product checkout from one seller — all lines share batch_id."""
+    """Multi-product checkout from one seller — all lines share batch_id.
+
+    Every cart line becomes its own WarehouseOrder. After commit we re-read
+    by batch_id so a partial save cannot silently return fewer products.
+    """
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
     expected_seller_type = _marketplace_seller_type(buyer)
@@ -1205,13 +1209,18 @@ async def place_cart_order(
     if seller.company_type != expected_seller_type or not seller.has_warehouse:
         raise HTTPException(status_code=404, detail="Sotuvchi kompaniya topilmadi")
 
-    batch_id = uuid_lib.uuid4()
-    orders: list[WarehouseOrder] = []
-    names: list[str] = []
+    # Merge duplicate product_ids (qty sum) then validate ALL before inserting any
+    merged: dict = {}
     for item in payload.items:
+        key = str(item.product_id)
+        merged[key] = merged.get(key, 0.0) + float(item.quantity)
+    prepared: list[tuple[WarehouseProduct, float, Warehouse]] = []
+    for product_id, quantity in merged.items():
+        if quantity <= 0:
+            raise HTTPException(status_code=400, detail="Har bir mahsulot uchun miqdor musbat bo'lishi kerak")
         product_result = await db.execute(
             select(WarehouseProduct).where(
-                WarehouseProduct.id == item.product_id,
+                WarehouseProduct.id == product_id,
                 WarehouseProduct.company_id == payload.seller_company_id,
             )
         )
@@ -1221,18 +1230,35 @@ async def place_cart_order(
         target_warehouse = await _resolve_buyer_warehouse(
             buyer_warehouses, seller, seller_product, payload.warehouse_id, db, company_id
         )
+        # Pre-check stock/listing without mutating yet
+        if not bool(getattr(seller_product, "listed_on_marketplace", True)):
+            raise HTTPException(
+                status_code=400, detail=f"«{seller_product.name}» Marketplacega chiqarilmagan"
+            )
+        avail = await available_qty(seller_product)
+        if avail < quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"«{seller_product.name}» uchun yetarli zaxira yo'q (mavjud: {avail})",
+            )
+        prepared.append((seller_product, quantity, target_warehouse))
+
+    batch_id = uuid_lib.uuid4()
+    orders: list[WarehouseOrder] = []
+    names: list[str] = []
+    for seller_product, quantity, target_warehouse in prepared:
         order = await _create_line_order(
             db=db,
             buyer=buyer,
             seller=seller,
             seller_product=seller_product,
-            quantity=item.quantity,
+            quantity=quantity,
             target_warehouse=target_warehouse,
             actor=current_user,
             batch_id=batch_id,
         )
         orders.append(order)
-        names.append(f"{seller_product.name} × {item.quantity}")
+        names.append(f"{seller_product.name} × {quantity}")
 
     await db.flush()
     seller_notify = await users_with_permission(db, seller.id, "manage_warehouse")
@@ -1247,13 +1273,27 @@ async def place_cart_order(
         related_user_id=current_user.id,
     )
     await db.commit()
-    if len(orders) != len(payload.items):
-        raise HTTPException(status_code=500, detail="Savatcha buyurtmasi to'liq yaratilmadi")
-    out = []
-    for o in orders:
-        await db.refresh(o)
-        out.append(await _order_out(db, o))
-    return out
+
+    saved = list(
+        (
+            await db.execute(
+                select(WarehouseOrder)
+                .where(WarehouseOrder.batch_id == batch_id)
+                .order_by(WarehouseOrder.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if len(saved) != len(prepared):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Savatcha to'liq saqlanmadi: {len(saved)}/{len(prepared)} ta mahsulot. "
+                f"Qayta urinib ko'ring."
+            ),
+        )
+    return [await _order_out(db, o) for o in saved]
 
 
 @router.post("/products/{product_id}/list-marketplace", response_model=ProductOut)
@@ -1422,15 +1462,28 @@ async def _complete_order(
         target_wh_id = buyer_warehouses[0].id
 
     cost_price = float(order.unit_price)
-    existing_result = await db.execute(
-        select(WarehouseProduct).where(
-            WarehouseProduct.company_id == buyer.id,
-            WarehouseProduct.warehouse_id == target_wh_id,
-            func.lower(WarehouseProduct.name) == seller_product.name.strip().lower(),
-            WarehouseProduct.unit == seller_product.unit,
-            WarehouseProduct.source_company_id == seller.id,
-        )
-    )
+    # Match the same seller variant — do not merge different cart lines that
+    # only share a similar name (size/color/sku must agree, including NULL).
+    filters = [
+        WarehouseProduct.company_id == buyer.id,
+        WarehouseProduct.warehouse_id == target_wh_id,
+        func.lower(WarehouseProduct.name) == seller_product.name.strip().lower(),
+        WarehouseProduct.unit == seller_product.unit,
+        WarehouseProduct.source_company_id == seller.id,
+    ]
+    if seller_product.size is None:
+        filters.append(WarehouseProduct.size.is_(None))
+    else:
+        filters.append(WarehouseProduct.size == seller_product.size)
+    if seller_product.color is None:
+        filters.append(WarehouseProduct.color.is_(None))
+    else:
+        filters.append(WarehouseProduct.color == seller_product.color)
+    if seller_product.sku is None:
+        filters.append(WarehouseProduct.sku.is_(None))
+    else:
+        filters.append(WarehouseProduct.sku == seller_product.sku)
+    existing_result = await db.execute(select(WarehouseProduct).where(*filters))
     buyer_product = existing_result.scalar_one_or_none()
     if buyer_product is not None:
         buyer_product.quantity = float(buyer_product.quantity) + qty
@@ -1595,6 +1648,27 @@ async def list_orders(
 
     result = await db.execute(query.order_by(WarehouseOrder.created_at.desc()))
     orders = list(result.scalars().all())
+
+    # Scoped views (loader/courier/receipt) filter by status and used to hide
+    # sibling cart lines — UI then showed "1 ta mahsulot" while the second
+    # line still existed. Always expand matching batches so every cart product
+    # stays visible together.
+    batch_ids = {o.batch_id for o in orders if o.batch_id is not None}
+    if batch_ids:
+        by_id = {o.id: o for o in orders}
+        sibling_q = select(WarehouseOrder).where(WarehouseOrder.batch_id.in_(batch_ids))
+        if resolved == "purchases" or resolved == "receipt":
+            sibling_q = sibling_q.where(WarehouseOrder.buyer_company_id == company_id)
+        else:
+            sibling_q = sibling_q.where(WarehouseOrder.seller_company_id == company_id)
+        for sib in (await db.execute(sibling_q)).scalars().all():
+            by_id[sib.id] = sib
+        orders = sorted(
+            by_id.values(),
+            key=lambda o: o.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+
     return [await _order_out(db, o) for o in orders]
 
 
@@ -1636,6 +1710,45 @@ async def _batch_lines(
     if status is not None:
         query = query.where(WarehouseOrder.status == status)
     return list((await db.execute(query)).scalars().all())
+
+
+_PIPELINE_STATUSES = [
+    "ordered",
+    "loading",
+    "loaded",
+    "on_road",
+    "courier_accepted",
+    "awaiting_receipt",
+    "completed",
+]
+
+
+def _status_rank(status: str) -> int:
+    try:
+        return _PIPELINE_STATUSES.index(status)
+    except ValueError:
+        return -1
+
+
+async def _batch_lines_at_or_behind(
+    db: AsyncSession,
+    order: WarehouseOrder,
+    expected_status: str,
+) -> list[WarehouseOrder]:
+    """Active cart lines at ``expected_status`` or still behind it.
+
+    Used so a pipeline click never advances only one product while its
+    siblings stay stuck on an earlier step.
+    """
+    lines = await _batch_lines(db, order)
+    active = [o for o in lines if o.status not in {"completed", "cancelled"}]
+    if not active:
+        return []
+    target = _status_rank(expected_status)
+    movable = [o for o in active if _status_rank(o.status) <= target]
+    if not any(_status_rank(o.status) == target for o in movable):
+        return []
+    return movable
 
 
 def _batch_label(lines: list[WarehouseOrder]) -> str:
@@ -1713,7 +1826,7 @@ async def transition_order(
         if str(company_id) != str(order.seller_company_id):
             raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        lines = await _batch_lines(db, order, status="ordered")
+        lines = await _batch_lines_at_or_behind(db, order, "ordered")
         if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma 'Buyurtma qilindi' holatida emas")
         for line in lines:
@@ -1735,14 +1848,10 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_loader", "manage_warehouse"]
         )
-        # Catch siblings still stuck at "ordered" (legacy desync) then load all
-        lagging = await _batch_lines(db, order, status="ordered")
-        for line in lagging:
-            line.status = "loading"
-            line.status_note = payload.note or "Yuklash boshlandi"
-        if lagging:
-            await db.flush()
-        lines = await _batch_lines(db, order, status="loading")
+        lines = await _batch_lines_at_or_behind(db, order, "loading")
+        if not lines:
+            # Also allow acting when all siblings are still at ordered
+            lines = await _batch_lines_at_or_behind(db, order, "ordered")
         if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma yuklash holatida emas")
         for line in lines:
@@ -1763,7 +1872,7 @@ async def transition_order(
         if str(company_id) != str(order.seller_company_id):
             raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        lines = await _batch_lines(db, order, status="loaded")
+        lines = await _batch_lines_at_or_behind(db, order, "loaded")
         if not lines:
             raise HTTPException(status_code=400, detail="Avval yuklashni tasdiqlang")
         for line in lines:
@@ -1796,7 +1905,7 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
         )
-        lines = await _batch_lines(db, order, status="on_road")
+        lines = await _batch_lines_at_or_behind(db, order, "on_road")
         if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma yo'lda emas")
         for line in lines:
@@ -1813,7 +1922,7 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
         )
-        lines = await _batch_lines(db, order, status="courier_accepted")
+        lines = await _batch_lines_at_or_behind(db, order, "courier_accepted")
         if not lines:
             raise HTTPException(status_code=400, detail="Avval arizani qabul qiling")
         for line in lines:
@@ -1841,31 +1950,33 @@ async def transition_order(
             raise HTTPException(status_code=403, detail="Faqat xaridor tasdiqlaydi")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
 
-        to_complete = await _batch_lines(db, order, status="awaiting_receipt")
+        # Pull every non-cancelled cart sibling that reached receipt (or is
+        # somehow still behind) into completion as one payment / stock credit.
+        all_lines = await _batch_lines(db, order)
+        stuck = [
+            o
+            for o in all_lines
+            if o.status not in {"awaiting_receipt", "completed", "cancelled"}
+        ]
+        if stuck:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Savatchada hali yo'lda/yuklanayotgan mahsulotlar bor "
+                    f"({_batch_label(stuck)}). Avval ularni yetkazib bering."
+                ),
+            )
+
+        to_complete = [o for o in all_lines if o.status == "awaiting_receipt"]
         if not to_complete:
             raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
 
-        # Block if other cart lines are still in transit
-        if order.batch_id is not None:
-            all_lines = await _batch_lines(db, order)
-            stuck = [
-                o
-                for o in all_lines
-                if o.status not in {"awaiting_receipt", "completed", "cancelled"}
-            ]
-            if stuck:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Savatchada hali yo'lda/yuklanayotgan mahsulotlar bor "
-                        f"({_batch_label(stuck)}). Avval ularni yetkazib bering."
-                    ),
-                )
-
         total_amount = 0.0
+        credited_names: list[str] = []
         for line in to_complete:
             await _complete_order(db, line, actor=current_user, buyer=buyer, seller=seller)
             total_amount += float(line.total_price)
+            credited_names.append(line.product_name)
             await db.flush()
 
         seller_ids = await users_with_permission(db, seller.id, "manage_warehouse")
@@ -1875,8 +1986,10 @@ async def transition_order(
             user_ids=seller_ids,
             ntype="warehouse_order",
             message=(
-                f"Muvaffaqiyatli sotildi va yetkazildi ({len(to_complete)} ta pozitsiya) — "
-                f"{buyer.name}. Byudjetga +{total_amount:,.0f} so'm"
+                f"Muvaffaqiyatli sotildi va yetkazildi ({len(to_complete)} ta: "
+                f"{', '.join(credited_names[:3])}"
+                f"{'…' if len(credited_names) > 3 else ''}) — {buyer.name}. "
+                f"Byudjetga +{total_amount:,.0f} so'm"
             ),
             company_id=seller.id,
             invite_token=str(order.id),
@@ -1887,7 +2000,9 @@ async def transition_order(
             user_ids=buyer_ids,
             ntype="warehouse_order",
             message=(
-                f"Mahsulot omboringizga qo'shildi ({len(to_complete)} ta pozitsiya). "
+                f"Omborga qo'shildi ({len(to_complete)} ta mahsulot: "
+                f"{', '.join(credited_names[:3])}"
+                f"{'…' if len(credited_names) > 3 else ''}). "
                 f"Byudjetdan -{total_amount:,.0f} so'm"
             ),
             company_id=buyer.id,

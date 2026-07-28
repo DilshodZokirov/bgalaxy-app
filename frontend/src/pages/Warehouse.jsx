@@ -974,8 +974,11 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
   }
 
   function openReceiptChecklist(order) {
-    const batch = order.batch_id
-      ? orders.filter((o) => o.batch_id === order.batch_id && o.status === "awaiting_receipt")
+    const batchKey = order.batch_id != null ? String(order.batch_id) : null;
+    const batch = batchKey
+      ? orders.filter(
+          (o) => String(o.batch_id) === batchKey && o.status === "awaiting_receipt"
+        )
       : [order];
     setChecklistOrders(batch.length ? batch : [order]);
   }
@@ -1012,7 +1015,8 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
       list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(idFor("ordered"), "start_loading") });
     }
     if (canSell && (scope === "loader" || scope === "sales") && canLoad && (statusLine.status === "loading" || lines.some((o) => o.status === "ordered"))) {
-      list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(idFor("loading") || idFor("ordered"), "confirm_loaded") });
+      const loadId = (lines.find((o) => o.status === "loading") || lines.find((o) => o.status === "ordered") || statusLine).id;
+      list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(loadId, "confirm_loaded") });
     }
     if (canSell && scope === "sales" && canManage && statusLine.status === "loaded") {
       list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(idFor("loaded"), "dispatch") });
