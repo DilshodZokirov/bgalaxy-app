@@ -13,4 +13,4 @@ from app.models.scheduled_meeting import ScheduledMeeting  # noqa: F401
 from app.models.role import Role  # noqa: F401
 from app.models.task import Task, TaskComment  # noqa: F401
 from app.models.user import User  # noqa: F401
-from app.models.warehouse import Warehouse, WarehouseProduct, StockMovement, WarehouseOrder  # noqa: F401
+from app.models.warehouse import Warehouse, WarehouseProduct, StockMovement, WarehouseOrder, CompanyRating  # noqa: F401

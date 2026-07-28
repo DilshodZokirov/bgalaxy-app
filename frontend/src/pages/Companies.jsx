@@ -147,6 +147,7 @@ export default function Companies() {
   const [listLoading, setListLoading] = useState(true);
   const [tab, setTab] = useState("overview");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [name, setName] = useState("");
   const [companyType, setCompanyType] = useState("kompaniya");
   const [locationRegion, setLocationRegion] = useState("");
@@ -185,15 +186,67 @@ export default function Companies() {
   }, [companies]);
 
   const createOpen = showCreateForm || (companies && companies.length === 0);
+  const formMode = showEditForm ? "edit" : createOpen ? "create" : null;
+  const formOpen = !!formMode;
 
   useEffect(() => {
-    if (!createOpen) return undefined;
+    if (!formOpen) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [createOpen]);
+  }, [formOpen]);
+
+  function resetFormFields() {
+    setName("");
+    setCompanyType("kompaniya");
+    setLocationRegion("");
+    setLocationAddress("");
+    setInn("");
+    setGeo(null);
+    setLogoUrl(null);
+    setError(null);
+  }
+
+  function openCreateForm() {
+    setShowEditForm(false);
+    resetFormFields();
+    setShowCreateForm(true);
+  }
+
+  function openEditForm(company) {
+    if (!company) return;
+    setShowCreateForm(false);
+    setName(company.name || "");
+    setCompanyType(company.company_type || "kompaniya");
+    setLocationRegion(company.location_region || "");
+    setLocationAddress(company.location_address || "");
+    setInn(company.inn ? String(company.inn) : "");
+    setLogoUrl(company.logo_url || null);
+    setGeo(
+      company.latitude != null && company.longitude != null
+        ? {
+            latitude: Number(company.latitude),
+            longitude: Number(company.longitude),
+            geo_label: company.geo_label || null,
+          }
+        : null
+    );
+    setError(null);
+    setShowEditForm(true);
+  }
+
+  function closeEditForm() {
+    setShowEditForm(false);
+    resetFormFields();
+  }
+
+  function closeCreateForm() {
+    if (companies && companies.length === 0) return;
+    setShowCreateForm(false);
+    resetFormFields();
+  }
 
   function refreshCompanies() {
     setListLoading(true);
@@ -343,15 +396,48 @@ export default function Companies() {
       });
       invalidateCompaniesCache();
       setActiveCompanyId(res.id);
-      setName("");
-      setCompanyType("kompaniya");
-      setLocationRegion("");
-      setLocationAddress("");
-      setInn("");
-      setGeo(null);
-      setLogoUrl(null);
+      resetFormFields();
       setShowCreateForm(false);
       setTab("overview");
+      refreshCompanies();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdate(e) {
+    e.preventDefault();
+    if (!activeCompany) return;
+    setError(null);
+    if (!locationRegion) {
+      setError("Joylashuv (viloyat/shahar) tanlang");
+      return;
+    }
+    const innDigits = inn.replace(/\D/g, "");
+    if (innDigits.length !== 9) {
+      setError("INN (STIR) 9 ta raqam bo‘lishi kerak");
+      return;
+    }
+    if (geo?.latitude == null || geo?.longitude == null) {
+      setError("Kartadan aniq joylashuvni tanlang");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.updateCompany(activeCompany.id, {
+        name,
+        location_region: locationRegion,
+        location_address: locationAddress.trim() || null,
+        logo_url: logoUrl || null,
+        inn: innDigits,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        geo_label: geo.geo_label || null,
+      });
+      invalidateCompaniesCache();
+      closeEditForm();
       refreshCompanies();
     } catch (err) {
       setError(err.message);
@@ -428,7 +514,7 @@ export default function Companies() {
             <h2>Korxona boshqaruvi</h2>
           </div>
           <div className="os-toolbar-actions">
-            {!createOpen && otherCompanies.length > 0 && (
+            {!formOpen && otherCompanies.length > 0 && (
               <label className="os-switcher">
                 <span>Faol</span>
                 <select
@@ -449,14 +535,14 @@ export default function Companies() {
             <button
               type="button"
               className="os-btn-primary"
-              onClick={() => setShowCreateForm(true)}
+              onClick={openCreateForm}
             >
               Yangi kompaniya
             </button>
           </div>
         </div>
 
-        {createOpen &&
+        {formOpen &&
           createPortal(
             <div
               className="companies-modal-backdrop"
@@ -464,39 +550,51 @@ export default function Companies() {
               aria-modal="true"
               aria-labelledby="os-create-title"
               onClick={(e) => {
-                if (e.target === e.currentTarget && companies.length > 0) {
-                  setShowCreateForm(false);
-                }
+                if (e.target !== e.currentTarget) return;
+                if (formMode === "edit") closeEditForm();
+                else if (companies.length > 0) closeCreateForm();
               }}
             >
               <section className="os-create os-create-pro companies-modal companies-modal-create">
                 <div className="os-create-hero">
                   <div className="os-create-hero-row">
-                    <span className="os-create-kicker">Yangi yozuv</span>
-                    {companies.length > 0 && (
+                    <span className="os-create-kicker">
+                      {formMode === "edit" ? "Tahrirlash" : "Yangi yozuv"}
+                    </span>
+                    {(formMode === "edit" || companies.length > 0) && (
                       <button
                         type="button"
                         className="os-create-close"
-                        onClick={() => setShowCreateForm(false)}
+                        onClick={() => (formMode === "edit" ? closeEditForm() : closeCreateForm())}
                         aria-label="Yopish"
                       >
                         ✕
                       </button>
                     )}
                   </div>
-                  <h3 id="os-create-title">Yangi kompaniya yaratish</h3>
+                  <h3 id="os-create-title">
+                    {formMode === "edit" ? "Kompaniyani tahrirlash" : "Yangi kompaniya yaratish"}
+                  </h3>
                   <p>
-                    Nom, INN, brand va kartadagi aniq joylashuv — siz avtomatik egasi bo‘lasiz.
-                    Koordinatalar yetkazib berish uchun saqlanadi.
+                    {formMode === "edit"
+                      ? "Nom, INN, brand va kartadagi joylashuvni yangilang. Turi va slug o‘zgarmaydi."
+                      : "Nom, INN, brand va kartadagi aniq joylashuv — siz avtomatik egasi bo‘lasiz. Koordinatalar yetkazib berish uchun saqlanadi."}
                   </p>
                 </div>
-                <form className="os-create-form" onSubmit={handleSubmit}>
+                <form
+                  className="os-create-form"
+                  onSubmit={formMode === "edit" ? handleUpdate : handleSubmit}
+                >
                   <div className="os-create-section">
                     <div className="os-create-section-head">
                       <span className="os-create-step">01</span>
                       <div>
                         <h4>Asosiy ma’lumot</h4>
-                        <p>Kompaniya nomi, turi va soliq identifikatori</p>
+                        <p>
+                          {formMode === "edit"
+                            ? "Kompaniya nomi va soliq identifikatori"
+                            : "Kompaniya nomi, turi va soliq identifikatori"}
+                        </p>
                       </div>
                     </div>
 
@@ -510,9 +608,14 @@ export default function Companies() {
                           onChange={(e) => setName(e.target.value)}
                           required
                         />
-                        {name.trim() && (
+                        {formMode === "create" && name.trim() && (
                           <em className="os-field-hint">
                             Ichki identifikator: /{slugify(name)} — URL va tizim uchun avtomatik
+                          </em>
+                        )}
+                        {formMode === "edit" && activeCompany?.slug && (
+                          <em className="os-field-hint">
+                            Ichki identifikator: /{activeCompany.slug} — o‘zgarmaydi
                           </em>
                         )}
                       </label>
@@ -533,22 +636,24 @@ export default function Companies() {
                       </label>
                     </div>
 
-                    <div className="os-type-grid" role="group" aria-label="Kompaniya turi">
-                      {COMPANY_TYPES.map((t) => (
-                        <button
-                          key={t.key}
-                          type="button"
-                          className={`os-type-card ${companyType === t.key ? "active" : ""}`}
-                          onClick={() => setCompanyType(t.key)}
-                        >
-                          <strong>{t.mark}</strong>
-                          <span>
-                            {t.label}
-                            <small>{t.industry}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    {formMode === "create" && (
+                      <div className="os-type-grid" role="group" aria-label="Kompaniya turi">
+                        {COMPANY_TYPES.map((t) => (
+                          <button
+                            key={t.key}
+                            type="button"
+                            className={`os-type-card ${companyType === t.key ? "active" : ""}`}
+                            onClick={() => setCompanyType(t.key)}
+                          >
+                            <strong>{t.mark}</strong>
+                            <span>
+                              {t.label}
+                              <small>{t.industry}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="os-create-section">
@@ -638,17 +743,23 @@ export default function Companies() {
 
                   {error && <p className="error">{error}</p>}
                   <div className="os-create-actions">
-                    {companies.length > 0 && (
+                    {(formMode === "edit" || companies.length > 0) && (
                       <button
                         type="button"
                         className="os-btn-ghost"
-                        onClick={() => setShowCreateForm(false)}
+                        onClick={() => (formMode === "edit" ? closeEditForm() : closeCreateForm())}
                       >
                         Bekor qilish
                       </button>
                     )}
                     <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
-                      {loading ? "Yaratilmoqda..." : "Kompaniyani yaratish"}
+                      {formMode === "edit"
+                        ? loading
+                          ? "Saqlanmoqda..."
+                          : "Saqlash"
+                        : loading
+                          ? "Yaratilmoqda..."
+                          : "Kompaniyani yaratish"}
                     </button>
                   </div>
                 </form>
@@ -657,7 +768,7 @@ export default function Companies() {
             document.body
           )}
 
-        {!createOpen && activeCompany && (
+        {!formOpen && activeCompany && (
           <section className="os-panel">
             <header className="os-panel-header">
               <div className="os-brand">
@@ -688,16 +799,21 @@ export default function Companies() {
                 </div>
               </div>
               {isOwner && (
-                <button
-                  type="button"
-                  className="os-text-danger"
-                  onClick={() => {
-                    setDeleteTarget(activeCompany);
-                    setDeleteError(null);
-                  }}
-                >
-                  O‘chirish
-                </button>
+                <div className="os-section-actions">
+                  <button type="button" className="os-btn-ghost" onClick={() => openEditForm(activeCompany)}>
+                    Tahrirlash
+                  </button>
+                  <button
+                    type="button"
+                    className="os-text-danger"
+                    onClick={() => {
+                      setDeleteTarget(activeCompany);
+                      setDeleteError(null);
+                    }}
+                  >
+                    O‘chirish
+                  </button>
+                </div>
               )}
             </header>
 

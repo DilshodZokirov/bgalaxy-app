@@ -70,6 +70,8 @@ export const api = {
   resetPassword: (token, newPassword) =>
     request("/auth/reset-password", { method: "POST", body: { token, new_password: newPassword }, auth: false }),
   createCompany: (data) => request("/companies", { method: "POST", body: data }),
+  updateCompany: (companyId, data) =>
+    request(`/companies/${companyId}`, { method: "PATCH", body: data }),
   deleteCompany: (companyId) => request(`/companies/${companyId}`, { method: "DELETE" }),
   getMyCompanies: () => request("/companies/mine"),
   geoSearch: (q, region = null, category = null) => {
@@ -105,7 +107,16 @@ export const api = {
         warehouseId ? `&warehouse_id=${warehouseId}` : ""
       }`
     ),
-  getWarehouseMarketplace: (companyId) => request(`/companies/${companyId}/warehouse/marketplace`),
+  getMarketplaceSellers: (companyId) =>
+    request(`/companies/${companyId}/warehouse/marketplace/sellers`),
+  getMarketplaceSellerProducts: (companyId, sellerId) =>
+    request(`/companies/${companyId}/warehouse/marketplace/sellers/${sellerId}/products`),
+  getWarehouseMarketplace: (companyId, sellerId = null) =>
+    request(
+      `/companies/${companyId}/warehouse/marketplace${
+        sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : ""
+      }`
+    ),
   placeWarehouseOrder: (companyId, sellerCompanyId, productId, quantity, warehouseId = null) =>
     request(`/companies/${companyId}/warehouse/marketplace/order`, {
       method: "POST",
@@ -115,6 +126,29 @@ export const api = {
         quantity,
         ...(warehouseId ? { warehouse_id: warehouseId } : {}),
       },
+    }),
+  placeWarehouseCartOrder: (companyId, sellerCompanyId, items, warehouseId = null) =>
+    request(`/companies/${companyId}/warehouse/marketplace/cart-order`, {
+      method: "POST",
+      body: {
+        seller_company_id: sellerCompanyId,
+        items,
+        ...(warehouseId ? { warehouse_id: warehouseId } : {}),
+      },
+    }),
+  listProductOnMarketplace: (companyId, productId, price) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}/list-marketplace`, {
+      method: "POST",
+      body: { price },
+    }),
+  unlistProductFromMarketplace: (companyId, productId) =>
+    request(`/companies/${companyId}/warehouse/products/${productId}/unlist-marketplace`, {
+      method: "POST",
+    }),
+  rateWarehouseCompany: (companyId, ratedCompanyId, orderId, score) =>
+    request(`/companies/${companyId}/warehouse/ratings`, {
+      method: "POST",
+      body: { rated_company_id: ratedCompanyId, order_id: orderId, score },
     }),
   getWarehouseOrders: (companyId, scope = "auto", status = null) =>
     request(

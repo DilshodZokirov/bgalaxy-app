@@ -26,6 +26,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import DeveloperPanel from "./pages/DeveloperPanel";
 import Analytics from "./pages/Analytics";
 import Warehouse from "./pages/Warehouse";
+import Marketplace from "./pages/Marketplace";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ResetPin from "./pages/ResetPin";
@@ -190,6 +191,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Warehouse />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/marketplace"
+          element={
+            <ProtectedRoute>
+              <Marketplace />
             </ProtectedRoute>
           }
         />

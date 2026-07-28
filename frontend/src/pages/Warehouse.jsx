@@ -37,6 +37,11 @@ const DASHBOARD_VIEWS = [
   { key: "sold", label: "Aylanma" },
 ];
 
+/** Distributor + market: no manual inventoy — order via Marketplace only. */
+function isBuyerOnlyCompany(company) {
+  return company?.company_type === "distributor" || company?.company_type === "market";
+}
+
 function emptyForm(type) {
   return {
     name: "",
@@ -705,17 +710,151 @@ function OrderPipelineCard({ order, actions, highlight }) {
   );
 }
 
+function ReceiptChecklistModal({ orders, onConfirm, onClose, busy, error }) {
+  const total = orders.reduce((s, o) => s + Number(o.total_price || 0), 0);
+  const sellerName = orders[0]?.seller_company_name || "Sotuvchi";
+  return (
+    <div className="wh-modal-backdrop" onClick={onClose}>
+      <div className="card wh-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="wh-modal-head">
+          <h3>Qabul checklist</h3>
+          <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
+        </div>
+        <p className="wh-hint">Sotuvchi: <strong>{sellerName}</strong>. Tasdiqlashdan oldin tekshiring.</p>
+        <ul className="wh-checklist">
+          {orders.map((o) => (
+            <li key={o.id}>
+              <span>{o.product_name}</span>
+              <span>
+                {o.quantity} {UNIT_LABELS[o.unit] || o.unit} · {money(o.total_price)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="wh-total">Umumiy: {money(total)}</p>
+        {error && <p className="error">{error}</p>}
+        <button type="button" className="wh-cta" disabled={busy} onClick={onConfirm}>
+          {busy ? "Tasdiqlanmoqda..." : "Tasdiqlash"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RatingModal({ sellerName, onSubmit, onSkip }) {
+  const [score, setScore] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit(score);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="wh-modal-backdrop">
+      <form className="card wh-modal" onSubmit={handleSubmit}>
+        <div className="wh-modal-head">
+          <h3>Baholang</h3>
+        </div>
+        <p className="wh-hint">
+          <strong>{sellerName}</strong> — yetkazib berishdan keyin baho bering.
+        </p>
+        <div className="wh-rating-stars">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={n <= score ? "on" : ""}
+              onClick={() => setScore(n)}
+              aria-label={`${n} yulduz`}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+        {error && <p className="error">{error}</p>}
+        <div className="wh-modal-actions">
+          <button type="button" className="secondary wh-soft-btn" onClick={onSkip} disabled={busy}>
+            O‘tkazib yuborish
+          </button>
+          <button type="submit" className="wh-cta" disabled={busy}>
+            {busy ? "Saqlanmoqda..." : "Baholash"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ListMarketplaceModal({ product, company, onClose, onSaved }) {
+  const [price, setPrice] = useState(String(product.price || ""));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const p = Number(price);
+    if (!p || p <= 0) {
+      setError("Sotuv narxini kiriting");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.listProductOnMarketplace(company.id, product.id, p);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="wh-modal-backdrop" onClick={onClose}>
+      <form className="card wh-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="wh-modal-head">
+          <h3>Marketplacega chiqarish</h3>
+          <button type="button" className="secondary wh-soft-btn" onClick={onClose}>Yopish</button>
+        </div>
+        <p className="wh-hint">
+          «{product.name}» uchun yangi sotuv narxini kiriting. Chiqarilgach market/distributorlar ko‘radi.
+        </p>
+        <label>Yangi narx (so‘m)</label>
+        <input type="number" min="0.01" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        {error && <p className="error">{error}</p>}
+        <button type="submit" className="wh-cta" disabled={saving}>
+          {saving ? "Chiqarilmoqda..." : "Marketplacega qo‘yish"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
+  const isMarket = company.company_type === "market";
   const isDistributor = company.company_type === "distributor";
+  const isPurchaseBuyer = isBuyerOnlyCompany(company);
+  const canSell = !isMarket;
   const canManage = !!(perms?.is_owner || perms?.permissions?.manage_warehouse);
   const canLoad = !!(perms?.is_owner || perms?.permissions?.warehouse_loader || canManage);
   const canCourier = !!(perms?.is_owner || perms?.permissions?.warehouse_courier || canManage);
 
   const scopes = [];
-  if (isDistributor) {
+  if (isPurchaseBuyer) {
     scopes.push({ key: "purchases", label: "Mening buyurtmalarim" });
     scopes.push({ key: "receipt", label: "Qabul qilish" });
-  } else {
+  }
+  if (canSell) {
     scopes.push({ key: "sales", label: "Ombor kuzatuv" });
     if (canLoad) scopes.push({ key: "loader", label: "Yuklash" });
     if (canCourier) scopes.push({ key: "courier", label: "Yetkazish" });
@@ -731,6 +870,8 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [checklistOrders, setChecklistOrders] = useState(null);
+  const [ratingTarget, setRatingTarget] = useState(null);
 
   useEffect(() => {
     if (defaultScope && scopes.some((s) => s.key === defaultScope)) {
@@ -765,26 +906,59 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
     }
   }
 
+  function openReceiptChecklist(order) {
+    const batch = order.batch_id
+      ? orders.filter((o) => o.batch_id === order.batch_id && o.status === "awaiting_receipt")
+      : [order];
+    setChecklistOrders(batch.length ? batch : [order]);
+  }
+
+  async function confirmReceiptBatch() {
+    if (!checklistOrders?.length) return;
+    const primary = checklistOrders[0];
+    setBusyId(primary.id);
+    setError(null);
+    try {
+      await api.transitionWarehouseOrder(company.id, primary.id, "confirm_receipt");
+      setChecklistOrders(null);
+      setRatingTarget({
+        sellerName: primary.seller_company_name || "Sotuvchi",
+        sellerId: primary.seller_company_id,
+        orderId: primary.id,
+      });
+      refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function actionsFor(order) {
     const busy = busyId === order.id;
     const list = [];
-    if (!isDistributor && scope === "sales" && canManage && order.status === "ordered") {
+    if (canSell && scope === "sales" && canManage && order.status === "ordered") {
       list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
     }
-    if (!isDistributor && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
+    if (canSell && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
       list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(order.id, "confirm_loaded") });
     }
-    if (!isDistributor && scope === "sales" && canManage && order.status === "loaded") {
+    if (canSell && scope === "sales" && canManage && order.status === "loaded") {
       list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(order.id, "dispatch") });
     }
-    if (!isDistributor && scope === "courier" && canCourier && order.status === "on_road") {
+    if (canSell && scope === "courier" && canCourier && order.status === "on_road") {
       list.push({ action: "accept_courier", label: "Arizani qabul qilish", busy, onClick: () => runAction(order.id, "accept_courier") });
     }
-    if (!isDistributor && scope === "courier" && canCourier && order.status === "courier_accepted") {
+    if (canSell && scope === "courier" && canCourier && order.status === "courier_accepted") {
       list.push({ action: "confirm_arrival", label: "Yetib keldim", busy, onClick: () => runAction(order.id, "confirm_arrival") });
     }
-    if (isDistributor && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
-      list.push({ action: "confirm_receipt", label: "Qabul qilishni tasdiqlash", busy, onClick: () => runAction(order.id, "confirm_receipt") });
+    if (isPurchaseBuyer && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
+      list.push({
+        action: "confirm_receipt",
+        label: "Checklist / Tasdiqlash",
+        busy,
+        onClick: () => openReceiptChecklist(order),
+      });
     }
     if (canManage && (order.status === "ordered" || order.status === "loading")) {
       list.push({
@@ -802,13 +976,18 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
     return list;
   }
 
+  const lead = isMarket
+    ? "Distributiv firmadan buyurtma holati va yetkazilgan yukni tekshirib qabul qiling — tasdiqlangandan keyin omborga avtomatik qo‘shiladi."
+    : isDistributor
+      ? "Xaridlaringizni qabul qiling; market buyurtmalarini yuklash → yo‘l → yetkazish orqali bajaring."
+      : "Barcha buyurtmalar: qaysi xaridor, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish.";
+
+  // Group receipt list by batch for cleaner UI
+  const displayOrders = orders;
+
   return (
     <div className="wh-orders">
-      <p className="wh-section-lead">
-        {isDistributor
-          ? "Buyurtma holati, yo‘l kuzatuvi va yetkazilgan yukni tekshirib qabul qiling — tasdiqlangandan keyin omborga avtomatik qo‘shiladi."
-          : "Barcha buyurtmalar: qaysi distributiv, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish."}
-      </p>
+      <p className="wh-section-lead">{lead}</p>
       <div className="wh-view-tabs" role="tablist">
         {scopes.map((s) => (
           <button
@@ -823,94 +1002,40 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
       </div>
       {error && <p className="error">{error}</p>}
       {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
-      {!loading && orders.length === 0 && (
+      {!loading && displayOrders.length === 0 && (
         <div className="wh-empty"><p>Bu bo‘limda buyurtma yo‘q.</p></div>
       )}
       <div className="wh-orders-list">
-        {orders.map((o) => (
+        {displayOrders.map((order) => (
           <OrderPipelineCard
-            key={o.id}
-            order={o}
-            highlight={focusOrderId && focusOrderId === o.id}
-            actions={actionsFor(o)}
+            key={order.id}
+            order={order}
+            actions={actionsFor(order)}
+            highlight={focusOrderId && String(focusOrderId) === String(order.id)}
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-function MarketplaceTab({ company, onOrdered }) {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [orderProduct, setOrderProduct] = useState(null);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    refresh();
-  }, [company.id]);
-
-  function refresh() {
-    setLoading(true);
-    api
-      .getWarehouseMarketplace(company.id)
-      .then(setProducts)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
-
-  const visible = products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
-
-  return (
-    <div className="wh-market">
-      <p className="wh-section-lead">
-        Ishlab chiqaruvchi omboridan buyurtma bering. Mavjud miqdor — boshqa firmalar band qilgan zaxiradan tashqari qoldiq.
-        Buyurtma berilgach yuklash → yo‘l → qabul qilish bosqichlari boshlanadi; omborga faqat qabuldan keyin tushadi.
-      </p>
-      <input className="wh-search" type="text" placeholder="Nomi bo‘yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      {error && <p className="error">{error}</p>}
-      {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
-      {!loading && visible.length === 0 && <div className="wh-empty"><p>Hozircha bozorda mahsulot yo‘q.</p></div>}
-      <div className="wh-grid">
-        {visible.map((p) => (
-          <article key={p.id} className="wh-card">
-            {p.image_url ? (
-              <img className="wh-card-img" src={p.image_url} alt={p.name} />
-            ) : (
-              <div className="wh-card-img placeholder" />
-            )}
-            <div className="wh-card-body">
-              <span className="wh-source">{p.company_name}</span>
-              <h4>{p.name}</h4>
-              <p>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</p>
-              <p className="ok">Mavjud: {p.quantity} {UNIT_LABELS[p.unit] || p.unit}</p>
-              {p.reserved_quantity > 0 && (
-                <p className="wh-hint">Boshqa buyurtmalar band: {p.reserved_quantity}</p>
-              )}
-              <button
-                type="button"
-                className="wh-cta"
-                onClick={() =>
-                  setOrderProduct({
-                    ...p,
-                    onOrder: (q) => api.placeWarehouseOrder(company.id, p.company_id, p.id, q),
-                  })
-                }
-              >
-                Buyurtma berish
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-      {orderProduct && (
-        <OrderModal
-          product={orderProduct}
-          onClose={() => setOrderProduct(null)}
-          onOrdered={() => {
-            refresh();
-            onOrdered?.();
+      {checklistOrders && (
+        <ReceiptChecklistModal
+          orders={checklistOrders}
+          busy={!!busyId}
+          error={error}
+          onClose={() => setChecklistOrders(null)}
+          onConfirm={confirmReceiptBatch}
+        />
+      )}
+      {ratingTarget && (
+        <RatingModal
+          sellerName={ratingTarget.sellerName}
+          onSkip={() => setRatingTarget(null)}
+          onSubmit={async (score) => {
+            await api.rateWarehouseCompany(
+              company.id,
+              ratingTarget.sellerId,
+              ratingTarget.orderId,
+              score
+            );
+            setRatingTarget(null);
           }}
         />
       )}
@@ -931,7 +1056,7 @@ export default function Warehouse() {
   const [editProduct, setEditProduct] = useState(null);
   const [stockProduct, setStockProduct] = useState(null);
   const [reorderProduct, setReorderProduct] = useState(null);
-  const [reorderBusy, setReorderBusy] = useState(null);
+  const [listProduct, setListProduct] = useState(null);
   const [tab, setTab] = useState(() => searchParams.get("tab") || "dashboard");
   const [perms, setPerms] = useState(null);
   const [search, setSearch] = useState("");
@@ -1010,40 +1135,8 @@ export default function Warehouse() {
     }
   }
 
-  async function handleReorder(product) {
-    setError(null);
-    setReorderBusy(product.id);
-    try {
-      const market = await api.getWarehouseMarketplace(company.id);
-      const nameKey = (product.name || "").trim().toLowerCase();
-      const match = market.find(
-        (m) =>
-          String(m.company_id) === String(product.source_company_id) &&
-          (m.name || "").trim().toLowerCase() === nameKey &&
-          m.unit === product.unit
-      ) || market.find(
-        (m) =>
-          (m.name || "").trim().toLowerCase() === nameKey &&
-          m.unit === product.unit &&
-          (m.company_name || "").trim().toLowerCase() === (product.source_company_name || "").trim().toLowerCase()
-      );
-      if (!match) {
-        setError(
-          `"${product.name}" bozorda topilmadi yoki zaxira tugagan. Bozor bo‘limidan boshqa mahsulot buyurtma qiling.`
-        );
-        setTab("marketplace");
-        return;
-      }
-      setReorderProduct({
-        ...match,
-        onOrder: (q) =>
-          api.placeWarehouseOrder(company.id, match.company_id, match.id, q, product.warehouse_id || null),
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setReorderBusy(null);
-    }
+  async function handleReorder() {
+    navigate("/marketplace");
   }
 
   function isLowStock(p) {
@@ -1088,9 +1181,6 @@ export default function Warehouse() {
     { key: "products", label: "Mahsulotlar" },
     { key: "orders", label: "Buyurtmalar" },
   ];
-  if (company?.company_type === "distributor") {
-    tabs.push({ key: "marketplace", label: "Bozor" });
-  }
 
   if (companyLoading) {
     return (
@@ -1133,14 +1223,19 @@ export default function Warehouse() {
     );
   }
 
+  const buyerOnly = isBuyerOnlyCompany(company);
+  const canListMarketplace =
+    company.company_type === "distributor" || company.company_type === "kompaniya";
   const subtitle =
     company.company_type === "distributor"
-      ? "Distributiv firma — zaxira faqat Bozor buyurtmasi orqali to‘ldiriladi"
-      : multi
-        ? selectedWarehouseId
-          ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
-          : `Umumiy ko‘rinish — ${warehouses.length} ta ombor`
-        : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
+      ? "Distributiv firma — zaxira Marketplace buyurtmasi orqali; sotuv narxi bilan chiqaring"
+      : company.company_type === "market"
+        ? "Market — mahsulot faqat distributiv omboridan buyurtma orqali keladi"
+        : multi
+          ? selectedWarehouseId
+            ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
+            : `Umumiy ko‘rinish — ${warehouses.length} ta ombor`
+          : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
 
   return (
     <AppShell>
@@ -1191,7 +1286,6 @@ export default function Warehouse() {
             multi={multi}
           />
         )}
-        {tab === "marketplace" && <MarketplaceTab company={company} onOrdered={refreshProducts} />}
         {tab === "orders" && (
           <OrdersPipelineTab
             company={company}
@@ -1204,7 +1298,7 @@ export default function Warehouse() {
         {tab === "products" && (
           <section className="wh-products">
             <div className="wh-tools">
-              {company.company_type !== "distributor" && (
+              {!buyerOnly && (
                 <button
                   type="button"
                   className="wh-cta"
@@ -1217,6 +1311,11 @@ export default function Warehouse() {
                   }}
                 >
                   Yangi mahsulot
+                </button>
+              )}
+              {buyerOnly && (
+                <button type="button" className="wh-cta" onClick={() => navigate("/marketplace")}>
+                  Marketplace
                 </button>
               )}
               <input
@@ -1253,13 +1352,13 @@ export default function Warehouse() {
             {!loading && products.length === 0 && (
               <div className="wh-empty">
                 <p>
-                  {company.company_type === "distributor"
-                    ? "Hali mahsulot yo‘q — Bozor bo‘limidan buyurtma bering."
+                  {buyerOnly
+                    ? "Hali mahsulot yo‘q — Marketplace orqali buyurtma bering."
                     : "Hali mahsulot qo‘shilmagan."}
                 </p>
-                {company.company_type === "distributor" && (
-                  <button type="button" className="wh-cta" onClick={() => setTab("marketplace")}>
-                    Bozorga o‘tish
+                {buyerOnly && (
+                  <button type="button" className="wh-cta" onClick={() => navigate("/marketplace")}>
+                    Marketplacega o‘tish
                   </button>
                 )}
               </div>
@@ -1271,7 +1370,6 @@ export default function Warehouse() {
             <div className="wh-grid">
               {visibleProducts.map((p) => {
                 const tone = stockTone(p, isLowStock(p));
-                const isDistributor = company.company_type === "distributor";
                 return (
                   <article key={p.id} className={`wh-card tone-${tone}`}>
                     {p.image_url ? (
@@ -1281,6 +1379,11 @@ export default function Warehouse() {
                     )}
                     <div className="wh-card-body">
                       {p.source_company_name && <span className="wh-source">{p.source_company_name} dan</span>}
+                      {canListMarketplace && (
+                        <span className={`wh-listed ${p.listed_on_marketplace ? "on" : "off"}`}>
+                          {p.listed_on_marketplace ? "Marketplaceda" : "Chiqarilmagan"}
+                        </span>
+                      )}
                       <div className="wh-card-top">
                         <h4>{p.name}</h4>
                         <span className={`wh-qty ${tone}`}>
@@ -1297,17 +1400,40 @@ export default function Warehouse() {
                       {p.sku && <p className="wh-meta">SKU: {p.sku}</p>}
                       {p.notes && <p className="wh-meta">{p.notes}</p>}
                       <div className="wh-card-actions">
-                        {isDistributor ? (
-                          <button
-                            type="button"
-                            className="wh-cta slim"
-                            disabled={reorderBusy === p.id}
-                            onClick={() => handleReorder(p)}
-                          >
-                            {reorderBusy === p.id ? "Qidirilmoqda..." : "Qayta buyurtma"}
-                          </button>
+                        {buyerOnly ? (
+                          <>
+                            {company.company_type === "distributor" && !p.listed_on_marketplace && (
+                              <button type="button" className="wh-cta slim" onClick={() => setListProduct(p)}>
+                                Marketplacega chiqarish
+                              </button>
+                            )}
+                            {company.company_type === "distributor" && p.listed_on_marketplace && (
+                              <button
+                                type="button"
+                                className="secondary wh-soft-btn"
+                                onClick={async () => {
+                                  try {
+                                    await api.unlistProductFromMarketplace(company.id, p.id);
+                                    refreshProducts();
+                                  } catch (err) {
+                                    setError(err.message);
+                                  }
+                                }}
+                              >
+                                Marketplacedan olish
+                              </button>
+                            )}
+                            <button type="button" className="secondary wh-soft-btn" onClick={handleReorder}>
+                              Qayta buyurtma
+                            </button>
+                          </>
                         ) : (
                           <>
+                            {!p.listed_on_marketplace && (
+                              <button type="button" className="wh-cta slim" onClick={() => setListProduct(p)}>
+                                Marketplacega chiqarish
+                              </button>
+                            )}
                             <button type="button" className="wh-cta slim" onClick={() => setStockProduct(p)}>Zaxira</button>
                             {p.unit === "dona" && (
                               <button type="button" className="secondary wh-soft-btn" onClick={() => handleQuickAdd(p)}>+1</button>
@@ -1326,7 +1452,7 @@ export default function Warehouse() {
         )}
       </div>
 
-      {showAdd && (
+      {showAdd && !buyerOnly && (
         <ProductModal
           company={company}
           products={products}
@@ -1336,7 +1462,7 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {editProduct && company.company_type !== "distributor" && (
+      {editProduct && !buyerOnly && (
         <ProductModal
           company={company}
           product={editProduct}
@@ -1347,8 +1473,16 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {stockProduct && company.company_type !== "distributor" && (
+      {stockProduct && !buyerOnly && (
         <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />
+      )}
+      {listProduct && (
+        <ListMarketplaceModal
+          product={listProduct}
+          company={company}
+          onClose={() => setListProduct(null)}
+          onSaved={refreshProducts}
+        />
       )}
       {reorderProduct && (
         <OrderModal

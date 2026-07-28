@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WarehouseSettingsUpdate(BaseModel):
@@ -56,6 +56,12 @@ class ProductUpdate(BaseModel):
     notes: str | None = None
 
 
+class ProductListMarketplace(BaseModel):
+    """List a product on Marketplace with a selling price."""
+
+    price: float = Field(gt=0)
+
+
 class ProductOut(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
@@ -71,6 +77,7 @@ class ProductOut(BaseModel):
     low_stock_threshold: float | None = None
     source_company_id: uuid.UUID | None = None
     source_company_name: str | None = None
+    listed_on_marketplace: bool = True
     size: str | None = None
     color: str | None = None
     expiry_date: date | None = None
@@ -100,11 +107,35 @@ class MarketplaceProductOut(BaseModel):
         from_attributes = True
 
 
+class MarketplaceSellerOut(BaseModel):
+    company_id: uuid.UUID
+    company_name: str
+    company_type: str
+    logo_url: str | None = None
+    location_region: str | None = None
+    product_count: int = 0
+    avg_rating: float | None = None
+    rating_count: int = 0
+
+
 class OrderCreate(BaseModel):
     seller_company_id: uuid.UUID
     product_id: uuid.UUID
     quantity: float
     warehouse_id: uuid.UUID | None = None  # buyer's target warehouse (optional)
+
+
+class CartItemCreate(BaseModel):
+    product_id: uuid.UUID
+    quantity: float = Field(gt=0)
+
+
+class CartOrderCreate(BaseModel):
+    """Multi-product checkout — all items must belong to one seller."""
+
+    seller_company_id: uuid.UUID
+    items: list[CartItemCreate]
+    warehouse_id: uuid.UUID | None = None
 
 
 class OrderTransition(BaseModel):
@@ -114,6 +145,7 @@ class OrderTransition(BaseModel):
 
 class OrderOut(BaseModel):
     id: uuid.UUID
+    batch_id: uuid.UUID | None = None
     buyer_company_id: uuid.UUID
     seller_company_id: uuid.UUID
     seller_product_id: uuid.UUID
@@ -135,6 +167,25 @@ class OrderOut(BaseModel):
     courier_accepted_at: datetime | None = None
     arrived_at: datetime | None = None
     completed_at: datetime | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RatingCreate(BaseModel):
+    rated_company_id: uuid.UUID
+    order_id: uuid.UUID
+    score: int = Field(ge=1, le=5)
+
+
+class RatingOut(BaseModel):
+    id: uuid.UUID
+    rater_company_id: uuid.UUID
+    rated_company_id: uuid.UUID
+    order_id: uuid.UUID
+    batch_id: uuid.UUID | None = None
+    score: int
     created_at: datetime
 
     class Config:

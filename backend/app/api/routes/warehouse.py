@@ -10,16 +10,21 @@ from app.db.database import get_db
 from app.models.accounting import Transaction
 from app.models.company import Company
 from app.models.user import User
-from app.models.warehouse import StockMovement, Warehouse, WarehouseOrder, WarehouseProduct
+from app.models.warehouse import CompanyRating, StockMovement, Warehouse, WarehouseOrder, WarehouseProduct
 from app.schemas.company import CompanyOut
 from app.schemas.warehouse import (
+    CartOrderCreate,
     MarketplaceProductOut,
+    MarketplaceSellerOut,
     OrderCreate,
     OrderOut,
     OrderTransition,
     ProductCreate,
+    ProductListMarketplace,
     ProductOut,
     ProductUpdate,
+    RatingCreate,
+    RatingOut,
     StockAdjustment,
     StockMovementOut,
     WarehouseCreate,
@@ -44,6 +49,41 @@ WAREHOUSE_TYPE_NAMES = {
 }
 MAX_WAREHOUSES = 3
 VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi", "warehouse_loader", "warehouse_courier"]
+BUYER_ONLY_TYPES = {"distributor", "market"}
+MARKETPLACE_SELLER_BY_BUYER = {
+    "distributor": "kompaniya",
+    "market": "distributor",
+}
+
+
+def _assert_can_manage_inventory(company: Company) -> None:
+    """Distributor/market cannot hand-enter stock — they order via Marketplace."""
+    if company.company_type == "distributor":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Distributiv firma o'zi mahsulot qo'sha/tahrirlay olmaydi — "
+                "Marketplace orqali ishlab chiqaruvchi omboridan buyurtma bering."
+            ),
+        )
+    if company.company_type == "market":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Market qo'lda mahsulot qo'sha/tahrirlay olmaydi — "
+                "Marketplace orqali distributiv firmalar omboridan buyurtma bering."
+            ),
+        )
+
+
+def _marketplace_seller_type(buyer: Company) -> str:
+    seller_type = MARKETPLACE_SELLER_BY_BUYER.get(buyer.company_type)
+    if seller_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Marketplace faqat Distributiv firma va Market uchun mavjud",
+        )
+    return seller_type
 
 
 def _day_key(d: date) -> str:
@@ -265,6 +305,7 @@ def _product_out(product: WarehouseProduct, warehouse: Warehouse | None = None) 
         low_stock_threshold=float(product.low_stock_threshold) if product.low_stock_threshold is not None else None,
         source_company_id=product.source_company_id,
         source_company_name=product.source_company_name,
+        listed_on_marketplace=bool(getattr(product, "listed_on_marketplace", True)),
         size=product.size,
         color=product.color,
         expiry_date=product.expiry_date,
@@ -291,6 +332,7 @@ async def _order_out(db: AsyncSession, order: WarehouseOrder) -> OrderOut:
             courier_name = courier.full_name
     return OrderOut(
         id=order.id,
+        batch_id=getattr(order, "batch_id", None),
         buyer_company_id=order.buyer_company_id,
         seller_company_id=order.seller_company_id,
         seller_product_id=order.seller_product_id,
@@ -488,12 +530,7 @@ async def create_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, warehouses = await _require_warehouse_enabled(db, company_id)
-
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma o'zi mahsulot qo'sha olmaydi — Bozor bo'limidan boshqa kompaniyalar omboridan buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     if not warehouses:
         raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
@@ -588,11 +625,7 @@ async def update_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma mahsulotni tahrirlay olmaydi — kerak bo'lsa Bozordan qayta buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
@@ -630,11 +663,7 @@ async def delete_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma mahsulotni o'chira olmaydi — zaxira Bozor buyurtmalari orqali boshqariladi.",
-        )
+    _assert_can_manage_inventory(company)
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
@@ -665,11 +694,7 @@ async def adjust_stock(
     StockMovement and reflected immediately in the product's quantity."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma zaxirani qo'lda o'zgartira olmaydi — Bozor orqali qayta buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     if payload.change == 0:
         raise HTTPException(status_code=400, detail="O'zgarish 0 bo'lishi mumkin emas")
@@ -864,29 +889,152 @@ async def get_warehouse_dashboard(
     }
 
 
-@router.get("/marketplace", response_model=list[MarketplaceProductOut])
-async def browse_marketplace(
+@router.get("/marketplace/sellers", response_model=list[MarketplaceSellerOut])
+async def list_marketplace_sellers(
     company_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Faqat Distributiv firmalar uchun — boshqa (ishlab chiqaruvchi)
-    kompaniyalarning ombordagi, zaxirasi bor mahsulotlarini ko'rsatadi.
-    Mavjud miqdor = quantity - reserved (boshqa buyurtmalar band qilgan zaxira)."""
+    """Marketplace: seller companies (kompaniya for distributor, distributor for market)."""
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     buyer = await _get_company(db, company_id)
-    if buyer.company_type != "distributor":
-        raise HTTPException(status_code=400, detail="Bozor faqat Distributiv firmalar uchun mavjud")
+    seller_type = _marketplace_seller_type(buyer)
+
+    result = await db.execute(
+        select(WarehouseProduct, Company)
+        .join(Company, Company.id == WarehouseProduct.company_id)
+        .where(
+            Company.company_type == seller_type,
+            Company.has_warehouse == True,  # noqa: E712
+            WarehouseProduct.listed_on_marketplace == True,  # noqa: E712
+            WarehouseProduct.quantity > 0,
+        )
+    )
+    by_seller: dict[str, dict] = {}
+    for product, company in result.all():
+        avail = await available_qty(product)
+        if avail <= 0:
+            continue
+        key = str(company.id)
+        if key not in by_seller:
+            by_seller[key] = {
+                "company": company,
+                "product_count": 0,
+            }
+        by_seller[key]["product_count"] += 1
+
+    if not by_seller:
+        return []
+
+    rating_result = await db.execute(
+        select(
+            CompanyRating.rated_company_id,
+            func.avg(CompanyRating.score),
+            func.count(CompanyRating.id),
+        )
+        .where(CompanyRating.rated_company_id.in_([uuid_lib.UUID(k) for k in by_seller.keys()]))
+        .group_by(CompanyRating.rated_company_id)
+    )
+    ratings = {
+        str(rated_id): (float(avg) if avg is not None else None, int(cnt or 0))
+        for rated_id, avg, cnt in rating_result.all()
+    }
+
+    out = []
+    for key, data in by_seller.items():
+        company = data["company"]
+        avg, cnt = ratings.get(key, (None, 0))
+        out.append(
+            MarketplaceSellerOut(
+                company_id=company.id,
+                company_name=company.name,
+                company_type=company.company_type,
+                logo_url=company.logo_url,
+                location_region=getattr(company, "location_region", None),
+                product_count=data["product_count"],
+                avg_rating=round(avg, 1) if avg is not None else None,
+                rating_count=cnt,
+            )
+        )
+    out.sort(key=lambda s: (-(s.avg_rating or 0), -s.product_count, s.company_name.lower()))
+    return out
+
+
+@router.get("/marketplace/sellers/{seller_id}/products", response_model=list[MarketplaceProductOut])
+async def list_seller_marketplace_products(
+    company_id: str,
+    seller_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
+    buyer = await _get_company(db, company_id)
+    seller_type = _marketplace_seller_type(buyer)
+
+    seller = await _get_company(db, seller_id)
+    if seller.company_type != seller_type or not seller.has_warehouse:
+        raise HTTPException(status_code=404, detail="Sotuvchi topilmadi")
+
+    result = await db.execute(
+        select(WarehouseProduct, Warehouse.warehouse_type)
+        .outerjoin(Warehouse, Warehouse.id == WarehouseProduct.warehouse_id)
+        .where(
+            WarehouseProduct.company_id == seller_id,
+            WarehouseProduct.listed_on_marketplace == True,  # noqa: E712
+            WarehouseProduct.quantity > 0,
+        )
+        .order_by(WarehouseProduct.name)
+    )
+    out = []
+    for product, wh_type in result.all():
+        avail = await available_qty(product)
+        if avail <= 0:
+            continue
+        reserved = float(getattr(product, "reserved_quantity", 0) or 0)
+        out.append(
+            MarketplaceProductOut(
+                id=product.id,
+                company_id=product.company_id,
+                company_name=seller.name,
+                warehouse_id=product.warehouse_id,
+                warehouse_type=wh_type,
+                name=product.name,
+                price=float(product.price),
+                quantity=avail,
+                reserved_quantity=reserved,
+                unit=product.unit,
+                image_url=product.image_url,
+            )
+        )
+    return out
+
+
+@router.get("/marketplace", response_model=list[MarketplaceProductOut])
+async def browse_marketplace(
+    company_id: str,
+    seller_id: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Listed marketplace products. Prefer /marketplace/sellers then seller products."""
+    await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
+    buyer = await _get_company(db, company_id)
+    seller_type = _marketplace_seller_type(buyer)
+
+    filters = [
+        Company.company_type == seller_type,
+        Company.has_warehouse == True,  # noqa: E712
+        WarehouseProduct.listed_on_marketplace == True,  # noqa: E712
+        WarehouseProduct.quantity > 0,
+    ]
+    if seller_id:
+        filters.append(WarehouseProduct.company_id == seller_id)
 
     result = await db.execute(
         select(WarehouseProduct, Company.name, Warehouse.warehouse_type)
         .join(Company, Company.id == WarehouseProduct.company_id)
         .outerjoin(Warehouse, Warehouse.id == WarehouseProduct.warehouse_id)
-        .where(
-            Company.company_type == "kompaniya",
-            Company.has_warehouse == True,  # noqa: E712
-            WarehouseProduct.quantity > 0,
-        )
+        .where(*filters)
         .order_by(WarehouseProduct.name)
     )
     out = []
@@ -913,6 +1061,67 @@ async def browse_marketplace(
     return out
 
 
+async def _resolve_buyer_warehouse(
+    buyer_warehouses: list[Warehouse],
+    seller: Company,
+    seller_product: WarehouseProduct,
+    warehouse_id,
+    db: AsyncSession,
+    company_id: str,
+) -> Warehouse:
+    if warehouse_id:
+        wh = await _get_warehouse(db, company_id, str(warehouse_id))
+        assert wh is not None
+        return wh
+    seller_wh = await _get_warehouse(
+        db, str(seller.id), str(seller_product.warehouse_id) if seller_product.warehouse_id else None
+    )
+    if seller_wh:
+        match = next((w for w in buyer_warehouses if w.warehouse_type == seller_wh.warehouse_type), None)
+        if match:
+            return match
+    return buyer_warehouses[0]
+
+
+async def _create_line_order(
+    *,
+    db: AsyncSession,
+    buyer: Company,
+    seller: Company,
+    seller_product: WarehouseProduct,
+    quantity: float,
+    target_warehouse: Warehouse,
+    actor: User,
+    batch_id,
+) -> WarehouseOrder:
+    if not bool(getattr(seller_product, "listed_on_marketplace", True)):
+        raise HTTPException(status_code=400, detail=f"«{seller_product.name}» Marketplacega chiqarilmagan")
+    avail = await available_qty(seller_product)
+    if avail < quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"«{seller_product.name}» uchun yetarli zaxira yo'q (mavjud: {avail})",
+        )
+    seller_product.reserved_quantity = float(getattr(seller_product, "reserved_quantity", 0) or 0) + quantity
+    order = WarehouseOrder(
+        id=uuid_lib.uuid4(),
+        batch_id=batch_id,
+        buyer_company_id=buyer.id,
+        seller_company_id=seller.id,
+        seller_product_id=seller_product.id,
+        buyer_warehouse_id=target_warehouse.id,
+        product_name=seller_product.name,
+        unit=seller_product.unit,
+        quantity=quantity,
+        unit_price=float(seller_product.price),
+        total_price=float(seller_product.price) * quantity,
+        status="ordered",
+        ordered_by_user_id=actor.id,
+    )
+    db.add(order)
+    return order
+
+
 @router.post("/marketplace/order", response_model=OrderOut, status_code=201)
 async def place_marketplace_order(
     company_id: str,
@@ -920,20 +1129,17 @@ async def place_marketplace_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Distributiv firma buyurtma beradi — zaxira band qilinadi, omborga
-    o'tkazish va byudjet faqat yetkazib berish yakunlanganda amalga oshadi."""
+    """Single-item order (legacy). Prefer /marketplace/cart-order for multi-item carts."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
-    if buyer.company_type != "distributor":
-        raise HTTPException(status_code=400, detail="Buyurtma faqat Distributiv firmalar uchun mavjud")
+    expected_seller_type = _marketplace_seller_type(buyer)
     if payload.quantity <= 0:
         raise HTTPException(status_code=400, detail="Miqdor musbat bo'lishi kerak")
     if not buyer_warehouses:
         raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
 
-    seller_result = await db.execute(select(Company).where(Company.id == payload.seller_company_id))
-    seller = seller_result.scalar_one_or_none()
-    if seller is None or seller.company_type != "kompaniya" or not seller.has_warehouse:
+    seller = await _get_company(db, str(payload.seller_company_id))
+    if seller.company_type != expected_seller_type or not seller.has_warehouse:
         raise HTTPException(status_code=404, detail="Sotuvchi kompaniya topilmadi")
 
     product_result = await db.execute(
@@ -944,41 +1150,20 @@ async def place_marketplace_order(
     seller_product = product_result.scalar_one_or_none()
     if seller_product is None:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
-    avail = await available_qty(seller_product)
-    if avail < payload.quantity:
-        raise HTTPException(status_code=400, detail="Sotuvchida yetarli zaxira yo'q")
 
-    target_warehouse: Warehouse | None = None
-    if payload.warehouse_id:
-        target_warehouse = await _get_warehouse(db, company_id, str(payload.warehouse_id))
-    else:
-        seller_wh = await _get_warehouse(
-            db, str(seller.id), str(seller_product.warehouse_id) if seller_product.warehouse_id else None
-        )
-        if seller_wh:
-            target_warehouse = next(
-                (w for w in buyer_warehouses if w.warehouse_type == seller_wh.warehouse_type), None
-            )
-        if target_warehouse is None:
-            target_warehouse = buyer_warehouses[0]
-
-    seller_product.reserved_quantity = float(getattr(seller_product, "reserved_quantity", 0) or 0) + payload.quantity
-
-    order = WarehouseOrder(
-        id=uuid_lib.uuid4(),
-        buyer_company_id=company_id,
-        seller_company_id=seller.id,
-        seller_product_id=seller_product.id,
-        buyer_warehouse_id=target_warehouse.id,
-        product_name=seller_product.name,
-        unit=seller_product.unit,
-        quantity=payload.quantity,
-        unit_price=float(seller_product.price),
-        total_price=float(seller_product.price) * payload.quantity,
-        status="ordered",
-        ordered_by_user_id=current_user.id,
+    target_warehouse = await _resolve_buyer_warehouse(
+        buyer_warehouses, seller, seller_product, payload.warehouse_id, db, company_id
     )
-    db.add(order)
+    order = await _create_line_order(
+        db=db,
+        buyer=buyer,
+        seller=seller,
+        seller_product=seller_product,
+        quantity=payload.quantity,
+        target_warehouse=target_warehouse,
+        actor=current_user,
+        batch_id=None,
+    )
     await db.flush()
 
     seller_notify = await users_with_permission(db, seller.id, "manage_warehouse")
@@ -1000,6 +1185,194 @@ async def place_marketplace_order(
     return await _order_out(db, order)
 
 
+@router.post("/marketplace/cart-order", response_model=list[OrderOut], status_code=201)
+async def place_cart_order(
+    company_id: str,
+    payload: CartOrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Multi-product checkout from one seller — all lines share batch_id."""
+    await require_permission(db, company_id, current_user.id, "manage_warehouse")
+    buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
+    expected_seller_type = _marketplace_seller_type(buyer)
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Savatcha bo'sh")
+    if not buyer_warehouses:
+        raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
+
+    seller = await _get_company(db, str(payload.seller_company_id))
+    if seller.company_type != expected_seller_type or not seller.has_warehouse:
+        raise HTTPException(status_code=404, detail="Sotuvchi kompaniya topilmadi")
+
+    batch_id = uuid_lib.uuid4()
+    orders: list[WarehouseOrder] = []
+    names: list[str] = []
+    for item in payload.items:
+        product_result = await db.execute(
+            select(WarehouseProduct).where(
+                WarehouseProduct.id == item.product_id,
+                WarehouseProduct.company_id == payload.seller_company_id,
+            )
+        )
+        seller_product = product_result.scalar_one_or_none()
+        if seller_product is None:
+            raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+        target_warehouse = await _resolve_buyer_warehouse(
+            buyer_warehouses, seller, seller_product, payload.warehouse_id, db, company_id
+        )
+        order = await _create_line_order(
+            db=db,
+            buyer=buyer,
+            seller=seller,
+            seller_product=seller_product,
+            quantity=item.quantity,
+            target_warehouse=target_warehouse,
+            actor=current_user,
+            batch_id=batch_id,
+        )
+        orders.append(order)
+        names.append(f"{seller_product.name} × {item.quantity}")
+
+    await db.flush()
+    seller_notify = await users_with_permission(db, seller.id, "manage_warehouse")
+    await notify_users(
+        db,
+        user_ids=seller_notify,
+        ntype="warehouse_order",
+        message=f"Yangi savatcha buyurtmasi: {buyer.name} — {', '.join(names[:3])}"
+        + (f" (+{len(names) - 3})" if len(names) > 3 else ""),
+        company_id=seller.id,
+        invite_token=str(orders[0].id),
+        related_user_id=current_user.id,
+    )
+    await db.commit()
+    return [await _order_out(db, o) for o in orders]
+
+
+@router.post("/products/{product_id}/list-marketplace", response_model=ProductOut)
+async def list_product_on_marketplace(
+    company_id: str,
+    product_id: str,
+    payload: ProductListMarketplace,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set selling price and publish product to Marketplace."""
+    await require_permission(db, company_id, current_user.id, "manage_warehouse")
+    company, _ = await _require_warehouse_enabled(db, company_id)
+    if company.company_type not in ("distributor", "kompaniya"):
+        raise HTTPException(status_code=400, detail="Faqat distributor yoki kompaniya Marketplacega chiqarishi mumkin")
+
+    result = await db.execute(
+        select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
+    )
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    if float(product.quantity) <= 0:
+        raise HTTPException(status_code=400, detail="Zaxirasi yo'q mahsulotni chiqarib bo'lmaydi")
+
+    product.price = float(payload.price)
+    product.listed_on_marketplace = True
+    await db.commit()
+    await db.refresh(product)
+    warehouse = await _get_warehouse(db, company_id, str(product.warehouse_id) if product.warehouse_id else None)
+    return _product_out(product, warehouse)
+
+
+@router.post("/products/{product_id}/unlist-marketplace", response_model=ProductOut)
+async def unlist_product_from_marketplace(
+    company_id: str,
+    product_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await require_permission(db, company_id, current_user.id, "manage_warehouse")
+    company, _ = await _require_warehouse_enabled(db, company_id)
+    if company.company_type not in ("distributor", "kompaniya"):
+        raise HTTPException(status_code=400, detail="Faqat distributor yoki kompaniya Marketplacedan olib tashlashi mumkin")
+
+    result = await db.execute(
+        select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
+    )
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    product.listed_on_marketplace = False
+    await db.commit()
+    await db.refresh(product)
+    warehouse = await _get_warehouse(db, company_id, str(product.warehouse_id) if product.warehouse_id else None)
+    return _product_out(product, warehouse)
+
+
+@router.post("/ratings", response_model=RatingOut, status_code=201)
+async def create_company_rating(
+    company_id: str,
+    payload: RatingCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer rates seller after a completed delivery."""
+    await require_permission(db, company_id, current_user.id, "manage_warehouse")
+    buyer = await _get_company(db, company_id)
+
+    order_result = await db.execute(
+        select(WarehouseOrder).where(
+            WarehouseOrder.id == payload.order_id,
+            WarehouseOrder.buyer_company_id == company_id,
+        )
+    )
+    order = order_result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+    if order.status != "completed":
+        raise HTTPException(status_code=400, detail="Faqat yakunlangan buyurtmani baholash mumkin")
+    if str(order.seller_company_id) != str(payload.rated_company_id):
+        raise HTTPException(status_code=400, detail="Baholanadigan kompaniya buyurtma sotuvchisiga mos emas")
+
+    existing = await db.execute(
+        select(CompanyRating).where(
+            CompanyRating.rater_company_id == company_id,
+            CompanyRating.order_id == payload.order_id,
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="Bu buyurtma allaqachon baholangan")
+
+    # One rating per batch (if cart)
+    if order.batch_id is not None:
+        batch_rated = await db.execute(
+            select(CompanyRating).where(
+                CompanyRating.rater_company_id == company_id,
+                CompanyRating.batch_id == order.batch_id,
+            )
+        )
+        if batch_rated.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=400, detail="Bu savatcha buyurtmasi allaqachon baholangan")
+
+    rating = CompanyRating(
+        id=uuid_lib.uuid4(),
+        rater_company_id=buyer.id,
+        rated_company_id=payload.rated_company_id,
+        order_id=order.id,
+        batch_id=order.batch_id,
+        score=payload.score,
+    )
+    db.add(rating)
+    await db.commit()
+    await db.refresh(rating)
+    return RatingOut(
+        id=rating.id,
+        rater_company_id=rating.rater_company_id,
+        rated_company_id=rating.rated_company_id,
+        order_id=rating.order_id,
+        batch_id=rating.batch_id,
+        score=rating.score,
+        created_at=rating.created_at,
+    )
+
+
 async def _complete_order(
     db: AsyncSession,
     order: WarehouseOrder,
@@ -1008,7 +1381,7 @@ async def _complete_order(
     buyer: Company,
     seller: Company,
 ) -> None:
-    """Finalize stock transfer + seller income after distributor confirms receipt."""
+    """Finalize stock transfer + seller income + buyer expense after receipt."""
     product_result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == order.seller_product_id)
     )
@@ -1031,7 +1404,7 @@ async def _complete_order(
             product_id=seller_product.id,
             user_id=actor.id,
             change=-qty,
-            note=f"Sotildi — {buyer.name} (Distributiv, yetkazildi)",
+            note=f"Sotildi — {buyer.name} (yetkazildi)",
         )
     )
 
@@ -1042,6 +1415,7 @@ async def _complete_order(
             raise HTTPException(status_code=400, detail="Xaridor ombori topilmadi")
         target_wh_id = buyer_warehouses[0].id
 
+    cost_price = float(order.unit_price)
     existing_result = await db.execute(
         select(WarehouseProduct).where(
             WarehouseProduct.company_id == buyer.id,
@@ -1054,18 +1428,23 @@ async def _complete_order(
     buyer_product = existing_result.scalar_one_or_none()
     if buyer_product is not None:
         buyer_product.quantity = float(buyer_product.quantity) + qty
+        # Keep current sell price if already listed; otherwise keep cost snapshot
+        if not bool(getattr(buyer_product, "listed_on_marketplace", False)):
+            buyer_product.price = cost_price
     else:
+        # Arriving stock is NOT auto-listed — seller must publish with a price
         buyer_product = WarehouseProduct(
             id=uuid_lib.uuid4(),
             company_id=buyer.id,
             warehouse_id=target_wh_id,
             name=seller_product.name,
-            price=seller_product.price,
+            price=cost_price,
             quantity=qty,
             unit=seller_product.unit,
             image_url=seller_product.image_url,
             source_company_id=seller.id,
             source_company_name=seller.name,
+            listed_on_marketplace=False,
             size=seller_product.size,
             color=seller_product.color,
             expiry_date=seller_product.expiry_date,
@@ -1083,15 +1462,30 @@ async def _complete_order(
         )
     )
 
+    amount = float(order.total_price)
     db.add(
         Transaction(
             id=uuid_lib.uuid4(),
             company_id=seller.id,
             type="income",
             category="Ombor sotuv",
-            amount=float(order.total_price),
+            amount=amount,
             description=(
                 f"Yetkazib berildi: {order.product_name} × {qty} {order.unit} — {buyer.name}"
+            ),
+            occurred_on=date.today(),
+            created_by=actor.id,
+        )
+    )
+    db.add(
+        Transaction(
+            id=uuid_lib.uuid4(),
+            company_id=buyer.id,
+            type="expense",
+            category="Ombor xarid",
+            amount=amount,
+            description=(
+                f"Sotib olindi: {order.product_name} × {qty} {order.unit} — {seller.name}"
             ),
             occurred_on=date.today(),
             created_by=actor.id,
@@ -1128,12 +1522,12 @@ async def list_orders(
     """Buyurtmalar ro'yxati.
 
     scope:
-      - purchases — distributor (xaridor) buyurtmalari
-      - sales — ishlab chiqaruvchi ombor kuzatuvi
+      - purchases — xaridor (distributor/market) buyurtmalari
+      - sales — sotuvchi ombor kuzatuvi
       - loader — yuklash navbati (loading)
       - courier — yo'ldagi / yetkazib beruvchi arizalari
       - receipt — qabul qilish kutilayotganlar
-      - auto — kompaniya turiga qarab (distributor→purchases, else→sales)
+      - auto — kompaniya turiga qarab (buyer-only→purchases, else→sales)
     """
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     company = await _get_company(db, company_id)
@@ -1141,7 +1535,7 @@ async def list_orders(
 
     resolved = scope
     if scope == "auto":
-        resolved = "purchases" if company.company_type == "distributor" else "sales"
+        resolved = "purchases" if company.company_type in BUYER_ONLY_TYPES else "sales"
 
     query = select(WarehouseOrder)
     if resolved == "purchases":
@@ -1367,11 +1761,28 @@ async def transition_order(
 
     elif action == "confirm_receipt":
         if str(company_id) != str(order.buyer_company_id):
-            raise HTTPException(status_code=403, detail="Faqat xaridor (distributiv) tasdiqlaydi")
+            raise HTTPException(status_code=403, detail="Faqat xaridor tasdiqlaydi")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
         if order.status != "awaiting_receipt":
             raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
-        await _complete_order(db, order, actor=current_user, buyer=buyer, seller=seller)
+
+        # Confirm whole cart batch when present
+        to_complete = [order]
+        if order.batch_id is not None:
+            batch_result = await db.execute(
+                select(WarehouseOrder).where(
+                    WarehouseOrder.batch_id == order.batch_id,
+                    WarehouseOrder.buyer_company_id == company_id,
+                    WarehouseOrder.status == "awaiting_receipt",
+                )
+            )
+            to_complete = list(batch_result.scalars().all())
+
+        total_amount = 0.0
+        for line in to_complete:
+            await _complete_order(db, line, actor=current_user, buyer=buyer, seller=seller)
+            total_amount += float(line.total_price)
+
         seller_ids = await users_with_permission(db, seller.id, "manage_warehouse")
         seller_ids += await users_with_permission(db, seller.id, "manage_accounting")
         await notify_users(
@@ -1379,8 +1790,8 @@ async def transition_order(
             user_ids=seller_ids,
             ntype="warehouse_order",
             message=(
-                f"Muvaffaqiyatli sotildi va yetkazildi: {order.product_name} × {order.quantity} "
-                f"{order.unit} — {buyer.name}. Byudjetga +{float(order.total_price):,.0f} so'm"
+                f"Muvaffaqiyatli sotildi va yetkazildi ({len(to_complete)} ta pozitsiya) — "
+                f"{buyer.name}. Byudjetga +{total_amount:,.0f} so'm"
             ),
             company_id=seller.id,
             invite_token=str(order.id),
@@ -1390,7 +1801,10 @@ async def transition_order(
             db,
             user_ids=buyer_ids,
             ntype="warehouse_order",
-            message=f"Mahsulot omboringizga qo'shildi: {order.product_name} × {order.quantity} {order.unit}",
+            message=(
+                f"Mahsulot omboringizga qo'shildi ({len(to_complete)} ta pozitsiya). "
+                f"Byudjetdan -{total_amount:,.0f} so'm"
+            ),
             company_id=buyer.id,
             invite_token=str(order.id),
         )
