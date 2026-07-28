@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BarChart,
@@ -10,15 +10,12 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import Wh3DBarChart from "../components/Wh3DBarChart";
+import WarehouseFinanceStats from "../components/WarehouseFinanceStats";
 import { MarketplaceTab } from "./Marketplace";
 
 const TYPE_LABELS = { technology: "Texnologiya", clothing: "Kiyim-kechak", food: "Oziq-ovqat" };
@@ -52,22 +49,6 @@ const DASHBOARD_VIEWS = [
   { key: "sold", label: "Aylanma" },
   { key: "stats", label: "Statistika" },
 ];
-
-const STATS_SCOPES = [
-  { key: "warehouse", label: "Ombor" },
-  { key: "accounting", label: "Umumiy (buxgalteriya)" },
-];
-
-/** Map warehouse period keys → accounting /stats period keys */
-function toAccountingPeriod(period) {
-  if (period === "today" || period === "week") return "1w";
-  if (period === "month") return "1m";
-  if (period === "3m") return "3m";
-  if (period === "6m") return "6m";
-  return "year";
-}
-
-const FINANCE_COLORS = { income: "#2dd4bf", expense: "#fb7185", balance: "#38bdf8", payroll: "#a78bfa" };
 
 /** Distributor + market: no manual inventoy — order via Marketplace only. */
 function isBuyerOnlyCompany(company) {
@@ -433,11 +414,8 @@ function WarehouseDashboard({ company, warehouseId, multi }) {
   const [period, setPeriod] = useState("month");
   const [chartType, setChartType] = useState("bar");
   const [view, setView] = useState("current");
-  const [statsScope, setStatsScope] = useState("warehouse");
   const [data, setData] = useState(null);
-  const [accStats, setAccStats] = useState(null);
   const [error, setError] = useState(null);
-  const [accError, setAccError] = useState(null);
 
   useEffect(() => {
     setError(null);
@@ -447,70 +425,13 @@ function WarehouseDashboard({ company, warehouseId, multi }) {
       .catch((err) => setError(err.message));
   }, [company.id, period, warehouseId]);
 
-  useEffect(() => {
-    if (view !== "stats" || statsScope !== "accounting") return;
-    setAccError(null);
-    setAccStats(null);
-    api
-      .getAccountingStats(company.id, toAccountingPeriod(period))
-      .then(setAccStats)
-      .catch((err) => setAccError(err.message));
-  }, [company.id, period, view, statsScope]);
-
-  const financeChartData = useMemo(() => {
-    if (statsScope === "accounting" && accStats?.buckets) {
-      return accStats.buckets.map((b) => ({
-        label: b.label,
-        income: Number(b.income || 0),
-        expense: Number(b.expense || 0),
-        balance: Number(b.balance || 0),
-        payroll: Number(b.payroll || 0),
-      }));
-    }
-    return (data?.finance_trend || []).map((b) => ({
-      label: b.label,
-      income: Number(b.income || 0),
-      expense: Number(b.expense || 0),
-      balance: Number(b.balance || 0),
-    }));
-  }, [statsScope, accStats, data]);
-
-  const financeTotals = useMemo(() => {
-    if (statsScope === "accounting" && accStats?.totals) {
-      return {
-        income: Number(accStats.totals.total_income || 0),
-        expense: Number(accStats.totals.total_expense || 0),
-        payroll: Number(accStats.totals.total_payroll || 0),
-        balance: Number(accStats.totals.balance || 0),
-      };
-    }
-    const t = data?.finance_totals || {};
-    return {
-      income: Number(t.income || 0),
-      expense: Number(t.expense || 0),
-      payroll: 0,
-      balance: Number(t.balance || 0),
-    };
-  }, [statsScope, accStats, data]);
-
-  const pieData = useMemo(() => {
-    const rows = [
-      { name: "Kirim", value: financeTotals.income, key: "income" },
-      { name: "Chiqim", value: financeTotals.expense, key: "expense" },
-    ];
-    if (statsScope === "accounting" && financeTotals.payroll > 0) {
-      rows.push({ name: "Oylik", value: financeTotals.payroll, key: "payroll" });
-    }
-    return rows.filter((r) => r.value > 0);
-  }, [financeTotals, statsScope]);
-
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="wh-empty-inline">Yuklanmoqda...</p>;
 
   const unitEntries = Object.entries(data.total_by_unit || {});
   const totalEvents = (data.trend || []).reduce((sum, t) => sum + t.events, 0);
-  const maxReceived = Math.max(1, ...data.by_product.map((p) => p.received));
-  const maxBudget = Math.max(1, ...(data.by_product_budget || []).map((p) => p.value));
+  const maxReceived = Math.max(1, ...(data.by_product || []).map((p) => p.received), 1);
+  const maxBudget = Math.max(1, ...(data.by_product_budget || []).map((p) => p.value), 1);
   const tooltipStyle = { background: "#0f172a", border: "1px solid rgba(148,163,184,0.25)", borderRadius: 10, color: "#f8fafc" };
   const budgetLabel = multi && !warehouseId ? "Umumiy byudjet qiymati (barcha omborlar)" : "Umumiy byudjet qiymati";
 
@@ -523,6 +444,10 @@ function WarehouseDashboard({ company, warehouseId, multi }) {
           </button>
         ))}
       </div>
+
+      {view === "stats" && (
+        <WarehouseFinanceStats companyId={company.id} warehouseId={warehouseId} multi={multi} />
+      )}
 
       {view === "current" && (
         <>
@@ -696,134 +621,6 @@ function WarehouseDashboard({ company, warehouseId, multi }) {
               </ResponsiveContainer>
             )}
           </ChartBlock>
-        </>
-      )}
-
-      {view === "stats" && (
-        <>
-          <div className="wh-view-tabs wh-stats-scope" role="tablist" aria-label="Statistika doirasi">
-            {STATS_SCOPES.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className={statsScope === s.key ? "active" : ""}
-                onClick={() => setStatsScope(s.key)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <p className="wh-hint" style={{ marginBottom: 12 }}>
-            {statsScope === "warehouse"
-              ? multi && !warehouseId
-                ? "Ombor statistikasi: barcha omborlar bo‘yicha Marketplace sotuv (kirim) va xarid (chiqim)."
-                : "Ombor statistikasi: tanlangan ombor bo‘yicha sotuv kirimi va xarid chiqimi."
-              : "Umumiy: buxgalteriya bo‘limidagi barcha kirim, chiqim, oylik va balans."}
-          </p>
-
-          {statsScope === "accounting" && accError && (
-            <p className="error">
-              Buxgalteriya ma’lumotini olishning iloji yo‘q: {accError}. «manage_accounting» ruxsati kerak bo‘lishi mumkin.
-            </p>
-          )}
-          {statsScope === "accounting" && !accStats && !accError && (
-            <p className="wh-empty-inline">Buxgalteriya statistikasi yuklanmoqda...</p>
-          )}
-
-          {(statsScope === "warehouse" || (statsScope === "accounting" && accStats)) && (
-            <>
-              <div className="wh-stats">
-                <article className="wh-stat good">
-                  <span>Kirim</span>
-                  <strong>{money(financeTotals.income)}</strong>
-                </article>
-                <article className="wh-stat warn">
-                  <span>Chiqim</span>
-                  <strong>{money(financeTotals.expense)}</strong>
-                </article>
-                {statsScope === "accounting" && (
-                  <article className="wh-stat">
-                    <span>Oylik</span>
-                    <strong>{money(financeTotals.payroll)}</strong>
-                  </article>
-                )}
-                <article className="wh-stat">
-                  <span>Balans</span>
-                  <strong>{money(financeTotals.balance)}</strong>
-                </article>
-              </div>
-
-              <ChartBlock
-                title={statsScope === "warehouse" ? "Ombor kirim / chiqim" : "Umumiy kirim / chiqim"}
-                period={period}
-                setPeriod={setPeriod}
-                chartType={chartType}
-                setChartType={setChartType}
-                hint={
-                  statsScope === "warehouse"
-                    ? "Kirim = yakunlangan sotuvlar; chiqim = yakunlangan xaridlar (so‘m)."
-                    : "Buxgalteriya: tranzaksiyalar, fakturalar va oylik (agar mavjud)."
-                }
-              >
-                {chartType === "3d" ? (
-                  <div className="wh-dual-3d">
-                    <Wh3DBarChart data={financeChartData} dataKey="income" color="#2dd4bf" valueFormatter={money} />
-                    <Wh3DBarChart data={financeChartData} dataKey="expense" color="#fb7185" valueFormatter={money} />
-                  </div>
-                ) : chartType === "line" ? (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={financeChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                      <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#94a3b8" fontSize={11} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                      <Legend />
-                      <Line type="monotone" dataKey="income" name="Kirim" stroke={FINANCE_COLORS.income} strokeWidth={2} />
-                      <Line type="monotone" dataKey="expense" name="Chiqim" stroke={FINANCE_COLORS.expense} strokeWidth={2} />
-                      {statsScope === "accounting" && (
-                        <Line type="monotone" dataKey="payroll" name="Oylik" stroke={FINANCE_COLORS.payroll} strokeWidth={2} />
-                      )}
-                      <Line type="monotone" dataKey="balance" name="Balans" stroke={FINANCE_COLORS.balance} strokeWidth={2} strokeDasharray="4 4" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={financeChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                      <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#94a3b8" fontSize={11} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                      <Legend />
-                      <Bar dataKey="income" name="Kirim" fill={FINANCE_COLORS.income} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="expense" name="Chiqim" fill={FINANCE_COLORS.expense} radius={[4, 4, 0, 0]} />
-                      {statsScope === "accounting" && (
-                        <Bar dataKey="payroll" name="Oylik" fill={FINANCE_COLORS.payroll} radius={[4, 4, 0, 0]} />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </ChartBlock>
-
-              <section className="wh-panel">
-                <div className="wh-panel-head"><h3>Ulush (davr jami)</h3></div>
-                {pieData.length === 0 ? (
-                  <p className="wh-empty-inline">Bu davrda moliyaviy harakat yo‘q.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
-                        {pieData.map((entry) => (
-                          <Cell key={entry.key} fill={FINANCE_COLORS[entry.key] || "#94a3b8"} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => money(v)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </section>
-            </>
-          )}
         </>
       )}
     </div>

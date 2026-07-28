@@ -1,13 +1,17 @@
 import uuid as uuid_lib
+import csv
+import io
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.database import get_db
-from app.models.accounting import Transaction
+from app.models.accounting import Invoice, PayrollEntry, Transaction
 from app.models.company import Company
 from app.models.user import User
 from app.models.warehouse import CompanyRating, StockMovement, Warehouse, WarehouseOrder, WarehouseProduct
@@ -933,6 +937,400 @@ async def get_warehouse_dashboard(
         "warehouse_id": warehouse_id,
         "aggregated": warehouse_id is None,
     }
+
+
+FINANCE_KINDS = {
+    "warehouse_income",
+    "warehouse_expense",
+    "acc_income",
+    "acc_expense",
+    "invoice",
+    "payroll",
+}
+
+FINANCE_KIND_LABELS = {
+    "warehouse_income": "Ombor kirim (sotuv)",
+    "warehouse_expense": "Ombor chiqim (xarid)",
+    "acc_income": "Buxgalteriya kirim",
+    "acc_expense": "Buxgalteriya chiqim",
+    "invoice": "Faktura",
+    "payroll": "Oylik",
+}
+
+
+def _parse_kinds(kinds: str | None) -> set[str]:
+    if not kinds or kinds.strip() in {"", "all", "*"}:
+        return set(FINANCE_KINDS)
+    selected = {k.strip() for k in kinds.split(",") if k.strip()}
+    bad = selected - FINANCE_KINDS
+    if bad:
+        raise HTTPException(status_code=400, detail=f"Noto'g'ri tur: {', '.join(sorted(bad))}")
+    return selected or set(FINANCE_KINDS)
+
+
+async def _build_finance_events(
+    db: AsyncSession,
+    *,
+    company_id: str,
+    start: date,
+    end: date,
+    kinds: set[str],
+    warehouse_id: str | None,
+) -> list[dict]:
+    """Unified chronological ledger rows for warehouse + accounting sources."""
+    events: list[dict] = []
+
+    if "warehouse_income" in kinds:
+        sold_q = (
+            select(
+                WarehouseOrder.id,
+                WarehouseOrder.completed_at,
+                WarehouseOrder.created_at,
+                WarehouseOrder.total_price,
+                WarehouseOrder.product_name,
+                WarehouseOrder.quantity,
+                WarehouseOrder.unit,
+            )
+            .join(WarehouseProduct, WarehouseProduct.id == WarehouseOrder.seller_product_id)
+            .where(
+                WarehouseOrder.seller_company_id == company_id,
+                WarehouseOrder.status == "completed",
+                WarehouseOrder.created_at >= datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc),
+            )
+        )
+        if warehouse_id:
+            sold_q = sold_q.where(WarehouseProduct.warehouse_id == warehouse_id)
+        for oid, completed_at, created_at, total_price, pname, qty, unit in (await db.execute(sold_q)).all():
+            stamp = completed_at or created_at
+            if stamp is None:
+                continue
+            d = stamp.date()
+            if d < start or d > end:
+                continue
+            events.append(
+                {
+                    "id": f"wh-in-{oid}",
+                    "occurred_on": d.isoformat(),
+                    "kind": "warehouse_income",
+                    "kind_label": FINANCE_KIND_LABELS["warehouse_income"],
+                    "direction": "income",
+                    "amount": float(total_price),
+                    "title": pname,
+                    "detail": f"Sotuv · {qty} {unit}",
+                    "status": "completed",
+                }
+            )
+
+    if "warehouse_expense" in kinds:
+        buy_q = select(
+            WarehouseOrder.id,
+            WarehouseOrder.completed_at,
+            WarehouseOrder.created_at,
+            WarehouseOrder.total_price,
+            WarehouseOrder.product_name,
+            WarehouseOrder.quantity,
+            WarehouseOrder.unit,
+        ).where(
+            WarehouseOrder.buyer_company_id == company_id,
+            WarehouseOrder.status == "completed",
+            WarehouseOrder.created_at >= datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+        if warehouse_id:
+            buy_q = buy_q.where(WarehouseOrder.buyer_warehouse_id == warehouse_id)
+        for oid, completed_at, created_at, total_price, pname, qty, unit in (await db.execute(buy_q)).all():
+            stamp = completed_at or created_at
+            if stamp is None:
+                continue
+            d = stamp.date()
+            if d < start or d > end:
+                continue
+            events.append(
+                {
+                    "id": f"wh-out-{oid}",
+                    "occurred_on": d.isoformat(),
+                    "kind": "warehouse_expense",
+                    "kind_label": FINANCE_KIND_LABELS["warehouse_expense"],
+                    "direction": "expense",
+                    "amount": float(total_price),
+                    "title": pname,
+                    "detail": f"Xarid · {qty} {unit}",
+                    "status": "completed",
+                }
+            )
+
+    # Accounting transactions — skip Ombor categories when warehouse_* kinds cover them
+    if "acc_income" in kinds or "acc_expense" in kinds:
+        tx_q = select(Transaction).where(
+            Transaction.company_id == company_id,
+            Transaction.occurred_on >= start,
+            Transaction.occurred_on <= end,
+        )
+        for tx in (await db.execute(tx_q)).scalars().all():
+            cat = (tx.category or "").strip()
+            if cat in {"Ombor sotuv", "Ombor xarid"}:
+                continue  # already represented via warehouse orders
+            if tx.type == "income" and "acc_income" in kinds:
+                events.append(
+                    {
+                        "id": f"tx-{tx.id}",
+                        "occurred_on": tx.occurred_on.isoformat(),
+                        "kind": "acc_income",
+                        "kind_label": FINANCE_KIND_LABELS["acc_income"],
+                        "direction": "income",
+                        "amount": float(tx.amount),
+                        "title": cat or "Kirim",
+                        "detail": tx.description or "",
+                        "status": "posted",
+                    }
+                )
+            elif tx.type == "expense" and "acc_expense" in kinds:
+                events.append(
+                    {
+                        "id": f"tx-{tx.id}",
+                        "occurred_on": tx.occurred_on.isoformat(),
+                        "kind": "acc_expense",
+                        "kind_label": FINANCE_KIND_LABELS["acc_expense"],
+                        "direction": "expense",
+                        "amount": float(tx.amount),
+                        "title": cat or "Chiqim",
+                        "detail": tx.description or "",
+                        "status": "posted",
+                    }
+                )
+
+    if "invoice" in kinds:
+        inv_q = select(Invoice).where(
+            Invoice.company_id == company_id,
+            Invoice.issue_date >= start,
+            Invoice.issue_date <= end,
+        )
+        for inv in (await db.execute(inv_q)).scalars().all():
+            direction = "income" if inv.status == "paid" else "expense" if inv.status == "overdue" else "neutral"
+            events.append(
+                {
+                    "id": f"inv-{inv.id}",
+                    "occurred_on": inv.issue_date.isoformat(),
+                    "kind": "invoice",
+                    "kind_label": FINANCE_KIND_LABELS["invoice"],
+                    "direction": direction,
+                    "amount": float(inv.total_amount),
+                    "title": inv.client_name,
+                    "detail": f"Faktura · {inv.status}",
+                    "status": inv.status,
+                }
+            )
+
+    if "payroll" in kinds:
+        period_from = start.strftime("%Y-%m")
+        period_to = end.strftime("%Y-%m")
+        pay_q = (
+            select(PayrollEntry, User)
+            .join(User, User.id == PayrollEntry.employee_id)
+            .where(
+                PayrollEntry.company_id == company_id,
+                PayrollEntry.period >= period_from,
+                PayrollEntry.period <= period_to,
+            )
+        )
+        for entry, employee in (await db.execute(pay_q)).all():
+            # Use first day of payroll month for sorting/bucketing
+            y, m = entry.period.split("-")
+            d = date(int(y), int(m), 1)
+            if d < start.replace(day=1) or d > end:
+                continue
+            events.append(
+                {
+                    "id": f"pay-{entry.id}",
+                    "occurred_on": d.isoformat(),
+                    "kind": "payroll",
+                    "kind_label": FINANCE_KIND_LABELS["payroll"],
+                    "direction": "expense",
+                    "amount": float(entry.amount),
+                    "title": employee.full_name,
+                    "detail": f"Oylik · {entry.period} · {entry.status}",
+                    "status": entry.status,
+                }
+            )
+
+    events.sort(key=lambda e: (e["occurred_on"], e["kind"], e["title"]), reverse=True)
+    return events
+
+
+def _finance_trend_from_events(events: list[dict], buckets: list[str], key_fn) -> list[dict]:
+    empty = {k: 0.0 for k in FINANCE_KINDS}
+    by_bucket = {b: dict(empty) for b in buckets}
+    for ev in events:
+        d = date.fromisoformat(ev["occurred_on"])
+        key = key_fn(d)
+        if key not in by_bucket:
+            continue
+        by_bucket[key][ev["kind"]] += float(ev["amount"])
+    trend = []
+    for b in buckets:
+        row = {"label": b, **by_bucket[b]}
+        income = row["warehouse_income"] + row["acc_income"]
+        expense = row["warehouse_expense"] + row["acc_expense"] + row["payroll"]
+        # Paid invoices contribute to income-like balance; overdue to expense-like
+        # (invoice series itself stays separate for chart toggles)
+        row["balance"] = income - expense
+        trend.append(row)
+    return trend
+
+
+@router.get("/finance-ledger")
+async def get_finance_ledger(
+    company_id: str,
+    period: str = "month",
+    kinds: str | None = Query(default="all"),
+    warehouse_id: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ombor + buxgalteriya moliyaviy jurnal (filter, pagination, trend)."""
+    await require_any_permission(
+        db,
+        company_id,
+        current_user.id,
+        ["manage_warehouse", "manage_accounting", "ombor_ishchi"],
+    )
+    await _require_warehouse_enabled(db, company_id)
+    if warehouse_id:
+        await _get_warehouse(db, company_id, warehouse_id)
+
+    selected = _parse_kinds(kinds)
+    buckets, start, key_fn = _dashboard_buckets(period)
+    end = date.today()
+    events = await _build_finance_events(
+        db,
+        company_id=company_id,
+        start=start,
+        end=end,
+        kinds=selected,
+        warehouse_id=warehouse_id,
+    )
+
+    if search:
+        q = search.strip().lower()
+        events = [
+            e
+            for e in events
+            if q in (e["title"] or "").lower()
+            or q in (e["detail"] or "").lower()
+            or q in (e["kind_label"] or "").lower()
+        ]
+
+    total = len(events)
+    start_idx = (page - 1) * page_size
+    page_items = events[start_idx : start_idx + page_size]
+
+    totals = {k: 0.0 for k in FINANCE_KINDS}
+    for e in events:
+        totals[e["kind"]] += float(e["amount"])
+
+    return {
+        "period": period,
+        "kinds": sorted(selected),
+        "trend": _finance_trend_from_events(events, buckets, key_fn),
+        "items": page_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "totals": totals,
+        "kind_labels": FINANCE_KIND_LABELS,
+    }
+
+
+@router.get("/finance-ledger/export")
+async def export_finance_ledger(
+    company_id: str,
+    period: str = "month",
+    kinds: str | None = Query(default="all"),
+    warehouse_id: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    format: str = Query(default="csv"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Filtered ledger export as CSV or Excel."""
+    await require_any_permission(
+        db,
+        company_id,
+        current_user.id,
+        ["manage_warehouse", "manage_accounting", "ombor_ishchi"],
+    )
+    await _require_warehouse_enabled(db, company_id)
+    if warehouse_id:
+        await _get_warehouse(db, company_id, warehouse_id)
+
+    selected = _parse_kinds(kinds)
+    _buckets, start, _key_fn = _dashboard_buckets(period)
+    end = date.today()
+    events = await _build_finance_events(
+        db,
+        company_id=company_id,
+        start=start,
+        end=end,
+        kinds=selected,
+        warehouse_id=warehouse_id,
+    )
+    if search:
+        q = search.strip().lower()
+        events = [
+            e
+            for e in events
+            if q in (e["title"] or "").lower()
+            or q in (e["detail"] or "").lower()
+            or q in (e["kind_label"] or "").lower()
+        ]
+
+    headers = ["Sana", "Tur", "Yo'nalish", "Summa", "Sarlavha", "Tafsilot", "Holat"]
+    rows = [
+        [
+            e["occurred_on"],
+            e["kind_label"],
+            "Kirim" if e["direction"] == "income" else "Chiqim" if e["direction"] == "expense" else "—",
+            float(e["amount"]),
+            e["title"],
+            e["detail"],
+            e["status"],
+        ]
+        for e in events
+    ]
+    stamp = date.today().isoformat()
+    fmt = (format or "csv").lower().strip()
+
+    if fmt == "xlsx" or fmt == "excel":
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Jurnal"
+        ws.append(headers)
+        for row in rows:
+            ws.append(row)
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="ombor-moliya-{stamp}.xlsx"'
+            },
+        )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    # UTF-8 BOM for Excel-friendly CSV
+    content = "\ufeff" + buffer.getvalue()
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="ombor-moliya-{stamp}.csv"'},
+    )
 
 
 @router.get("/marketplace/sellers", response_model=list[MarketplaceSellerOut])
