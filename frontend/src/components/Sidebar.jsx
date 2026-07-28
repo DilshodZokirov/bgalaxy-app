@@ -6,7 +6,6 @@ import {
   fetchMyCompanies,
   getActiveCompanyId,
   getCachedNavFlags,
-  pickActiveCompany,
   setActiveCompanyId,
   setCachedNavFlags,
 } from "../hooks/useCompany";
@@ -36,23 +35,38 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const [canViewWarehouse, setCanViewWarehouse] = useState(!!cachedFlags?.warehouse);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("bgalaxy_sidebar_collapsed") === "1");
 
+  // Load companies + permissions in one pass. Never clear nav flags while a
+  // request is in-flight — that caused Ombor to vanish then reappear.
   useEffect(() => {
-    fetchMyCompanies()
-      .then((list) => {
-        setCompanies(list);
-        const id = getActiveCompanyId() || list[0]?.id;
-        const active = list.find((c) => c.id === id) || list[0];
-        setHasWarehouse(!!active?.has_warehouse || (active?.warehouses?.length > 0));
-      })
-      .catch(() => {});
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
-    const id = activeId || companies[0]?.id;
-    if (!id) return;
-    api
-      .getMyPermissions(id)
-      .then((info) => {
+    async function loadNav() {
+      try {
+        const list = await fetchMyCompanies();
+        if (cancelled) return;
+        setCompanies(list);
+
+        const id = getActiveCompanyId() || list[0]?.id;
+        if (id && id !== activeId) setActiveIdState(id);
+        const active = list.find((c) => c.id === id) || list[0] || null;
+        const hasWh = !!active?.has_warehouse || (active?.warehouses?.length > 0);
+
+        if (!active) {
+          // Confirmed: no company — hide optional nav
+          setHasWarehouse(false);
+          setCanViewWarehouse(false);
+          setCanManageAccounting(false);
+          setCanViewAnalytics(false);
+          setCachedNavFlags({ accounting: false, analytics: false, warehouse: false });
+          return;
+        }
+
+        // Keep previous flags until permissions resolve (sticky).
+        if (hasWh) setHasWarehouse(true);
+
+        const info = await api.getMyPermissions(active.id);
+        if (cancelled) return;
+
         const accounting = info.is_owner || !!info.permissions?.manage_accounting;
         const analytics = info.is_owner || !!info.permissions?.view_analytics;
         const warehouse =
@@ -61,24 +75,28 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
           !!info.permissions?.ombor_ishchi ||
           !!info.permissions?.warehouse_loader ||
           !!info.permissions?.warehouse_courier;
+
         setCanManageAccounting(accounting);
         setCanViewAnalytics(analytics);
-        setCanViewWarehouse(warehouse);
-        const active = pickActiveCompany(companies) || companies.find((c) => c.id === id);
-        const hasWh = !!active?.has_warehouse || (active?.warehouses?.length > 0);
         setHasWarehouse(hasWh);
+        setCanViewWarehouse(warehouse);
         setCachedNavFlags({
           accounting,
           analytics,
           warehouse: hasWh && warehouse,
         });
-      })
-      .catch(() => {
-        setCanManageAccounting(false);
-        setCanViewAnalytics(false);
-        setCanViewWarehouse(false);
-      });
-  }, [activeId, companies]);
+      } catch {
+        // Keep sticky/cached flags on transient errors — do not blank the nav.
+      }
+    }
+
+    loadNav();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run only when user switches company (full reload also remounts).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   function handleSwitch(e) {
     const id = e.target.value;
