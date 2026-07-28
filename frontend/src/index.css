@@ -8859,11 +8859,14 @@ html[data-custom-bg="1"] .galaxy-sky {
 .companies-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 1200;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px;
+  padding: max(16px, 4vh) 16px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: rgba(2, 6, 23, 0.72);
   backdrop-filter: blur(6px);
 }
@@ -8871,24 +8874,38 @@ html[data-custom-bg="1"] .galaxy-sky {
 .companies-modal {
   width: 100%;
   max-width: 520px;
-  max-height: 80vh;
-  overflow-y: auto;
+  max-height: none;
+  margin: auto;
+  overflow-y: visible;
 }
 
 .companies-modal-sm { max-width: 400px; }
 
 .companies-modal-create {
-  max-width: 820px;
-  max-height: 92vh;
+  max-width: min(820px, calc(100vw - 32px));
+  max-height: none;
+  margin: auto;
   padding: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .companies-modal-create .os-create-form {
-  overflow-y: auto;
-  max-height: calc(92vh - 120px);
+  overflow-y: visible;
+  max-height: none;
+}
+
+@media (max-height: 900px) {
+  .companies-modal-create .os-create-form {
+    overflow-y: auto;
+    max-height: min(70vh, calc(100vh - 160px));
+  }
+
+  .companies-modal-create {
+    max-height: calc(100vh - 32px);
+  }
 }
 
 .os-create-hero-row {
