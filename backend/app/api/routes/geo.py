@@ -131,11 +131,63 @@ class GeoPlace(BaseModel):
     label: str
     title: str | None = None
     subtitle: str | None = None
-    kind: str = "place"  # street | place | metro
+    kind: str = "place"  # street | place | metro | shop | pharmacy | bank | cafe | fuel | mall
 
 
-_METRO_QUERY_RE = re.compile(r"(?i)^\s*(metro|метро|subway|метро\s*bekati|metro\s*bekati)s?\s*$")
-_METRO_WORD_RE = re.compile(r"(?i)\b(metro|метро|subway|bekati)\b")
+class GeoCategory(BaseModel):
+    key: str
+    label: str
+    hint: str
+
+
+# Quick-pick categories (Google Maps–like layers)
+_GEO_CATEGORIES: tuple[GeoCategory, ...] = (
+    GeoCategory(key="metro", label="Metro", hint="Metro bekatlari"),
+    GeoCategory(key="shop", label="Do‘kon", hint="Korzinka, supermarket…"),
+    GeoCategory(key="pharmacy", label="Apteka", hint="Dorixonalar"),
+    GeoCategory(key="bank", label="Bank", hint="Bank filiallari"),
+    GeoCategory(key="cafe", label="Kafe", hint="Kafe va restoran"),
+    GeoCategory(key="fuel", label="Yoqilg‘i", hint="Yoqilg‘i quyish"),
+    GeoCategory(key="mall", label="TC", hint="Savdo markazlari"),
+)
+
+# category → (kind, nominatim queries, photon query)
+_CATEGORY_QUERIES: dict[str, tuple[str, tuple[str, ...], str]] = {
+    "metro": ("metro", ("metro station", "метро бекати"), "metro"),
+    "shop": ("shop", ("Korzinka", "supermarket", "супермаркет", "Makro"), "supermarket"),
+    "pharmacy": ("pharmacy", ("apteka", "pharmacy", "аптека"), "pharmacy"),
+    "bank": ("bank", ("bank", "банк"), "bank"),
+    "cafe": ("cafe", ("cafe", "restaurant", "кафе", "restoran"), "cafe"),
+    "fuel": ("fuel", ("fuel", "АЗС", "yoqilg'i", "gas station"), "fuel"),
+    "mall": ("mall", ("shopping mall", "savdo markazi", "ТЦ"), "mall"),
+}
+
+# Brand / keyword → force POI cluster search (all branches on map)
+_SMART_BRANDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    # (match regex, kind, search queries)
+    (r"(?i)\bkorzinka\b", "shop", ("Korzinka",)),
+    (r"(?i)\bmakro\b", "shop", ("Makro",)),
+    (r"(?i)\bhavas\b", "shop", ("Havas",)),
+    (r"(?i)\bbaraka\s*market\b", "shop", ("Baraka market",)),
+    (r"(?i)\bcosmetics?\s*plaza\b|\bcplaza\b", "shop", ("Cosmetics Plaza",)),
+    (r"(?i)\buzum\s*market\b", "shop", ("Uzum Market",)),
+    (r"(?i)\bmagnum\b", "shop", ("Magnum",)),
+    (r"(?i)\bclick\b", "bank", ("Click",)),
+    (r"(?i)\btbc\b", "bank", ("TBC Bank", "TBC")),
+    (r"(?i)\bkapital\s*bank\b", "bank", ("Kapitalbank", "Kapital bank")),
+    (r"(?i)\bipoteka\b", "bank", ("Ipoteka bank",)),
+    (r"(?i)\barzon\s*apteka\b", "pharmacy", ("Arzon Apteka",)),
+    (r"(?i)\b999\b|\bapteka\s*999\b", "pharmacy", ("Apteka 999",)),
+)
+
+_CATEGORY_WORD_MAP: tuple[tuple[str, str], ...] = (
+    (r"(?i)\b(supermarket|do['ʻ’]?kon|магазин|супермаркет)\b", "shop"),
+    (r"(?i)\b(apteka|pharmacy|dorixona|аптека)\b", "pharmacy"),
+    (r"(?i)\b(bank|банк)\b", "bank"),
+    (r"(?i)\b(cafe|kafe|restoran|restaurant|кафе)\b", "cafe"),
+    (r"(?i)\b(azs|fuel|yoqilg|бензин|gas\s*station)\b", "fuel"),
+    (r"(?i)\b(mall|tc\b|savdo\s*markaz|торговый)\b", "mall"),
+)
 
 # Reliable Toshkent metro stations (OSM-aligned) — plain "metro" query alone is too weak
 _TASHKENT_METRO: tuple[tuple[str, float, float], ...] = (
@@ -435,8 +487,28 @@ def _rank(places: list[GeoPlace], q: str, region: str | None) -> list[GeoPlace]:
     return sorted(places, key=score)
 
 
-def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
-    """Google/Yandex-like suggest; special-case metro → all stations in region."""
+def _search_sync(q: str, region: str | None, category: str | None = None) -> list[GeoPlace]:
+    """Smart suggest: categories, brands (Korzinka…), metro, or streets."""
+    cat = (category or "").strip().lower() or None
+    if cat == "metro" or (not cat and _is_metro_query(q)):
+        return _metro_search(region)
+
+    if cat and cat in _CATEGORY_QUERIES:
+        kind, queries, photon_q = _CATEGORY_QUERIES[cat]
+        brand = _detect_brand(q)
+        if brand:
+            return _poi_cluster_search(brand[1], brand[2], region)
+        return _poi_cluster_search(kind, queries + (photon_q,), region)
+
+    brand = _detect_brand(q)
+    if brand:
+        return _poi_cluster_search(brand[1], brand[2], region)
+
+    inferred = _detect_category_word(q)
+    if inferred and inferred in _CATEGORY_QUERIES:
+        kind, queries, photon_q = _CATEGORY_QUERIES[inferred]
+        return _poi_cluster_search(kind, queries + (q, photon_q), region)
+
     if _is_metro_query(q):
         return _metro_search(region)
 
@@ -445,18 +517,21 @@ def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
         return []
 
     stem = _stem(q)
-
-    # 1) Photon highway suggest on stem — best “related streets” list
-    photon_streets = _photon_search(stem, region=region, highway_only=True, limit=15)
+    photon_streets = _photon_search(stem, region=region, highway_only=True, limit=12)
+    photon_places = _photon_search(stem, region=region, highway_only=False, limit=15)
     if stem.lower() != q.strip().lower():
         photon_streets = _merge_places(
             photon_streets,
-            _photon_search(q, region=region, highway_only=True, limit=10),
+            _photon_search(q, region=region, highway_only=True, limit=8),
+            limit=16,
+        )
+        photon_places = _merge_places(
+            photon_places,
+            _photon_search(q, region=region, highway_only=False, limit=10),
             limit=20,
         )
 
-    # Also try alternate spellings on stem (Rayxon ↔ Rayhon)
-    alt_stems = []
+    alt_stems: list[str] = []
     for v in variants:
         s = _stem(v)
         if s.lower() not in {stem.lower(), *(a.lower() for a in alt_stems)}:
@@ -464,35 +539,115 @@ def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
     for alt in alt_stems[:2]:
         photon_streets = _merge_places(
             photon_streets,
-            _photon_search(alt, region=region, highway_only=True, limit=10),
-            limit=24,
+            _photon_search(alt, region=region, highway_only=True, limit=8),
+            limit=20,
         )
 
-    # 2) Photon general (POIs / places) for fuller coverage
-    photon_places = _photon_search(stem, region=region, highway_only=False, limit=8)
-
-    # 3) Nominatim — bounded to region viewbox when selected
     nom_hits: list[GeoPlace] = []
     for variant in variants[:4]:
         nom_hits = _merge_places(
-            nom_hits, _nominatim_search(variant, limit=8, region=region), limit=16
+            nom_hits, _nominatim_search(variant, limit=12, region=region), limit=20
         )
-        if len(nom_hits) >= 8:
+        if len(nom_hits) >= 10:
             break
 
-    # Prefer streets first in merge order, then hard-filter by selected viloyat, then rank
-    merged = _merge_places(photon_streets, nom_hits, photon_places, limit=24)
-    merged = _filter_by_region(merged, region)
-    ranked = _rank(merged, q, region)
-    return ranked[:12]
+    enriched = [_enrich_kind(p) for p in _merge_places(photon_places, nom_hits, photon_streets, limit=30)]
+    enriched = _filter_by_region(enriched, region)
+    ranked = _rank(enriched, q, region)
+    return ranked[:20]
+
+
+def _detect_brand(q: str) -> tuple[str, str, tuple[str, ...]] | None:
+    text = q.strip()
+    for pattern, kind, queries in _SMART_BRANDS:
+        if re.search(pattern, text):
+            return (pattern, kind, queries)
+    return None
+
+
+def _detect_category_word(q: str) -> str | None:
+    text = q.strip()
+    if len(text) > 28:
+        return None
+    for pattern, key in _CATEGORY_WORD_MAP:
+        if re.search(pattern, text):
+            return key
+    return None
+
+
+def _enrich_kind(p: GeoPlace) -> GeoPlace:
+    if p.kind not in ("place", "street"):
+        return p
+    hay = f"{p.title or ''} {p.label}".lower()
+    if any(k in hay for k in ("metro", "метро", "subway")):
+        kind = "metro"
+    elif any(k in hay for k in ("korzinka", "supermarket", "супермаркет", "makro", "havas")):
+        kind = "shop"
+    elif any(k in hay for k in ("apteka", "pharmacy", "аптека", "dorixona")):
+        kind = "pharmacy"
+    elif "bank" in hay or "банк" in hay:
+        kind = "bank"
+    elif any(k in hay for k in ("cafe", "kafe", "restaurant", "кафе", "restoran")):
+        kind = "cafe"
+    elif any(k in hay for k in ("fuel", "azs", "азс", "yoqilg")):
+        kind = "fuel"
+    elif any(k in hay for k in ("mall", "savdo markaz", "торгов")):
+        kind = "mall"
+    else:
+        return p
+    return GeoPlace(
+        lat=p.lat,
+        lng=p.lng,
+        label=p.label,
+        title=p.title,
+        subtitle=p.subtitle,
+        kind=kind,
+    )
+
+
+def _poi_cluster_search(kind: str, queries: tuple[str, ...], region: str | None) -> list[GeoPlace]:
+    """Find many branches of a brand/category and mark them for the map."""
+    hits: list[GeoPlace] = []
+
+    def tag(p: GeoPlace) -> GeoPlace:
+        return GeoPlace(
+            lat=p.lat,
+            lng=p.lng,
+            label=p.label,
+            title=p.title or p.label,
+            subtitle=p.subtitle,
+            kind=kind,
+        )
+
+    for query in queries[:4]:
+        for p in _nominatim_search(query, limit=25, region=region):
+            hits.append(tag(p))
+        for p in _photon_search(query, region=region, highway_only=False, limit=20):
+            hits.append(tag(p))
+
+    if region:
+        if region in _METRO_REGION_BBOX:
+            bbox = _METRO_REGION_BBOX[region]
+            hits = [p for p in hits if _in_bbox(p.lat, p.lng, bbox)]
+        else:
+            hits = _filter_by_region(hits, region)
+
+    seen: set[tuple[float, float, str]] = set()
+    unique: list[GeoPlace] = []
+    for p in hits:
+        key = (round(p.lat, 4), round(p.lng, 4), (p.title or "").lower()[:40])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(p)
+    return unique[:40]
 
 
 def _is_metro_query(q: str) -> bool:
     text = q.strip()
-    if _METRO_QUERY_RE.match(text):
+    if re.match(r"(?i)^\s*(metro|метро|subway|метро\s*bekati|metro\s*bekati)s?\s*$", text):
         return True
-    # "metro bekati", "Toshkent metro" etc.
-    return bool(_METRO_WORD_RE.search(text)) and len(text) <= 40
+    return bool(re.search(r"(?i)\b(metro|метро|subway)\b", text)) and len(text) <= 40
 
 
 def _metro_search(region: str | None) -> list[GeoPlace]:
@@ -509,8 +664,8 @@ def _metro_search(region: str | None) -> list[GeoPlace]:
             kind="metro",
         )
 
-    for q in ("metro station", "метро бекати", "subway station"):
-        for p in _nominatim_search(q, limit=30, region=region):
+    for query in ("metro station", "метро бекати", "subway station"):
+        for p in _nominatim_search(query, limit=30, region=region):
             hay = f"{p.title or ''} {p.label}".lower()
             if any(k in hay for k in ("station", "metro", "метро", "subway", "bekati")):
                 hits.append(as_metro(p))
@@ -556,14 +711,26 @@ def _metro_search(region: str | None) -> list[GeoPlace]:
     return unique[:40]
 
 
+@router.get("/categories", response_model=list[GeoCategory])
+async def geo_categories(_user: User = Depends(get_current_user)):
+    return list(_GEO_CATEGORIES)
+
+
 @router.get("/search", response_model=list[GeoPlace])
 async def geo_search(
-    q: str = Query(..., min_length=2, max_length=200),
+    q: str = Query("", max_length=200),
     region: str | None = Query(None, max_length=100),
+    category: str | None = Query(None, max_length=40),
     _user: User = Depends(get_current_user),
 ):
     region_clean = (region or "").strip() or None
-    return await asyncio.to_thread(_search_sync, q.strip(), region_clean)
+    cat = (category or "").strip().lower() or None
+    text = (q or "").strip()
+    if not cat and len(text) < 2:
+        raise HTTPException(status_code=400, detail="Qidiruv juda qisqa")
+    if not text and cat:
+        text = cat
+    return await asyncio.to_thread(_search_sync, text, region_clean, cat)
 
 
 @router.get("/reverse", response_model=GeoPlace | None)
