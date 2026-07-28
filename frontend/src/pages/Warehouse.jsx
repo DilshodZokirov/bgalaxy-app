@@ -664,28 +664,73 @@ function OrderModal({ product, onClose, onOrdered }) {
   );
 }
 
-function OrderPipelineCard({ order, actions, highlight }) {
-  const stepIdx = ORDER_STEPS.indexOf(order.status);
+function groupOrdersByBatch(orders) {
+  const batches = new Map();
+  const groups = [];
+  for (const order of orders) {
+    if (order.batch_id) {
+      const key = String(order.batch_id);
+      if (!batches.has(key)) batches.set(key, []);
+      batches.get(key).push(order);
+    } else {
+      groups.push({ key: String(order.id), orders: [order] });
+    }
+  }
+  for (const [key, lines] of batches.entries()) {
+    lines.sort((a, b) => (a.product_name || "").localeCompare(b.product_name || ""));
+    groups.push({ key, orders: lines });
+  }
+  groups.sort(
+    (a, b) => new Date(b.orders[0]?.created_at || 0) - new Date(a.orders[0]?.created_at || 0)
+  );
+  return groups;
+}
+
+function OrderPipelineCard({ orders, actions, highlight }) {
+  const lines = Array.isArray(orders) ? orders : [orders];
+  const primary = lines[0];
+  if (!primary) return null;
+  const isBatch = lines.length > 1 || !!primary.batch_id;
+  const total = lines.reduce((s, o) => s + Number(o.total_price || 0), 0);
+  const stepIdx = ORDER_STEPS.indexOf(primary.status);
   return (
     <article className={`wh-order-card ${highlight ? "is-highlight" : ""}`}>
       <div className="wh-order-top">
         <div>
-          <h4>{order.product_name}</h4>
+          <h4>
+            {isBatch ? `Savatcha · ${lines.length} ta mahsulot` : primary.product_name}
+          </h4>
+          {isBatch ? (
+            <ul className="wh-order-lines">
+              {lines.map((o) => (
+                <li key={o.id}>
+                  <span>{o.product_name}</span>
+                  <span>
+                    {o.quantity} {UNIT_LABELS[o.unit] || o.unit} · {money(o.total_price)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="wh-hint">
+              {primary.quantity} {UNIT_LABELS[primary.unit] || primary.unit} · {money(primary.total_price)}
+            </p>
+          )}
           <p className="wh-hint">
-            {order.quantity} {UNIT_LABELS[order.unit] || order.unit} · {money(order.total_price)}
+            Jami: <strong>{money(total)}</strong>
           </p>
           <p className="wh-hint">
-            {order.buyer_company_name && <>Xaridor: <strong>{order.buyer_company_name}</strong> · </>}
-            {order.seller_company_name && <>Sotuvchi: <strong>{order.seller_company_name}</strong></>}
+            {primary.buyer_company_name && <>Xaridor: <strong>{primary.buyer_company_name}</strong> · </>}
+            {primary.seller_company_name && <>Sotuvchi: <strong>{primary.seller_company_name}</strong></>}
           </p>
-          {order.courier_name && <p className="wh-hint">Yetkazuvchi: {order.courier_name}</p>}
-          {order.status_note && <p className="wh-hint">{order.status_note}</p>}
+          {primary.courier_name && <p className="wh-hint">Yetkazuvchi: {primary.courier_name}</p>}
+          {primary.status_note && <p className="wh-hint">{primary.status_note}</p>}
         </div>
-        <span className={`wh-order-status status-${order.status}`}>
-          {ORDER_STATUS_LABELS[order.status] || order.status}
+        <span className={`wh-order-status status-${primary.status}`}>
+          {ORDER_STATUS_LABELS[primary.status] || primary.status}
         </span>
       </div>
-      {order.status !== "cancelled" && (
+      {primary.status !== "cancelled" && (
         <div className="wh-order-steps" aria-hidden>
           {ORDER_STEPS.map((s, i) => (
             <span key={s} className={stepIdx >= i ? "done" : ""} title={ORDER_STATUS_LABELS[s]} />
@@ -935,8 +980,9 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
     }
   }
 
-  function actionsFor(order) {
-    const busy = busyId === order.id;
+  function actionsFor(lines) {
+    const order = lines[0];
+    const busy = lines.some((o) => busyId === o.id) || busyId === order?.batch_id;
     const list = [];
     if (canSell && scope === "sales" && canManage && order.status === "ordered") {
       list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
@@ -968,7 +1014,10 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
         danger: true,
         busy,
         onClick: () => {
-          if (window.confirm("Buyurtmani bekor qilasizmi? Band zaxira qaytariladi.")) {
+          const msg = lines.length > 1
+            ? `Savatchadagi ${lines.length} ta mahsulot bekor qilinsinmi? Band zaxira qaytariladi.`
+            : "Buyurtmani bekor qilasizmi? Band zaxira qaytariladi.";
+          if (window.confirm(msg)) {
             runAction(order.id, "cancel");
           }
         },
@@ -983,8 +1032,7 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
       ? "Xaridlaringizni qabul qiling; market buyurtmalarini yuklash → yo‘l → yetkazish orqali bajaring."
       : "Barcha buyurtmalar: qaysi xaridor, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish.";
 
-  // Group receipt list by batch for cleaner UI
-  const displayOrders = orders;
+  const displayGroups = groupOrdersByBatch(orders);
 
   return (
     <div className="wh-orders">
@@ -1003,16 +1051,19 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
       </div>
       {error && <p className="error">{error}</p>}
       {loading && <p className="wh-empty-inline">Yuklanmoqda...</p>}
-      {!loading && displayOrders.length === 0 && (
+      {!loading && displayGroups.length === 0 && (
         <div className="wh-empty"><p>Bu bo‘limda buyurtma yo‘q.</p></div>
       )}
       <div className="wh-orders-list">
-        {displayOrders.map((order) => (
+        {displayGroups.map((group) => (
           <OrderPipelineCard
-            key={order.id}
-            order={order}
-            actions={actionsFor(order)}
-            highlight={focusOrderId && String(focusOrderId) === String(order.id)}
+            key={group.key}
+            orders={group.orders}
+            actions={actionsFor(group.orders)}
+            highlight={
+              focusOrderId &&
+              group.orders.some((o) => String(focusOrderId) === String(o.id))
+            }
           />
         ))}
       </div>
