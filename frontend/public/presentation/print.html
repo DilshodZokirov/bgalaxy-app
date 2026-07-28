@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <title>Business Galaxy — Taqdimot (PDF)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    @page {
+      size: 297mm 167mm; /* 16:9 landscape-ish A4 width */
+      margin: 0;
+    }
+    :root {
+      --bg0: #07111f;
+      --ink: #f4f7fb;
+      --muted: #9db0c7;
+      --line: rgba(157, 176, 199, 0.22);
+      --accent: #2dd4bf;
+      --accent2: #38bdf8;
+      --warm: #f59e0b;
+      --danger: #fb7185;
+      --card: rgba(14, 28, 48, 0.85);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Manrope", sans-serif;
+      background: #000;
+      color: var(--ink);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .slide {
+      width: 297mm;
+      height: 167mm;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+      padding: 14mm 16mm;
+      background:
+        radial-gradient(900px 500px at 10% 0%, rgba(56,189,248,.16), transparent 55%),
+        radial-gradient(700px 420px at 90% 15%, rgba(45,212,191,.12), transparent 50%),
+        linear-gradient(180deg, #07111f 0%, #0a1628 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .slide:last-child { page-break-after: auto; }
+    .kicker {
+      font-size: 11pt;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 8pt;
+    }
+    .brand {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      color: var(--accent2);
+      font-size: 13pt;
+      margin-bottom: 4pt;
+    }
+    h1, h2 {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    h1 { font-size: 34pt; max-width: 16ch; }
+    h2 { font-size: 24pt; margin-bottom: 10pt; }
+    .lead {
+      margin-top: 10pt;
+      font-size: 12.5pt;
+      color: var(--muted);
+      max-width: 42rem;
+      line-height: 1.45;
+    }
+    .grid-2, .grid-3, .grid-4 {
+      display: grid;
+      gap: 8pt;
+      margin-top: 12pt;
+    }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12pt;
+      padding: 10pt 11pt;
+    }
+    .card h3 {
+      font-family: "Syne", sans-serif;
+      font-size: 11.5pt;
+      margin-bottom: 4pt;
+    }
+    .card p, .card li {
+      color: var(--muted);
+      font-size: 9.5pt;
+      line-height: 1.4;
+    }
+    .card ul { padding-left: 12pt; }
+    .card li + li { margin-top: 2pt; }
+    .num {
+      display: inline-block;
+      min-width: 18pt;
+      color: var(--accent);
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 10pt;
+      margin-bottom: 4pt;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6pt; margin-top: 12pt; }
+    .pill {
+      border: 1px solid var(--line);
+      padding: 4pt 9pt;
+      border-radius: 999px;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .pill.accent { color: var(--accent); border-color: rgba(45,212,191,.4); }
+    .pill.sky { color: var(--accent2); border-color: rgba(56,189,248,.4); }
+    .pill.warm { color: var(--warm); border-color: rgba(245,158,11,.4); }
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6pt; margin-top: 12pt; }
+    .flow .step {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10pt;
+      padding: 6pt 10pt;
+      font-weight: 700;
+      font-size: 10pt;
+    }
+    .flow .arrow { color: var(--accent); font-weight: 800; }
+    .chain {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 8pt;
+      align-items: stretch;
+      margin-top: 12pt;
+    }
+    .chain .node {
+      background: rgba(45,212,191,.1);
+      border: 1px solid rgba(45,212,191,.28);
+      border-radius: 12pt;
+      padding: 10pt;
+      text-align: center;
+    }
+    .chain .node strong {
+      display: block;
+      font-family: "Syne", sans-serif;
+      font-size: 12pt;
+      margin-bottom: 3pt;
+    }
+    .chain .node span { color: var(--muted); font-size: 9pt; }
+    .arrow-cell { display: grid; place-items: center; color: var(--accent2); font-size: 16pt; font-weight: 800; }
+    .roadmap { list-style: none; margin-top: 6pt; }
+    .roadmap li {
+      display: grid;
+      grid-template-columns: 55pt 1fr;
+      gap: 10pt;
+      padding: 7pt 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .roadmap .when { font-family: "Syne", sans-serif; color: var(--accent2); font-weight: 700; font-size: 10pt; }
+    .roadmap .what strong { display: block; font-size: 11pt; margin-bottom: 2pt; }
+    .roadmap .what span { color: var(--muted); font-size: 9.5pt; }
+    .quote {
+      margin-top: 12pt;
+      font-family: "Syne", sans-serif;
+      font-size: 16pt;
+      max-width: 28ch;
+      line-height: 1.25;
+    }
+    .quote em { color: var(--accent); font-style: normal; }
+    .title-meta {
+      margin-top: 14pt;
+      display: flex; flex-wrap: wrap; gap: 16pt;
+      color: var(--muted);
+      font-size: 10pt;
+    }
+    .title-meta strong {
+      color: var(--ink);
+      display: block;
+      font-size: 8pt;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 2pt;
+    }
+    .check { color: var(--accent); }
+    .x { color: var(--danger); }
+    .footer {
+      position: absolute;
+      right: 16mm; bottom: 8mm;
+      font-size: 8pt;
+      color: rgba(157,176,199,.55);
+    }
+  </style>
+</head>
+<body>
+
+<section class="slide">
+  <p class="brand">BUSINESS GALAXY</p>
+  <p class="kicker">Korxona operatsion platformasi</p>
+  <h1>Bitta galaktikada — jamoa, ombor, moliya va hamkorlik</h1>
+  <p class="lead">BG (Business Galaxy) — O‘zbekiston bizneslari uchun virtual ofis, ichki aloqa, vazifalar, buxgalteriya va Marketplace orqali ta’minot zanjirini birlashtirgan zamonaviy platforma.</p>
+  <div class="title-meta">
+    <div><strong>Mahsulot</strong> BG · bgalaxy-app</div>
+    <div><strong>Maqsad</strong> Taqdimot · investor / hamkor / jamoa</div>
+    <div><strong>Holat</strong> MVP ishlayapti · rivojlanish davomida</div>
+  </div>
+  <div class="footer">1 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">01 · Kun tartibi</p>
+  <h2>Nimalarni ko‘rib chiqamiz</h2>
+  <div class="grid-2">
+    <div class="card"><div class="num">1</div><h3>Muammo</h3><p>Bizneslar nima uchun tarqoq vositalar bilan qiynaladi</p></div>
+    <div class="card"><div class="num">2</div><h3>Yechim</h3><p>Business Galaxy nimani birlashtiradi</p></div>
+    <div class="card"><div class="num">3</div><h3>Qanday ishlaydi</h3><p>Modullar, rollar, Marketplace zanjiri</p></div>
+    <div class="card"><div class="num">4</div><h3>Kelajak</h3><p>5 bosqichli yo‘l xaritasi: ombor → market → global → booking → galaktika</p></div>
+  </div>
+  <div class="footer">2 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">02 · Muammo</p>
+  <h2>Biznes «yig‘ilmagan» ishlaydi</h2>
+  <div class="grid-3">
+    <div class="card"><h3>Aloqa tarqoq</h3><p>Telegram, telefon, email — qarorlar va topshiriqlar yo‘qoladi.</p></div>
+    <div class="card"><h3>Ombor «qog‘ozda»</h3><p>Zaxira, buyurtma, yetkazib berish alohida — xato ko‘p.</p></div>
+    <div class="card"><h3>Zanjir uzilgan</h3><p>Ishlab chiqaruvchi → distributor → market o‘rtasida raqamli ko‘prik yo‘q.</p></div>
+    <div class="card"><h3>Moliya kechikadi</h3><p>Sotuv bo‘lsa ham kirim/chiqim qo‘lda — hisobot ishonchsiz.</p></div>
+    <div class="card"><h3>Masofaviy ish zaif</h3><p>Video, vazifa, ruxsatlar turli joyda.</p></div>
+    <div class="card"><h3>Nazorat yo‘q</h3><p>Kim nima qilishi mumkinligi noaniq; jarayon yo‘q.</p></div>
+  </div>
+  <div class="footer">3 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">03 · Yechim</p>
+  <h2>Bitta platforma — butun korxona</h2>
+  <p class="lead">Business Galaxy korxonani «galaktika» sifatida yuritadi: ofis, jamoa, moliya, ombor va bozor bitta tizimda.</p>
+  <div class="pill-row">
+    <span class="pill accent">Virtual ofis</span>
+    <span class="pill sky">Chat &amp; video</span>
+    <span class="pill">Vazifalar</span>
+    <span class="pill warm">Buxgalteriya</span>
+    <span class="pill accent">Ombor</span>
+    <span class="pill sky">Marketplace</span>
+    <span class="pill">AI Ziyo</span>
+    <span class="pill">Rollar &amp; ruxsatlar</span>
+  </div>
+  <p class="quote">«Tarqoq ilovalar o‘rniga — <em>bitta ish muhiti</em>.»</p>
+  <div class="footer">4 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">04 · Auditoriyа</p>
+  <h2>Kimga mo‘ljallangan</h2>
+  <div class="grid-3">
+    <div class="card"><div class="num">K</div><h3>Kompaniya</h3><p>Ombor yuritadi, mahsulotni Marketplacega chiqaradi, distributorlarga sotadi.</p></div>
+    <div class="card"><div class="num">D</div><h3>Distributor</h3><p>Ishlab chiqaruvchidan xarid qiladi, marketlarga sotadi.</p></div>
+    <div class="card"><div class="num">M</div><h3>Market</h3><p>Qo‘lda zaxira kiritmaydi — distributor omboridan buyurtma qiladi.</p></div>
+  </div>
+  <div class="card" style="margin-top:10pt"><h3>Ichki jamoa</h3><p>Owner, ombor ishchisi, yuklovchi, yetkazuvchi, buxgalter — har biri o‘z ruxsatlari bilan.</p></div>
+  <div class="footer">5 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">05 · Qanday ishlaydi</p>
+  <h2>Foydalanuvchi yo‘li</h2>
+  <div class="flow">
+    <div class="step">Ro‘yxatdan o‘tish</div><span class="arrow">→</span>
+    <div class="step">Kompaniya yaratish</div><span class="arrow">→</span>
+    <div class="step">Jamoa / lavozim</div><span class="arrow">→</span>
+    <div class="step">Ombor yoqish</div><span class="arrow">→</span>
+    <div class="step">Ishlash</div>
+  </div>
+  <div class="grid-2" style="margin-top:12pt">
+    <div class="card"><h3>Ichki ish</h3><ul><li>Chat, kanallar, bildirishnomalar</li><li>Vazifalar (kanban, ball)</li><li>Virtual ofis / video</li><li>Buxgalteriya</li></ul></div>
+    <div class="card"><h3>Tashqi aylanma</h3><ul><li>Marketplace savatcha</li><li>Buyurtma pipeline</li><li>Yuklash → yo‘l → qabul</li><li>Avtomatik ombor + moliya</li></ul></div>
+  </div>
+  <div class="footer">6 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">06 · Ta’minot zanjiri</p>
+  <h2>Marketplace qanday bog‘laydi</h2>
+  <div class="chain">
+    <div class="node"><strong>Kompaniya</strong><span>Ishlab chiqaradi · Marketplacega chiqaradi</span></div>
+    <div class="arrow-cell">→</div>
+    <div class="node"><strong>Distributor</strong><span>Xarid qiladi · marketlarga sotadi</span></div>
+    <div class="arrow-cell">→</div>
+    <div class="node"><strong>Market</strong><span>Faqat buyurtma · omborga qabul</span></div>
+  </div>
+  <div class="grid-2" style="margin-top:10pt">
+    <div class="card"><h3>Qoidalar</h3><ul><li>Market qo‘lda zaxira kiritmaydi</li><li>Faqat chiqarilgan mahsulot ko‘rinadi</li><li>Bir savatcha = bir sotuvchi</li><li>Qabuldan keyin baho (1–5★)</li></ul></div>
+    <div class="card"><h3>Buyurtma hayoti</h3><p>Buyurtma → Yuklash → Yo‘lda → Qabul checklist → Omborga kirim. Bir nechta mahsulot bitta savatcha sifatida birga yuradi.</p></div>
+  </div>
+  <div class="footer">7 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">07 · Modullar</p>
+  <h2>Hozir nima ishlaydi</h2>
+  <div class="grid-4">
+    <div class="card"><h3>Auth &amp; kompaniya</h3><p>Email, Google, lavozim, ruxsatlar</p></div>
+    <div class="card"><h3>Chat</h3><p>Kanallar, DM, fayl, real-vaqt</p></div>
+    <div class="card"><h3>Uchrashuv</h3><p>WebRTC, LiveKit, virtual ofis</p></div>
+    <div class="card"><h3>Vazifalar</h3><p>Kanban, muddat, ball, reyting</p></div>
+    <div class="card"><h3>Buxgalteriya</h3><p>Kirim/chiqim, faktura, grafik</p></div>
+    <div class="card"><h3>Ombor</h3><p>Ko‘p ombor, zaxira, dashboard</p></div>
+    <div class="card"><h3>Marketplace</h3><p>Savatcha, pipeline, reyting</p></div>
+    <div class="card"><h3>AI Ziyo</h3><p>Gemini asosida yordamchi</p></div>
+  </div>
+  <div class="footer">8 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">08 · Nima uchun BG</p>
+  <h2>Oddiy vositalar vs Business Galaxy</h2>
+  <div class="grid-2">
+    <div class="card"><h3>Oddiy yondashuv</h3><ul>
+      <li><span class="x">✕</span> Chat alohida, ombor Excel’da</li>
+      <li><span class="x">✕</span> Buyurtma telefon orqali</li>
+      <li><span class="x">✕</span> Moliya kechikib yoziladi</li>
+      <li><span class="x">✕</span> Kim nima qilgani noaniq</li>
+      <li><span class="x">✕</span> Ta’minot zanjiri bog‘lanmagan</li>
+    </ul></div>
+    <div class="card"><h3>Business Galaxy</h3><ul>
+      <li><span class="check">✓</span> Bitta login — barcha modullar</li>
+      <li><span class="check">✓</span> Buyurtma → ombor → byudjet avtomatik</li>
+      <li><span class="check">✓</span> Rollar va ruxsatlar</li>
+      <li><span class="check">✓</span> Jarayon kuzatuvi (pipeline)</li>
+      <li><span class="check">✓</span> Ishlab chiqaruvchi–distributor–market</li>
+    </ul></div>
+  </div>
+  <div class="footer">9 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">09 · Texnologiya</p>
+  <h2>Ishonchli zamonaviy stack</h2>
+  <div class="grid-2">
+    <div class="card"><h3>Backend</h3><p>FastAPI · PostgreSQL · SQLAlchemy · Alembic · WebSocket</p></div>
+    <div class="card"><h3>Frontend</h3><p>React · Vite · real-vaqt UI · 3D ofis</p></div>
+    <div class="card"><h3>Realtime</h3><p>WebRTC · LiveKit · coturn</p></div>
+    <div class="card"><h3>AI &amp; Deploy</h3><p>Gemini · Vercel · Render · Neon</p></div>
+  </div>
+  <div class="footer">10 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">10 · Biznes natija</p>
+  <h2>Qanday foyda beradi</h2>
+  <div class="grid-3">
+    <div class="card"><div class="num">⏱</div><h3>Vaqt</h3><p>Buyurtma va qabul raqamli — qo‘ng‘iroq va Excel kamayadi.</p></div>
+    <div class="card"><div class="num">🎯</div><h3>Aniqlik</h3><p>Zaxira band qilinadi, checklist bilan tasdiqlanadi, ombor yangilanadi.</p></div>
+    <div class="card"><div class="num">📈</div><h3>Nazorat</h3><p>Moliya avtomatik; jamoa ball va vazifa bilan boshqariladi.</p></div>
+  </div>
+  <p class="lead">Eng muhimi: <strong style="color:#f4f7fb">bitta savatchadagi barcha mahsulotlar</strong> to‘lovdan omborgacha birga yetib boradi.</p>
+  <div class="footer">11 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">11 · Kelajak · 5 bosqich</p>
+  <h2>Yo‘l xaritasi — galaktikaga chiqish</h2>
+  <ul class="roadmap">
+    <li><div class="when">1-bosqich</div><div class="what"><strong>Omborlar bevosita bog‘lanishi</strong><span>Korxona ↔ Distributor ↔ Market omborlari — bitta raqamli zanjir</span></div></li>
+    <li><div class="when">2-bosqich</div><div class="what"><strong>Yakka tartibdagi market / online do‘kon</strong><span>Har bir inson o‘z magazinini ochadi va yakka tadbirkor sifatida ishlaydi</span></div></li>
+    <li><div class="when">3-bosqich</div><div class="what"><strong>Global integratsiya</strong><span>Alibaba, Taobao va yirik korxonalar — ortiqcha dastursiz, faqat BG orqali</span></div></li>
+    <li><div class="when">4-bosqich</div><div class="what"><strong>Booking &amp; Ticketing</strong><span>Restoran/kafe/maishiy bronlari + stadion, konsert va tadbir chiptalari</span></div></li>
+    <li><div class="when">5 · Final</div><div class="what"><strong>Virtual galaktika + BG token</strong><span>Korxonalar xaritada, iste’molchi muhiti, o‘z tokenlari — barcha ofislar bir galaktikada</span></div></li>
+  </ul>
+  <div class="footer">12 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">12 · Vizyon</p>
+  <h2>Boshqa dasturga o‘rin qolmasin</h2>
+  <p class="lead">Har bir korxonaning virtual ko‘rinishi xaritaga joylanadi. Virtual korxonalar bir zonada, iste’molchi uchun alohida muhit — BG o‘z tokenlarini joriy qiladi.</p>
+  <div class="grid-3">
+    <div class="card"><div class="num">01→02</div><h3>Asos → kengayish</h3><p>Avval ombor zanjiri, keyin har kimga shaxsiy market.</p></div>
+    <div class="card"><div class="num">03→04</div><h3>Dunyo → hayot</h3><p>Global ta’minot, so‘ng booking va ticketing.</p></div>
+    <div class="card"><div class="num">05</div><h3>Bitta galaktika</h3><p>Virtual ofislar + token = yagona ekotizim.</p></div>
+  </div>
+  <p class="quote">Maqsad: <em>barcha xizmatlar — bir dasturda.</em></p>
+  <div class="footer">13 / 14</div>
+</section>
+
+<section class="slide">
+  <p class="kicker">13 · Xulosa</p>
+  <h2>Business Galaxy — korxona uchun yagona orbitа</h2>
+  <div class="grid-3">
+    <div class="card"><h3>Muammoga javob</h3><p>Tarqoq aloqa, ombor va moliyani bitta tizimga yig‘adi.</p></div>
+    <div class="card"><h3>Ishlash modeli</h3><p>Kompaniya → distributor → market + ichki jamoa vositalari.</p></div>
+    <div class="card"><h3>Yo‘nalish</h3><p>5 bosqich: omborlar → yakka market → global → booking → virtual galaktika + token.</p></div>
+  </div>
+  <p class="quote">Savollar bormi? <em>Keling, birgalikda orbitaga chiqamiz.</em></p>
+  <div class="title-meta">
+    <div><strong>Mahsulot</strong> Business Galaxy (BG)</div>
+    <div><strong>Repo</strong> bgalaxy-app</div>
+    <div><strong>Yo‘l xaritasi</strong> docs/ROADMAP.md</div>
+  </div>
+  <div class="footer">14 / 14</div>
+</section>
+
+</body>
+</html>

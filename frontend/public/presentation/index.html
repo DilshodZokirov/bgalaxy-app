@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Business Galaxy — Taqdimot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #07111f;
+      --bg1: #0c1a2e;
+      --ink: #f4f7fb;
+      --muted: #9db0c7;
+      --line: rgba(157, 176, 199, 0.22);
+      --accent: #2dd4bf;
+      --accent2: #38bdf8;
+      --warm: #f59e0b;
+      --danger: #fb7185;
+      --card: rgba(14, 28, 48, 0.72);
+      --glow: rgba(45, 212, 191, 0.18);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "Manrope", system-ui, sans-serif;
+      background: var(--bg0);
+      color: var(--ink);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sky {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(1200px 700px at 12% -10%, rgba(56, 189, 248, 0.18), transparent 55%),
+        radial-gradient(900px 600px at 88% 10%, rgba(45, 212, 191, 0.14), transparent 50%),
+        radial-gradient(700px 500px at 50% 110%, rgba(245, 158, 11, 0.08), transparent 45%),
+        linear-gradient(180deg, #07111f 0%, #0a1628 55%, #07111f 100%);
+    }
+    .sky::after {
+      content: "";
+      position: absolute; inset: 0;
+      background-image: radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,.45), transparent),
+        radial-gradient(1px 1px at 70% 20%, rgba(255,255,255,.35), transparent),
+        radial-gradient(1.5px 1.5px at 40% 70%, rgba(255,255,255,.3), transparent),
+        radial-gradient(1px 1px at 85% 60%, rgba(255,255,255,.4), transparent),
+        radial-gradient(1px 1px at 15% 80%, rgba(255,255,255,.25), transparent);
+      opacity: 0.55;
+      animation: drift 40s linear infinite;
+    }
+    @keyframes drift {
+      from { transform: translateY(0); }
+      to { transform: translateY(-40px); }
+    }
+
+    .deck {
+      position: relative; z-index: 1;
+      height: 100%; width: 100%;
+    }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: grid;
+      align-content: center;
+      padding: clamp(1.5rem, 4vw, 4rem) clamp(1.5rem, 6vw, 6rem);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(18px) scale(0.985);
+      transition: opacity .45s ease, transform .45s ease, visibility .45s;
+      overflow: auto;
+    }
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+
+    .kicker {
+      font-size: .78rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: .85rem;
+    }
+    h1, h2 {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+    h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); max-width: 14ch; }
+    h2 { font-size: clamp(1.7rem, 3.6vw, 2.8rem); margin-bottom: 1rem; }
+    .lead {
+      margin-top: 1.1rem;
+      font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+      color: var(--muted);
+      max-width: 42rem;
+      line-height: 1.55;
+    }
+    .brand {
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--accent2);
+      margin-bottom: .4rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.4rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.4rem;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .85rem;
+      margin-top: 1.4rem;
+    }
+    @media (max-width: 900px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      body { overflow: auto; }
+      .slide { position: relative; opacity: 1; visibility: visible; transform: none; min-height: 100vh; padding-bottom: 5rem; }
+      .slide:not(.active) { display: none; }
+      .controls { position: fixed; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1.15rem 1.25rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 20px 50px rgba(0,0,0,.25);
+    }
+    .card h3 {
+      font-family: "Syne", sans-serif;
+      font-size: 1.05rem;
+      margin-bottom: .45rem;
+    }
+    .card p, .card li {
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.5;
+    }
+    .card ul { padding-left: 1.1rem; }
+    .card li + li { margin-top: .35rem; }
+    .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem; height: 2rem;
+      border-radius: 999px;
+      background: var(--glow);
+      color: var(--accent);
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: .9rem;
+      margin-bottom: .7rem;
+    }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.4rem; }
+    .pill {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      color: var(--ink);
+      padding: .45rem .8rem;
+      border-radius: 999px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    .pill.accent { border-color: rgba(45,212,191,.4); color: var(--accent); }
+    .pill.sky { border-color: rgba(56,189,248,.4); color: var(--accent2); }
+    .pill.warm { border-color: rgba(245,158,11,.4); color: var(--warm); }
+
+    .flow {
+      display: flex; flex-wrap: wrap; align-items: center; gap: .55rem;
+      margin-top: 1.5rem;
+    }
+    .flow .step {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: .7rem 1rem;
+      font-weight: 700;
+      font-size: .92rem;
+    }
+    .flow .arrow { color: var(--accent); font-weight: 800; }
+
+    .chain {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: .75rem;
+      align-items: stretch;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 900px) {
+      .chain { grid-template-columns: 1fr; }
+      .chain .arrow-cell { display: none; }
+    }
+    .chain .node {
+      background: linear-gradient(160deg, rgba(45,212,191,.12), rgba(14,28,48,.8));
+      border: 1px solid rgba(45,212,191,.28);
+      border-radius: 18px;
+      padding: 1.1rem;
+      text-align: center;
+    }
+    .chain .node strong {
+      display: block;
+      font-family: "Syne", sans-serif;
+      font-size: 1.15rem;
+      margin-bottom: .35rem;
+    }
+    .chain .node span { color: var(--muted); font-size: .9rem; }
+    .arrow-cell {
+      display: grid; place-items: center;
+      color: var(--accent2);
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+
+    .roadmap li {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 6.5rem 1fr;
+      gap: 1rem;
+      padding: .85rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .roadmap .when {
+      font-family: "Syne", sans-serif;
+      color: var(--accent2);
+      font-weight: 700;
+    }
+    .roadmap .what strong { display: block; margin-bottom: .2rem; }
+    .roadmap .what span { color: var(--muted); font-size: .92rem; }
+
+    .quote {
+      margin-top: 1.5rem;
+      font-family: "Syne", sans-serif;
+      font-size: clamp(1.2rem, 2.4vw, 1.7rem);
+      max-width: 28ch;
+      line-height: 1.25;
+    }
+    .quote em { color: var(--accent); font-style: normal; }
+
+    .controls {
+      position: fixed;
+      z-index: 5;
+      left: 0; right: 0; bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .85rem clamp(1rem, 4vw, 2.5rem);
+      background: linear-gradient(180deg, transparent, rgba(7,17,31,.92));
+      backdrop-filter: blur(8px);
+    }
+    .progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,.08);
+      border-radius: 999px;
+      overflow: hidden;
+      max-width: 320px;
+    }
+    .progress > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width .35s ease;
+    }
+    .nav-btns { display: flex; gap: .5rem; align-items: center; }
+    .nav-btns button, .hint {
+      font: inherit;
+      border: 1px solid var(--line);
+      background: rgba(14,28,48,.8);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: .55rem 1rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .nav-btns button:hover { border-color: var(--accent); color: var(--accent); }
+    .hint { border: none; background: transparent; color: var(--muted); font-size: .82rem; cursor: default; }
+    .page-num {
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: .9rem;
+      min-width: 4.5rem;
+      text-align: center;
+    }
+
+    .title-meta {
+      margin-top: 2rem;
+      display: flex; flex-wrap: wrap; gap: 1.5rem;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+    .title-meta strong { color: var(--ink); display: block; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .2rem; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1.5rem;
+      align-items: start;
+      margin-top: .5rem;
+    }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+    .check { color: var(--accent); margin-right: .35rem; }
+    .x { color: var(--danger); margin-right: .35rem; }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+
+  <main class="deck" id="deck">
+    <!-- 1 -->
+    <section class="slide active" data-title="Muqova">
+      <p class="brand">BUSINESS GALAXY</p>
+      <p class="kicker">Korxona operatsion platformasi</p>
+      <h1>Bitta galaktikada — jamoa, ombor, moliya va hamkorlik</h1>
+      <p class="lead">
+        BG (Business Galaxy) — O‘zbekiston bizneslari uchun virtual ofis, ichki aloqa,
+        vazifalar, buxgalteriya va Marketplace orqali ta’minot zanjirini birlashtirgan
+        zamonaviy platforma.
+      </p>
+      <div class="title-meta">
+        <div><strong>Mahsulot</strong> BG · bgalaxy-app</div>
+        <div><strong>Maqsad</strong> Taqdimot · investor / hamkor / jamoa</div>
+        <div><strong>Holat</strong> MVP ishlayapti · rivojlanish davomida</div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide" data-title="Kun tartibi">
+      <p class="kicker">01 · Kun tartibi</p>
+      <h2>Nimalarni ko‘rib chiqamiz</h2>
+      <div class="grid-2">
+        <div class="card"><span class="num">1</span><h3>Muammo</h3><p>Bizneslar nima uchun tarqoq vositalar bilan qiynaladi</p></div>
+        <div class="card"><span class="num">2</span><h3>Yechim</h3><p>Business Galaxy nimani birlashtiradi</p></div>
+        <div class="card"><span class="num">3</span><h3>Qanday ishlaydi</h3><p>Modullar, rollar, Marketplace zanjiri</p></div>
+        <div class="card"><span class="num">4</span><h3>Kelajak</h3><p>5 bosqichli yo‘l xaritasi: ombor → market → global → booking → galaktika</p></div>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide" data-title="Muammo">
+      <p class="kicker">02 · Muammo</p>
+      <h2>Biznes «yig‘ilmagan» ishlaydi</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Aloqa tarqoq</h3>
+          <p>Telegram, telefon, email — qarorlar va topshiriqlar yo‘qoladi, tarix saqlanmaydi.</p>
+        </div>
+        <div class="card">
+          <h3>Ombor «qog‘ozda»</h3>
+          <p>Zaxira, buyurtma, yetkazib berish alohida yuritiladi — xato va kechikish ko‘p.</p>
+        </div>
+        <div class="card">
+          <h3>Zanjir uzilgan</h3>
+          <p>Ishlab chiqaruvchi → distributor → market o‘rtasida yagona raqamli ko‘prik yo‘q.</p>
+        </div>
+        <div class="card">
+          <h3>Moliya kechikadi</h3>
+          <p>Sotuv bo‘lsa ham kirim/chiqim qo‘lda — hisobot ishonchsiz.</p>
+        </div>
+        <div class="card">
+          <h3>Masofaviy ish zaif</h3>
+          <p>Video, vazifa, ruxsatlar turli joyda — jamoa bir muhitda emas.</p>
+        </div>
+        <div class="card">
+          <h3>Nazorat yo‘q</h3>
+          <p>Kim nima qilishi mumkinligi noaniq; ball, reyting, jarayon yo‘q.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="slide" data-title="Yechim">
+      <p class="kicker">03 · Yechim</p>
+      <h2>Bitta platforma — butun korxona</h2>
+      <p class="lead">
+        Business Galaxy korxonani «galaktika» sifatida yuritadi: ofis, jamoa, moliya,
+        ombor va bozor bitta tizimda. Har bir kompaniya o‘z orbitasida — lekin bir tarmoqda.
+      </p>
+      <div class="pill-row">
+        <span class="pill accent">Virtual ofis</span>
+        <span class="pill sky">Chat &amp; video</span>
+        <span class="pill">Vazifalar</span>
+        <span class="pill warm">Buxgalteriya</span>
+        <span class="pill accent">Ombor</span>
+        <span class="pill sky">Marketplace</span>
+        <span class="pill">AI Ziyo</span>
+        <span class="pill">Rollar &amp; ruxsatlar</span>
+      </div>
+      <p class="quote">«Tarqoq ilovalar o‘rniga — <em>bitta ish muhiti</em>.»</p>
+    </section>
+
+    <!-- 5 -->
+    <section class="slide" data-title="Kim uchun">
+      <p class="kicker">04 · Auditoriyа</p>
+      <h2>Kimga mo‘ljallangan</h2>
+      <div class="grid-3">
+        <div class="card">
+          <span class="num">K</span>
+          <h3>Kompaniya (ishlab chiqaruvchi)</h3>
+          <p>O‘z omborini yuritadi, mahsulotni Marketplacega chiqaradi, distributorlarga sotadi.</p>
+        </div>
+        <div class="card">
+          <span class="num">D</span>
+          <h3>Distributor</h3>
+          <p>Ishlab chiqaruvchidan xarid qiladi, zaxirani Marketplace orqali marketlarga sotadi.</p>
+        </div>
+        <div class="card">
+          <span class="num">M</span>
+          <h3>Market / do‘kon</h3>
+          <p>Qo‘lda mahsulot kiritmaydi — faqat distributor omboridan buyurtma qiladi va qabul qiladi.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <h3>Ichki jamoa</h3>
+        <p>Owner, ombor ishchisi, yuklovchi, yetkazuvchi, buxgalter — har biri o‘z ruxsatlari bilan ishlaydi.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide" data-title="Qanday ishlaydi">
+      <p class="kicker">05 · Qanday ishlaydi</p>
+      <h2>Foydalanuvchi yo‘li</h2>
+      <div class="flow">
+        <div class="step">Ro‘yxatdan o‘tish</div><span class="arrow">→</span>
+        <div class="step">Kompaniya yaratish</div><span class="arrow">→</span>
+        <div class="step">Jamoa / lavozim</div><span class="arrow">→</span>
+        <div class="step">Ombor yoqish</div><span class="arrow">→</span>
+        <div class="step">Ishlash</div>
+      </div>
+      <div class="grid-2" style="margin-top:1.5rem">
+        <div class="card">
+          <h3>Ichki ish</h3>
+          <ul>
+            <li>Chat, kanallar, bildirishnomalar</li>
+            <li>Vazifalar (kanban, ball, reyting)</li>
+            <li>Virtual ofis / video uchrashuv</li>
+            <li>Buxgalteriya: kirim, chiqim, hisobot</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Tashqi aylanma</h3>
+          <ul>
+            <li>Marketplace: sotuvchi tanlash</li>
+            <li>Savatcha → buyurtma (batch)</li>
+            <li>Yuklash → yo‘l → qabul</li>
+            <li>Avtomatik ombor + kirim/chiqim</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="slide" data-title="Marketplace zanjiri">
+      <p class="kicker">06 · Ta’minot zanjiri</p>
+      <h2>Marketplace qanday bog‘laydi</h2>
+      <div class="chain">
+        <div class="node">
+          <strong>Kompaniya</strong>
+          <span>Ishlab chiqaradi · Marketplacega chiqaradi</span>
+        </div>
+        <div class="arrow-cell">→</div>
+        <div class="node">
+          <strong>Distributor</strong>
+          <span>Xarid qiladi · marketlarga sotadi</span>
+        </div>
+        <div class="arrow-cell">→</div>
+        <div class="node">
+          <strong>Market</strong>
+          <span>Faqat buyurtma · omborga qabul</span>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:1.2rem">
+        <div class="card">
+          <h3>Qoidalar</h3>
+          <ul>
+            <li>Market qo‘lda zaxira kiritmaydi</li>
+            <li>Faqat Marketplacega chiqarilgan mahsulot ko‘rinadi</li>
+            <li>Bir savatcha = bir sotuvchi</li>
+            <li>Qabuldan keyin baho (1–5★)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Buyurtma hayoti</h3>
+          <p style="margin-bottom:.6rem">Buyurtma → Yuklash → Yuklandi → Yo‘lda → Yetkazuvchi → Qabul checklist → Omborga kirim</p>
+          <p>Bir nechta mahsulot bitta savatcha sifatida birga yuradi; to‘lovda sotuvchiga kirim, xaridorga chiqim.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="slide" data-title="Modullar">
+      <p class="kicker">07 · Modullar</p>
+      <h2>Hozir nima ishlaydi</h2>
+      <div class="grid-4">
+        <div class="card"><h3>Auth &amp; kompaniya</h3><p>Email, Google, lavozim, ruxsatlar, geo/INN</p></div>
+        <div class="card"><h3>Chat</h3><p>Kanallar, DM, fayl, real-vaqt WS</p></div>
+        <div class="card"><h3>Uchrashuv</h3><p>1-1 WebRTC, guruh LiveKit, virtual ofis</p></div>
+        <div class="card"><h3>Vazifalar</h3><p>Kanban, muddat, ball, reyting</p></div>
+        <div class="card"><h3>Buxgalteriya</h3><p>Kirim/chiqim, faktura, ish haqi, grafik</p></div>
+        <div class="card"><h3>Ombor</h3><p>Ko‘p ombor, zaxira, tarix, dashboard</p></div>
+        <div class="card"><h3>Marketplace</h3><p>Savatcha, pipeline, reyting</p></div>
+        <div class="card"><h3>AI Ziyo</h3><p>Gemini asosida yordamchi</p></div>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section class="slide" data-title="Qiyoslash">
+      <p class="kicker">08 · Nima uchun BG</p>
+      <h2>Oddiy vositalar vs Business Galaxy</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Oddiy yondashuv</h3>
+          <ul>
+            <li><span class="x">✕</span> Chat alohida, ombor Excel’da</li>
+            <li><span class="x">✕</span> Buyurtma telefon orqali</li>
+            <li><span class="x">✕</span> Moliya kechikib yoziladi</li>
+            <li><span class="x">✕</span> Kim nima qilgani noaniq</li>
+            <li><span class="x">✕</span> Ta’minot zanjiri bog‘lanmagan</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Business Galaxy</h3>
+          <ul>
+            <li><span class="check">✓</span> Bitta login — barcha modullar</li>
+            <li><span class="check">✓</span> Buyurtma → ombor → byudjet avtomatik</li>
+            <li><span class="check">✓</span> Rollar va ruxsatlar</li>
+            <li><span class="check">✓</span> Jarayon kuzatuvi (pipeline)</li>
+            <li><span class="check">✓</span> Ishlab chiqaruvchi–distributor–market zanjiri</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide" data-title="Texnologiya">
+      <p class="kicker">09 · Texnologiya</p>
+      <h2>Ishonchli zamonaviy stack</h2>
+      <div class="two-col">
+        <div>
+          <div class="grid-2">
+            <div class="card"><h3>Backend</h3><p>FastAPI · PostgreSQL · SQLAlchemy · Alembic · WebSocket</p></div>
+            <div class="card"><h3>Frontend</h3><p>React · Vite · real-vaqt UI · 3D ofis</p></div>
+            <div class="card"><h3>Realtime</h3><p>WebRTC · LiveKit · coturn (STUN/TURN)</p></div>
+            <div class="card"><h3>AI</h3><p>Google Gemini (Ziyo)</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Deploy</h3>
+          <ul>
+            <li>Frontend — Vercel</li>
+            <li>Backend — Render</li>
+            <li>DB — Neon PostgreSQL</li>
+            <li>CI / preview — GitHub + Vercel</li>
+          </ul>
+          <p style="margin-top:.8rem">API hujjatlari: <code>/docs</code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section class="slide" data-title="Natija">
+      <p class="kicker">10 · Biznes natija</p>
+      <h2>Qanday foyda beradi</h2>
+      <div class="grid-3">
+        <div class="card">
+          <span class="num">⏱</span>
+          <h3>Vaqt</h3>
+          <p>Buyurtma va qabul raqamli — qo‘ng‘iroq va Excel kamayadi.</p>
+        </div>
+        <div class="card">
+          <span class="num">🎯</span>
+          <h3>Aniqlik</h3>
+          <p>Zaxira band qilinadi, qabul checklist bilan tasdiqlanadi, ombor yangilanadi.</p>
+        </div>
+        <div class="card">
+          <span class="num">📈</span>
+          <h3>Nazorat</h3>
+          <p>Moliya avtomatik yoziladi; jamoa ball va vazifa bilan boshqariladi.</p>
+        </div>
+      </div>
+      <p class="lead" style="margin-top:1.2rem">
+        Eng muhimi: <strong style="color:var(--ink)">bitta savatchadagi barcha mahsulotlar</strong>
+        to‘lovdan omborgacha birga yetib boradi — jarayon uzilmaydi.
+      </p>
+    </section>
+
+    <!-- 12 -->
+    <section class="slide" data-title="Yo‘l xaritasi">
+      <p class="kicker">11 · Kelajak · 5 bosqich</p>
+      <h2>Yo‘l xaritasi — galaktikaga chiqish</h2>
+      <ul class="roadmap">
+        <li>
+          <div class="when">1-bosqich</div>
+          <div class="what">
+            <strong>Omborlar bevosita bog‘lanishi</strong>
+            <span>Korxona ombori ↔ Distributor ombori ↔ Market (chakana) ombori — bitta raqamli zanjir</span>
+          </div>
+        </li>
+        <li>
+          <div class="when">2-bosqich</div>
+          <div class="what">
+            <strong>Yakka tartibdagi market / online do‘kon</strong>
+            <span>Har bir inson o‘z magazinini ochadi va yakka tadbirkor sifatida ishlaydi</span>
+          </div>
+        </li>
+        <li>
+          <div class="when">3-bosqich</div>
+          <div class="what">
+            <strong>Global integratsiya</strong>
+            <span>Alibaba, Taobao va yirik korxonalar — ortiqcha dastursiz, faqat BG orqali</span>
+          </div>
+        </li>
+        <li>
+          <div class="when">4-bosqich</div>
+          <div class="what">
+            <strong>Booking &amp; Ticketing</strong>
+            <span>Restoran/kafe/maishiy xizmat bronlari + stadion, konsert va tadbir chiptalari</span>
+          </div>
+        </li>
+        <li>
+          <div class="when">5 · Final</div>
+          <div class="what">
+            <strong>Virtual galaktika + BG token</strong>
+            <span>Korxonalar xaritada, iste’molchi virtual muhiti, o‘z tokenlari — barcha ofislar bir galaktikada</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 13 -->
+    <section class="slide" data-title="Final maqsad">
+      <p class="kicker">12 · Vizyon</p>
+      <h2>Boshqa dasturga o‘rin qolmasin</h2>
+      <p class="lead">
+        Oxirgi bosqichda har bir korxonaning virtual ko‘rinishi xaritaga joylanadi.
+        Virtual korxonalar bir zonada, iste’molchi uchun alohida muhit — va BG o‘z tokenlarini joriy qiladi.
+      </p>
+      <div class="grid-3">
+        <div class="card">
+          <span class="num">01→02</span>
+          <h3>Asos → kengayish</h3>
+          <p>Avval ombor zanjiri, keyin har kimga shaxsiy market.</p>
+        </div>
+        <div class="card">
+          <span class="num">03→04</span>
+          <h3>Dunyo → hayot</h3>
+          <p>Global ta’minot, so‘ng booking va ticketing.</p>
+        </div>
+        <div class="card">
+          <span class="num">05</span>
+          <h3>Bitta galaktika</h3>
+          <p>Virtual ofislar + token = yagona ekotizim.</p>
+        </div>
+      </div>
+      <p class="quote">Maqsad: <em>barcha xizmatlar — bir dasturda.</em></p>
+    </section>
+
+    <!-- 14 -->
+    <section class="slide" data-title="Xulosa">
+      <p class="kicker">13 · Xulosa</p>
+      <h2>Business Galaxy — korxona uchun yagona orbitа</h2>
+      <div class="grid-3">
+        <div class="card"><h3>Muammoga javob</h3><p>Tarqoq aloqa, ombor va moliyani bitta tizimga yig‘adi.</p></div>
+        <div class="card"><h3>Ishlash modeli</h3><p>Kompaniya → distributor → market zanjiri + ichki jamoa vositalari.</p></div>
+        <div class="card"><h3>Yo‘nalish</h3><p>5 bosqich: omborlar → yakka market → global → booking → virtual galaktika + token.</p></div>
+      </div>
+      <p class="quote" style="margin-top:1.8rem">Savollar bormi? <em>Keling, birgalikda orbitaga chiqamiz.</em></p>
+      <div class="title-meta">
+        <div><strong>Mahsulot</strong> Business Galaxy (BG)</div>
+        <div><strong>Repo</strong> bgalaxy-app</div>
+        <div><strong>Yo‘l xaritasi</strong> docs/ROADMAP.md</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="controls">
+    <div class="page-num" id="pageNum">1 / 13</div>
+    <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+    <div class="nav-btns">
+      <span class="hint">← → yoki bo‘sh joy</span>
+      <button type="button" id="prev" aria-label="Oldingi">Orqaga</button>
+      <button type="button" id="next" aria-label="Keyingi">Keyingi</button>
+    </div>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    let i = 0;
+
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      document.getElementById("pageNum").textContent = `${i + 1} / ${slides.length}`;
+      document.getElementById("bar").style.width = `${((i + 1) / slides.length) * 100}%`;
+      history.replaceState(null, "", `#${i + 1}`);
+    }
+
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+
+    window.addEventListener("keydown", (e) => {
+      if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) {
+        e.preventDefault();
+        show(i + 1);
+      } else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) {
+        e.preventDefault();
+        show(i - 1);
+      } else if (e.key === "Home") show(0);
+      else if (e.key === "End") show(slides.length - 1);
+    });
+
+    let touchX = null;
+    window.addEventListener("touchstart", (e) => { touchX = e.changedTouches[0].screenX; }, { passive: true });
+    window.addEventListener("touchend", (e) => {
+      if (touchX == null) return;
+      const dx = e.changedTouches[0].screenX - touchX;
+      if (Math.abs(dx) > 50) show(i + (dx < 0 ? 1 : -1));
+      touchX = null;
+    }, { passive: true });
+
+    const hash = Number(location.hash.replace("#", ""));
+    show(Number.isFinite(hash) && hash >= 1 ? hash - 1 : 0);
+  </script>
+</body>
+</html>
