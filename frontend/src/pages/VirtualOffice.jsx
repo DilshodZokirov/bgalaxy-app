@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Room, RoomEvent } from "livekit-client";
 import { api, wsUrl } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import OfficeScene3D from "../components/OfficeScene3D";
 import OfficeCommsPanel from "../components/OfficeCommsPanel";
 
 export default function VirtualOffice() {
   const navigate = useNavigate();
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [zoom, setZoom] = useState(5);
   const [voiceStatus, setVoiceStatus] = useState("connecting"); // connecting | connected | off | error
   const [micOn, setMicOn] = useState(true);
@@ -43,12 +43,7 @@ export default function VirtualOffice() {
   const audioContainerRef = useRef(null);
   const ringtoneRef = useRef(null);
 
-  useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setCompany(pickActiveCompany(list)))
-      .catch(() => {});
-  }, []);
+  // company comes from useActiveCompany — no separate fetch
 
   // Shared, always-on voice room for everyone currently in the office —
   // audio only, no video tiles, no dedicated call UI.
@@ -297,12 +292,26 @@ export default function VirtualOffice() {
       <p className="galaxy-page-kicker">3D Metaverse</p>
       <h1>Virtual Ofis{company ? ` — ${company.name}` : ""}</h1>
       <p>
-        {company
-          ? "3D xonada yuring — jamoa a’zolari real vaqtda ko‘rinadi va eshitiladi."
-          : "Avval kompaniya yarating — keyin virtual ofisingiz ochiladi."}
+        {companyLoading
+          ? "Yuklanmoqda..."
+          : company
+            ? "3D xonada yuring — jamoa a’zolari real vaqtda ko‘rinadi va eshitiladi."
+            : "Avval kompaniya yarating — keyin virtual ofisingiz ochiladi."}
       </p>
     </div>
   );
+
+  if (companyLoading) {
+    return (
+      <AppShell topLeft={officeHeading}>
+        <div className="office-page">
+          <div className="empty-card office-empty">
+            <p>Virtual ofis yuklanmoqda...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!company) {
     return (

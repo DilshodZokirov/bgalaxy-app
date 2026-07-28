@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api/client";
-import { getActiveCompanyId, invalidateCompaniesCache, setActiveCompanyId } from "../hooks/useCompany";
+import { fetchMyCompanies, getActiveCompanyId, invalidateCompaniesCache, setActiveCompanyId } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
@@ -142,6 +142,7 @@ export default function Companies() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [companies, setCompanies] = useState(null);
+  const [listLoading, setListLoading] = useState(true);
   const [tab, setTab] = useState("overview");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState("");
@@ -174,8 +175,8 @@ export default function Companies() {
   }, []);
 
   function refreshCompanies() {
-    api
-      .getMyCompanies()
+    setListLoading(true);
+    fetchMyCompanies({ force: true })
       .then((list) => {
         setCompanies(list);
         if (list.length > 0 && !getActiveCompanyId()) {
@@ -188,7 +189,8 @@ export default function Companies() {
             .catch(() => {});
         });
       })
-      .catch(() => setCompanies([]));
+      .catch(() => setCompanies([]))
+      .finally(() => setListLoading(false));
   }
 
   const activeCompany =

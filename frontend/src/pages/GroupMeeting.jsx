@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import MeetingRoom from "../components/MeetingRoom";
 
@@ -21,7 +21,7 @@ export default function GroupMeeting() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scheduledMeetingId = searchParams.get("scheduled");
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [connection, setConnection] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,19 +29,12 @@ export default function GroupMeeting() {
   const [participants, setParticipants] = useState([]);
 
   useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setCompany(pickActiveCompany(list)))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (!company) return;
     api
       .getMyPermissions(company.id)
       .then((p) => setCanHost(!!p.permissions?.host_meeting_controls))
       .catch(() => {});
-  }, [company]);
+  }, [company?.id]);
 
   useEffect(() => {
     if (!connection || !company) return;
@@ -75,6 +68,19 @@ export default function GroupMeeting() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (companyLoading) {
+    return (
+      <AppShell topLeft={<GroupHeading />}>
+        <div className="meetings-page">
+          <section className="meetings-lobby">
+            <h2>Yuklanmoqda...</h2>
+            <p>Kompaniya ma’lumoti olinmoqda.</p>
+          </section>
+        </div>
+      </AppShell>
+    );
   }
 
   if (!company) {
