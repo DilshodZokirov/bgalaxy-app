@@ -2,7 +2,15 @@
 
 Chiroyli, to‘liq ekran slayd-taqdimot (o‘zbek tilida).
 
-## Ochish
+## PDF
+
+```text
+docs/presentation/Business-Galaxy-Taqdimot.pdf
+```
+
+13 sahifa, landscape 16:9. Yuklab oling yoki ochib ko‘ring.
+
+## Ochish (interaktiv)
 
 Brauzerda oching:
 
