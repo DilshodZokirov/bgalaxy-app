@@ -16,6 +16,7 @@ import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
 import RoleManager from "../components/RoleManager";
 import { WarehouseSection } from "../components/SettingsSections";
+import CompanyLocationMap from "../components/CompanyLocationMap";
 
 function slugify(name) {
   return name
@@ -149,6 +150,8 @@ export default function Companies() {
   const [companyType, setCompanyType] = useState("kompaniya");
   const [locationRegion, setLocationRegion] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
+  const [inn, setInn] = useState("");
+  const [geo, setGeo] = useState(null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -297,6 +300,15 @@ export default function Companies() {
       setError("Joylashuv (viloyat/shahar) tanlang");
       return;
     }
+    const innDigits = inn.replace(/\D/g, "");
+    if (innDigits.length !== 9) {
+      setError("INN (STIR) 9 ta raqam bo‘lishi kerak");
+      return;
+    }
+    if (geo?.latitude == null || geo?.longitude == null) {
+      setError("Kartadan aniq joylashuvni tanlang");
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.createCompany({
@@ -306,6 +318,10 @@ export default function Companies() {
         location_region: locationRegion,
         location_address: locationAddress.trim() || null,
         logo_url: logoUrl || null,
+        inn: innDigits,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        geo_label: geo.geo_label || null,
       });
       invalidateCompaniesCache();
       setActiveCompanyId(res.id);
@@ -313,6 +329,8 @@ export default function Companies() {
       setCompanyType("kompaniya");
       setLocationRegion("");
       setLocationAddress("");
+      setInn("");
+      setGeo(null);
       setLogoUrl(null);
       setShowCreateForm(false);
       setTab("overview");
@@ -417,74 +435,165 @@ export default function Companies() {
         </div>
 
         {(showCreateForm || companies.length === 0) && (
-          <section className="os-create">
-            <h3>Yangi kompaniya yaratish</h3>
-            <p>Nom, joylashuv va brand rasm — siz avtomatik egasi bo‘lasiz.</p>
-            <form onSubmit={handleSubmit}>
-              <label>Kompaniya nomi</label>
-              <input
-                type="text"
-                placeholder="Tech Solutions LLC"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-
-              <label>Joylashuv (viloyat / shahar)</label>
-              <select
-                value={locationRegion}
-                onChange={(e) => setLocationRegion(e.target.value)}
-                required
-              >
-                <option value="">Tanlang...</option>
-                {UZ_REGIONS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-
-              <label>Manzil (ixtiyoriy)</label>
-              <input
-                type="text"
-                placeholder="Ko‘cha, uy, ofis..."
-                value={locationAddress}
-                onChange={(e) => setLocationAddress(e.target.value)}
-                maxLength={255}
-              />
-
-              <label>Brand rasm (logo)</label>
-              <div className="os-logo-upload">
-                <div className="os-logo os-logo-preview" aria-hidden>
-                  {logoUrl ? <img src={logoUrl} alt="" /> : <span>{(name || "?").slice(0, 1).toUpperCase()}</span>}
+          <section className="os-create os-create-pro">
+            <div className="os-create-hero">
+              <span className="os-create-kicker">Yangi yozuv</span>
+              <h3>Yangi kompaniya yaratish</h3>
+              <p>
+                Nom, INN, brand va kartadagi aniq joylashuv — siz avtomatik egasi bo‘lasiz.
+                Koordinatalar yetkazib berish uchun saqlanadi.
+              </p>
+            </div>
+            <form className="os-create-form" onSubmit={handleSubmit}>
+              <div className="os-create-section">
+                <div className="os-create-section-head">
+                  <span className="os-create-step">01</span>
+                  <div>
+                    <h4>Asosiy ma’lumot</h4>
+                    <p>Kompaniya nomi, turi va soliq identifikatori</p>
+                  </div>
                 </div>
-                <div>
-                  <input type="file" accept="image/*" onChange={handleLogoFile} disabled={logoUploading} />
-                  <p className="os-muted">JPG/PNG — kvadratga yaqin rasm tavsiya etiladi.</p>
-                  {logoUrl && (
-                    <button type="button" className="os-text-danger" onClick={() => setLogoUrl(null)}>
-                      Rasmni olib tashlash
+
+                <div className="os-create-grid">
+                  <label className="os-field os-field-span">
+                    <span>Kompaniya nomi</span>
+                    <input
+                      type="text"
+                      placeholder="Tech Solutions LLC"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </label>
+
+                  <label className="os-field">
+                    <span>INN (STIR)</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="123456789"
+                      value={inn}
+                      onChange={(e) => setInn(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                      maxLength={9}
+                      required
+                      autoComplete="off"
+                    />
+                    <em className="os-field-hint">9 raqam — yuridik shaxs STIR</em>
+                  </label>
+
+                  <label className="os-field">
+                    <span>Slug</span>
+                    <input type="text" value={name ? slugify(name) : "—"} readOnly tabIndex={-1} />
+                  </label>
+                </div>
+
+                <div className="os-type-grid" role="group" aria-label="Kompaniya turi">
+                  {COMPANY_TYPES.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      className={`os-type-card ${companyType === t.key ? "active" : ""}`}
+                      onClick={() => setCompanyType(t.key)}
+                    >
+                      <strong>{t.mark}</strong>
+                      <span>
+                        {t.label}
+                        <small>{t.industry}</small>
+                      </span>
                     </button>
-                  )}
+                  ))}
                 </div>
               </div>
 
-              <label>Kompaniya turi</label>
-              <div className="os-type-grid">
-                {COMPANY_TYPES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    className={`os-type-card ${companyType === t.key ? "active" : ""}`}
-                    onClick={() => setCompanyType(t.key)}
-                  >
-                    <strong>{t.mark}</strong>
-                    <span>{t.label}</span>
-                  </button>
-                ))}
+              <div className="os-create-section">
+                <div className="os-create-section-head">
+                  <span className="os-create-step">02</span>
+                  <div>
+                    <h4>Brand</h4>
+                    <p>Logo — panel va marketplace’da ko‘rinadi</p>
+                  </div>
+                </div>
+
+                <label className={`os-logo-drop ${logoUrl ? "has-file" : ""}`}>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleLogoFile}
+                    disabled={logoUploading}
+                  />
+                  <div className="os-logo os-logo-preview" aria-hidden>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="" />
+                    ) : (
+                      <span>{(name || "?").slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="os-logo-drop-copy">
+                    <strong>{logoUploading ? "Yuklanmoqda..." : logoUrl ? "Logo tanlandi" : "Logo yuklash"}</strong>
+                    <span>JPG / PNG / WEBP · kvadratga yaqin rasm tavsiya etiladi</span>
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        className="os-text-danger"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setLogoUrl(null);
+                        }}
+                      >
+                        Rasmni olib tashlash
+                      </button>
+                    )}
+                  </div>
+                </label>
               </div>
+
+              <div className="os-create-section">
+                <div className="os-create-section-head">
+                  <span className="os-create-step">03</span>
+                  <div>
+                    <h4>Joylashuv</h4>
+                    <p>Viloyat + kartadan pin — yetkazib berish uchun</p>
+                  </div>
+                </div>
+
+                <div className="os-create-grid">
+                  <label className="os-field">
+                    <span>Viloyat / shahar</span>
+                    <select
+                      value={locationRegion}
+                      onChange={(e) => setLocationRegion(e.target.value)}
+                      required
+                    >
+                      <option value="">Tanlang...</option>
+                      {UZ_REGIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="os-field">
+                    <span>Manzil (ixtiyoriy)</span>
+                    <input
+                      type="text"
+                      placeholder="Ko‘cha, uy, ofis..."
+                      value={locationAddress}
+                      onChange={(e) => setLocationAddress(e.target.value)}
+                      maxLength={255}
+                    />
+                  </label>
+                </div>
+
+                <CompanyLocationMap value={geo} onChange={setGeo} regionHint={locationRegion || null} />
+              </div>
+
               {error && <p className="error">{error}</p>}
-              <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
-                {loading ? "Yaratilmoqda..." : "Yaratish"}
-              </button>
+              <div className="os-create-actions">
+                <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
+                  {loading ? "Yaratilmoqda..." : "Kompaniyani yaratish"}
+                </button>
+              </div>
             </form>
           </section>
         )}
@@ -507,10 +616,14 @@ export default function Companies() {
                   </div>
                   <p className="os-brand-sub">
                     /{activeCompany.slug} · {meta.label}
+                    {activeCompany.inn ? ` · INN ${activeCompany.inn}` : ""}
                     {activeCompany.location_region
                       ? ` · ${activeCompany.location_region}${
                           activeCompany.location_address ? `, ${activeCompany.location_address}` : ""
                         }`
+                      : ""}
+                    {activeCompany.latitude != null && activeCompany.longitude != null
+                      ? ` · ${Number(activeCompany.latitude).toFixed(4)}, ${Number(activeCompany.longitude).toFixed(4)}`
                       : ""}
                   </p>
                 </div>

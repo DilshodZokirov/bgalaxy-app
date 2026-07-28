@@ -198,6 +198,8 @@ async def _sync_company_flags(db: AsyncSession, company: Company) -> list[Wareho
 
 
 def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
+    lat = getattr(company, "latitude", None)
+    lng = getattr(company, "longitude", None)
     return CompanyOut(
         id=company.id,
         name=company.name,
@@ -206,6 +208,10 @@ def _company_out(company: Company, warehouses: list[Warehouse]) -> CompanyOut:
         logo_url=company.logo_url,
         location_region=getattr(company, "location_region", None),
         location_address=getattr(company, "location_address", None),
+        inn=getattr(company, "inn", None),
+        latitude=float(lat) if lat is not None else None,
+        longitude=float(lng) if lng is not None else None,
+        geo_label=getattr(company, "geo_label", None),
         company_type=company.company_type,
         has_warehouse=bool(warehouses) or bool(company.has_warehouse),
         warehouse_type=company.warehouse_type
