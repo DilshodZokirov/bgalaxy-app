@@ -44,6 +44,42 @@ WAREHOUSE_TYPE_NAMES = {
 }
 MAX_WAREHOUSES = 3
 VIEW_PERMISSIONS = ["manage_warehouse", "ombor_ishchi", "warehouse_loader", "warehouse_courier"]
+BUYER_ONLY_TYPES = {"distributor", "market"}
+# Buyer → from which seller type they order on the marketplace
+MARKETPLACE_SELLER_BY_BUYER = {
+    "distributor": "kompaniya",
+    "market": "distributor",
+}
+
+
+def _assert_can_manage_inventory(company: Company) -> None:
+    """Distributor/market cannot hand-enter stock — they order via Bozor."""
+    if company.company_type == "distributor":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Distributiv firma o'zi mahsulot qo'sha/tahrirlay olmaydi — "
+                "Bozor bo'limidan ishlab chiqaruvchi omboridan buyurtma bering."
+            ),
+        )
+    if company.company_type == "market":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Market qo'lda mahsulot qo'sha/tahrirlay olmaydi — "
+                "Bozor bo'limidan distributiv firmalar omboridan buyurtma bering."
+            ),
+        )
+
+
+def _marketplace_seller_type(buyer: Company) -> str:
+    seller_type = MARKETPLACE_SELLER_BY_BUYER.get(buyer.company_type)
+    if seller_type is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Bozor faqat Distributiv firma va Market uchun mavjud",
+        )
+    return seller_type
 
 
 def _day_key(d: date) -> str:
@@ -488,12 +524,7 @@ async def create_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, warehouses = await _require_warehouse_enabled(db, company_id)
-
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma o'zi mahsulot qo'sha olmaydi — Bozor bo'limidan boshqa kompaniyalar omboridan buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     if not warehouses:
         raise HTTPException(status_code=400, detail="Avval Sozlamalardan ombor yarating")
@@ -588,11 +619,7 @@ async def update_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma mahsulotni tahrirlay olmaydi — kerak bo'lsa Bozordan qayta buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
@@ -630,11 +657,7 @@ async def delete_product(
 ):
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma mahsulotni o'chira olmaydi — zaxira Bozor buyurtmalari orqali boshqariladi.",
-        )
+    _assert_can_manage_inventory(company)
 
     result = await db.execute(
         select(WarehouseProduct).where(WarehouseProduct.id == product_id, WarehouseProduct.company_id == company_id)
@@ -665,11 +688,7 @@ async def adjust_stock(
     StockMovement and reflected immediately in the product's quantity."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     company, _warehouses = await _require_warehouse_enabled(db, company_id)
-    if company.company_type == "distributor":
-        raise HTTPException(
-            status_code=400,
-            detail="Distributiv firma zaxirani qo'lda o'zgartira olmaydi — Bozor orqali qayta buyurtma bering.",
-        )
+    _assert_can_manage_inventory(company)
 
     if payload.change == 0:
         raise HTTPException(status_code=400, detail="O'zgarish 0 bo'lishi mumkin emas")
@@ -870,20 +889,18 @@ async def browse_marketplace(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Faqat Distributiv firmalar uchun — boshqa (ishlab chiqaruvchi)
-    kompaniyalarning ombordagi, zaxirasi bor mahsulotlarini ko'rsatadi.
+    """Bozor: distributor → kompaniya omborlari; market → distributor omborlari.
     Mavjud miqdor = quantity - reserved (boshqa buyurtmalar band qilgan zaxira)."""
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     buyer = await _get_company(db, company_id)
-    if buyer.company_type != "distributor":
-        raise HTTPException(status_code=400, detail="Bozor faqat Distributiv firmalar uchun mavjud")
+    seller_type = _marketplace_seller_type(buyer)
 
     result = await db.execute(
         select(WarehouseProduct, Company.name, Warehouse.warehouse_type)
         .join(Company, Company.id == WarehouseProduct.company_id)
         .outerjoin(Warehouse, Warehouse.id == WarehouseProduct.warehouse_id)
         .where(
-            Company.company_type == "kompaniya",
+            Company.company_type == seller_type,
             Company.has_warehouse == True,  # noqa: E712
             WarehouseProduct.quantity > 0,
         )
@@ -920,12 +937,11 @@ async def place_marketplace_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Distributiv firma buyurtma beradi — zaxira band qilinadi, omborga
+    """Distributor/market buyurtma beradi — zaxira band qilinadi, omborga
     o'tkazish va byudjet faqat yetkazib berish yakunlanganda amalga oshadi."""
     await require_permission(db, company_id, current_user.id, "manage_warehouse")
     buyer, buyer_warehouses = await _require_warehouse_enabled(db, company_id)
-    if buyer.company_type != "distributor":
-        raise HTTPException(status_code=400, detail="Buyurtma faqat Distributiv firmalar uchun mavjud")
+    expected_seller_type = _marketplace_seller_type(buyer)
     if payload.quantity <= 0:
         raise HTTPException(status_code=400, detail="Miqdor musbat bo'lishi kerak")
     if not buyer_warehouses:
@@ -933,7 +949,7 @@ async def place_marketplace_order(
 
     seller_result = await db.execute(select(Company).where(Company.id == payload.seller_company_id))
     seller = seller_result.scalar_one_or_none()
-    if seller is None or seller.company_type != "kompaniya" or not seller.has_warehouse:
+    if seller is None or seller.company_type != expected_seller_type or not seller.has_warehouse:
         raise HTTPException(status_code=404, detail="Sotuvchi kompaniya topilmadi")
 
     product_result = await db.execute(
@@ -1128,12 +1144,12 @@ async def list_orders(
     """Buyurtmalar ro'yxati.
 
     scope:
-      - purchases — distributor (xaridor) buyurtmalari
-      - sales — ishlab chiqaruvchi ombor kuzatuvi
+      - purchases — xaridor (distributor/market) buyurtmalari
+      - sales — sotuvchi ombor kuzatuvi
       - loader — yuklash navbati (loading)
       - courier — yo'ldagi / yetkazib beruvchi arizalari
       - receipt — qabul qilish kutilayotganlar
-      - auto — kompaniya turiga qarab (distributor→purchases, else→sales)
+      - auto — kompaniya turiga qarab (buyer-only→purchases, else→sales)
     """
     await require_any_permission(db, company_id, current_user.id, VIEW_PERMISSIONS)
     company = await _get_company(db, company_id)
@@ -1141,7 +1157,7 @@ async def list_orders(
 
     resolved = scope
     if scope == "auto":
-        resolved = "purchases" if company.company_type == "distributor" else "sales"
+        resolved = "purchases" if company.company_type in BUYER_ONLY_TYPES else "sales"
 
     query = select(WarehouseOrder)
     if resolved == "purchases":
