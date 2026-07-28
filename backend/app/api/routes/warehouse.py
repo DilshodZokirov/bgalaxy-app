@@ -802,6 +802,45 @@ async def get_warehouse_dashboard(
         total_sold_value += float(total_price)
         total_sold_quantity += float(quantity)
 
+    # Ombor kirim/chiqim (so'm): seller completed = kirim, buyer completed = chiqim
+    income_by_bucket = {b: float(sold_value_by_bucket[b]) for b in buckets}
+    expense_by_bucket = {b: 0.0 for b in buckets}
+
+    buy_query = select(
+        WarehouseOrder.completed_at,
+        WarehouseOrder.created_at,
+        WarehouseOrder.total_price,
+    ).where(
+        WarehouseOrder.buyer_company_id == company_id,
+        WarehouseOrder.status == "completed",
+        WarehouseOrder.created_at >= start,
+    )
+    if warehouse_id:
+        buy_query = buy_query.where(WarehouseOrder.buyer_warehouse_id == warehouse_id)
+    buy_result = await db.execute(buy_query)
+    total_purchase_value = 0.0
+    for completed_at, created_at, total_price in buy_result.all():
+        stamp = completed_at or created_at
+        if stamp is None:
+            continue
+        key = key_fn(stamp.date())
+        amount = float(total_price)
+        if key in expense_by_bucket:
+            expense_by_bucket[key] += amount
+        total_purchase_value += amount
+
+    finance_trend = [
+        {
+            "label": b,
+            "income": income_by_bucket[b],
+            "expense": expense_by_bucket[b],
+            "balance": income_by_bucket[b] - expense_by_bucket[b],
+        }
+        for b in buckets
+    ]
+    total_income = sum(income_by_bucket.values())
+    total_expense = sum(expense_by_bucket.values())
+
     kirim_filters = [
         WarehouseProduct.company_id == company_id,
         StockMovement.created_at >= start,
@@ -884,6 +923,13 @@ async def get_warehouse_dashboard(
         "product_count": product_count,
         "by_product_budget": by_product_budget,
         "total_budget_value": total_budget_value,
+        "finance_trend": finance_trend,
+        "finance_totals": {
+            "income": total_income,
+            "expense": total_expense,
+            "balance": total_income - total_expense,
+            "purchase_value": total_purchase_value,
+        },
         "warehouse_id": warehouse_id,
         "aggregated": warehouse_id is None,
     }

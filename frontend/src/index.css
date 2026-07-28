@@ -10202,6 +10202,22 @@ html[data-custom-bg="1"] .galaxy-sky {
   margin-bottom: 14px;
 }
 
+.wh-stats-scope {
+  margin-bottom: 8px;
+}
+
+.wh-dual-3d {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .wh-dual-3d {
+    grid-template-columns: 1fr;
+  }
+}
+
 .wh-stat,
 .wh-hero-metric,
 .wh-panel,
