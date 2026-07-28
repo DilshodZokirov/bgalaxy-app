@@ -107,6 +107,41 @@ export const api = {
         warehouseId ? `&warehouse_id=${warehouseId}` : ""
       }`
     ),
+  getWarehouseFinanceLedger: (companyId, { period = "month", kinds = "all", warehouseId = null, search = "", page = 1, pageSize = 20 } = {}) => {
+    const params = new URLSearchParams({
+      period,
+      kinds,
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (warehouseId) params.set("warehouse_id", warehouseId);
+    if (search) params.set("search", search);
+    return request(`/companies/${companyId}/warehouse/finance-ledger?${params}`);
+  },
+  downloadWarehouseFinanceLedger: async (
+    companyId,
+    { period = "month", kinds = "all", warehouseId = null, search = "", format = "csv" } = {}
+  ) => {
+    const token = getToken();
+    const params = new URLSearchParams({ period, kinds, format });
+    if (warehouseId) params.set("warehouse_id", warehouseId);
+    if (search) params.set("search", search);
+    const res = await fetch(
+      `${API_BASE}/companies/${companyId}/warehouse/finance-ledger/export?${params}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || "Eksportni yuklab bo'lmadi");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ombor-moliya-${new Date().toISOString().slice(0, 10)}.${format === "excel" || format === "xlsx" ? "xlsx" : "csv"}`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  },
   getMarketplaceSellers: (companyId) =>
     request(`/companies/${companyId}/warehouse/marketplace/sellers`),
   getMarketplaceSellerProducts: (companyId, sellerId) =>
