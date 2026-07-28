@@ -1,6 +1,9 @@
-# Business Galaxy — Taqdimot
+## PDF — to‘g‘ridan-to‘g‘ri yuklash
 
-Chiroyli, to‘liq ekran slayd-taqdimot (o‘zbek tilida).
+Cursor chatdan yuklab bo‘lmasligi mumkin. **Telefon yoki kompyuter brauzerida** quyidagi havolani oching:
+
+- **Hozir yuklash (GitHub):** https://github.com/DilshodZokirov/bgalaxy-app/raw/master/docs/presentation/Business-Galaxy-Taqdimot.pdf
+- **Saytda (PR #76 merge + deploydan keyin):** `https://SIZNING-SAYT.vercel.app/presentation/ochish.html`
 
 ## PDF
 
