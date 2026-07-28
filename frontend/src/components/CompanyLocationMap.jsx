@@ -47,14 +47,62 @@ const KIND_LABEL = {
 };
 
 const FALLBACK_CATEGORIES = [
-  { key: "metro", label: "Metro", hint: "Metro bekatlari" },
-  { key: "shop", label: "Do‘kon", hint: "Korzinka, supermarket…" },
-  { key: "pharmacy", label: "Apteka", hint: "Dorixonalar" },
-  { key: "bank", label: "Bank", hint: "Bank filiallari" },
-  { key: "cafe", label: "Kafe", hint: "Kafe va restoran" },
-  { key: "fuel", label: "Yoqilg‘i", hint: "Yoqilg‘i quyish" },
-  { key: "mall", label: "TC", hint: "Savdo markazlari" },
+  { key: "metro", label: "Metro", hint: "Metro bekatlari", query: "metro" },
+  { key: "shop", label: "Do‘kon", hint: "Korzinka, supermarket…", query: "Korzinka" },
+  { key: "pharmacy", label: "Apteka", hint: "Dorixonalar", query: "apteka" },
+  { key: "bank", label: "Bank", hint: "Bank filiallari", query: "bank" },
+  { key: "cafe", label: "Kafe", hint: "Kafe va restoran", query: "cafe" },
+  { key: "fuel", label: "Yoqilg‘i", hint: "Yoqilg‘i quyish", query: "fuel" },
+  { key: "mall", label: "TC", hint: "Savdo markazlari", query: "mall" },
 ];
+
+/** Local fallback if API/geo is down — Toshkent metro */
+const LOCAL_TASHKENT_METRO = [
+  ["Chilonzor", 41.2753, 69.2035],
+  ["Olmazor", 41.2788, 69.2125],
+  ["Novza", 41.2845, 69.2218],
+  ["Milliy bogʻ", 41.2912, 69.2315],
+  ["Mirzo Ulugʻbek", 41.2980, 69.2410],
+  ["Chorsu", 41.3255, 69.2355],
+  ["Gafur Gʻulom", 41.3188, 69.2488],
+  ["Alisher Navoiy", 41.3165, 69.2595],
+  ["Paxtakor", 41.3180, 69.2615],
+  ["Mustaqillik maydoni", 41.3149, 69.2711],
+  ["Amir Temur xiyoboni", 41.3115, 69.2797],
+  ["Hamid Olimjon", 41.3182, 69.2957],
+  ["Pushkin", 41.3219, 69.3111],
+  ["Buyuk Ipak Yoʻli", 41.3261, 69.3286],
+  ["Yunus Rajabiy", 41.3139, 69.2835],
+  ["Ming oʻrik", 41.3075, 69.2820],
+  ["Oybek", 41.2995, 69.2755],
+  ["Kosmonavtlar", 41.2925, 69.2735],
+  ["Yunusbod", 41.3455, 69.2855],
+  ["Shahriston", 41.3535, 69.2885],
+  ["Bodomzor", 41.3375, 69.2865],
+  ["Minor", 41.3295, 69.2825],
+  ["Abdulla Qodiriy", 41.3225, 69.2785],
+  ["Doʻstlik", 41.2955, 69.2285],
+  ["Texnopark", 41.2685, 69.3125],
+  ["Olmos", 41.2895, 69.3515],
+];
+
+function isMetroIntent(q, category) {
+  if (category === "metro") return true;
+  const t = (q || "").trim().toLowerCase();
+  return /\b(metro|метро|subway)\b/.test(t) || /metro\s*bekat/.test(t);
+}
+
+function localMetroFallback(regionHint) {
+  if (regionHint && !String(regionHint).startsWith("Toshkent")) return [];
+  return LOCAL_TASHKENT_METRO.map(([name, lat, lng]) => ({
+    lat,
+    lng,
+    label: `${name} metro bekati, Toshkent shahri`,
+    title: `${name} metro bekati`,
+    subtitle: "Toshkent shahri",
+    kind: "metro",
+  }));
+}
 
 function kindIcon(kind) {
   return L.divIcon({
@@ -243,8 +291,11 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     setSearching(true);
     setSearchError(null);
     try {
-      const hits = await searchPlaces(q, regionHint, cat);
+      let hits = await searchPlaces(q, regionHint, cat);
       if (seq !== suggestSeq.current) return;
+      if (!hits.length && isMetroIntent(q, cat)) {
+        hits = localMetroFallback(regionHint);
+      }
       setResults(hits);
       plotSuggestMarkers(hits);
       if (!hits.length) {
@@ -256,7 +307,21 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       }
     } catch (err) {
       if (seq !== suggestSeq.current) return;
-      setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
+      if (isMetroIntent(q, cat)) {
+        const hits = localMetroFallback(regionHint);
+        if (hits.length) {
+          setResults(hits);
+          plotSuggestMarkers(hits);
+          setSearchError(null);
+          return;
+        }
+      }
+      const raw = err?.message || "";
+      setSearchError(
+        /not found/i.test(raw)
+          ? "Qidiruv xizmati topilmadi — metro uchun mahalliy ro‘yxat yoki pin qo‘ying"
+          : raw || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying"
+      );
     } finally {
       if (seq === suggestSeq.current) setSearching(false);
     }
@@ -265,7 +330,7 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
   // Live suggest while typing
   useEffect(() => {
     const q = query.trim();
-    if (category) return undefined; // category chip drives its own fetch
+    if (category) return undefined;
     if (q.length < 3) {
       if (q.length === 0) {
         setResults([]);
@@ -279,10 +344,12 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, regionHint]);
 
-  // Category chip → immediate cluster search
+  // Category chip → immediate cluster search (use category key, not long hint text)
   useEffect(() => {
     if (!category) return undefined;
-    runLookup(query || category, category);
+    const meta = categories.find((c) => c.key === category);
+    const q = meta?.query || category;
+    runLookup(q, category);
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, regionHint]);
@@ -291,14 +358,13 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     if (category === key) {
       setCategory(null);
       setResults([]);
+      setSearchError(null);
       plotSuggestMarkers([]);
       return;
     }
+    const meta = categories.find((c) => c.key === key) || FALLBACK_CATEGORIES.find((c) => c.key === key);
     setCategory(key);
-    if (!query.trim()) {
-      const meta = categories.find((c) => c.key === key);
-      setQuery(meta?.hint?.split(",")[0] || key);
-    }
+    setQuery(meta?.query || key);
   }
 
   const clusterCount = results.filter((r) =>

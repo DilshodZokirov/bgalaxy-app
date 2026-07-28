@@ -620,9 +620,9 @@ def _poi_cluster_search(kind: str, queries: tuple[str, ...], region: str | None)
         )
 
     for query in queries[:4]:
-        for p in _nominatim_search(query, limit=25, region=region):
+        for p in _safe_nominatim(query, limit=25, region=region):
             hits.append(tag(p))
-        for p in _photon_search(query, region=region, highway_only=False, limit=20):
+        for p in _safe_photon(query, region=region, highway_only=False, limit=20):
             hits.append(tag(p))
 
     if region:
@@ -645,9 +645,31 @@ def _poi_cluster_search(kind: str, queries: tuple[str, ...], region: str | None)
 
 def _is_metro_query(q: str) -> bool:
     text = q.strip()
-    if re.match(r"(?i)^\s*(metro|метро|subway|метро\s*bekati|metro\s*bekati)s?\s*$", text):
+    if re.search(r"(?i)\b(metro|метро|subway)\b", text) and len(text) <= 48:
         return True
-    return bool(re.search(r"(?i)\b(metro|метро|subway)\b", text)) and len(text) <= 40
+    if re.search(r"(?i)\bbekat(i|lari|lar)?\b", text) and re.search(r"(?i)metro|метро", text):
+        return True
+    return False
+
+
+def _safe_nominatim(q: str, limit: int = 10, region: str | None = None) -> list[GeoPlace]:
+    try:
+        return _nominatim_search(q, limit=limit, region=region)
+    except HTTPException:
+        return []
+
+
+def _safe_photon(
+    q: str,
+    *,
+    region: str | None = None,
+    highway_only: bool = False,
+    limit: int = 15,
+) -> list[GeoPlace]:
+    try:
+        return _photon_search(q, region=region, highway_only=highway_only, limit=limit)
+    except HTTPException:
+        return []
 
 
 def _metro_search(region: str | None) -> list[GeoPlace]:
@@ -664,18 +686,19 @@ def _metro_search(region: str | None) -> list[GeoPlace]:
             kind="metro",
         )
 
-    for query in ("metro station", "метро бекати", "subway station"):
-        for p in _nominatim_search(query, limit=30, region=region):
+    # External providers may fail — never block curated fallback
+    for query in ("metro station", "метро бекати", "subway station", "metro bekati"):
+        for p in _safe_nominatim(query, limit=30, region=region):
             hay = f"{p.title or ''} {p.label}".lower()
             if any(k in hay for k in ("station", "metro", "метро", "subway", "bekati")):
                 hits.append(as_metro(p))
 
-    for p in _photon_search("metro", region=region, highway_only=False, limit=25):
+    for p in _safe_photon("metro", region=region, highway_only=False, limit=25):
         hay = f"{p.title or ''} {p.label}".lower()
         if any(k in hay for k in ("metro", "station", "bekati", "метро", "railway")):
             hits.append(as_metro(p))
 
-    # Curated Toshkent list fills gaps when OSM/Nominatim return almost nothing for "metro"
+    # Always seed Toshkent metros when searching there (or region not chosen yet)
     if region in (None, "Toshkent shahri", "Toshkent viloyati"):
         bbox = _METRO_REGION_BBOX.get(region or "Toshkent shahri")
         for name, lat, lng in _TASHKENT_METRO:
@@ -703,7 +726,7 @@ def _metro_search(region: str | None) -> list[GeoPlace]:
     unique: list[GeoPlace] = []
     for p in hits:
         key = re.sub(r"\s+", " ", (p.title or p.label).lower())
-        key = key.replace(" metro bekati", "").strip()
+        key = re.sub(r"\s*metro\s*bekati\s*", " ", key).strip()
         if key in seen:
             continue
         seen.add(key)
