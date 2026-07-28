@@ -8,7 +8,7 @@ Chiroyli, to‘liq ekran slayd-taqdimot (o‘zbek tilida).
 docs/presentation/Business-Galaxy-Taqdimot.pdf
 ```
 
-13 sahifa, landscape 16:9. Yuklab oling yoki ochib ko‘ring.
+14 sahifa, landscape 16:9. Yuklab oling yoki ochib ko‘ring.
 
 ## Ochish (interaktiv)
 
@@ -35,18 +35,21 @@ python3 -m http.server 8080
 | Home / End | Birinchi / oxirgi |
 | Telefon | Chap–o‘ng swipe |
 
-## Tarkib (13 slayd)
+## Tarkib (14 slayd)
 
 1. Muqova — BG nima  
 2. Kun tartibi  
 3. Muammo — biznes og‘riqlari  
 4. Yechim — yagona platforma  
 5. Auditoriyа — kompaniya / distributor / market  
-6. Qanday ishlaydi — foydalanuvchi yo‘li  
+6. Qanday ishlaydi  
 7. Marketplace zanjiri  
 8. Hozirgi modullar  
 9. Oddiy vositalar vs BG  
 10. Texnologiya  
-11. Biznes natija  
-12. Kelajak rejalari  
-13. Xulosa / savollar  
+11. Biznes foyda  
+12. Yo‘l xaritasi (5 bosqich)  
+13. Vizyon — virtual galaktika + token  
+14. Xulosa / savollar  
+
+Batafsil: `docs/ROADMAP.md`
