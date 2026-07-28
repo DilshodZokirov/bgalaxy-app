@@ -12,7 +12,7 @@ from app.models.role import DEFAULT_ROLE_PERMISSIONS, Role
 from app.models.invite import Invite
 from app.models.user import User
 from app.models.warehouse import Warehouse
-from app.schemas.company import CompanyCreate, CompanyOut, TeamMemberOut
+from app.schemas.company import CompanyCreate, CompanyOut, CompanyUpdate, TeamMemberOut
 from app.schemas.warehouse import WarehouseOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -189,6 +189,84 @@ async def my_companies(
         await db.commit()
 
     return [_company_out(c, by_company.get(str(c.id), [])) for c in companies]
+
+
+@router.patch("/{company_id}", response_model=CompanyOut)
+async def update_company(
+    company_id: str,
+    payload: CompanyUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Company).where(Company.id == company_id))
+    company = result.scalar_one_or_none()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Kompaniya topilmadi")
+    if str(company.owner_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Faqat kompaniya egasi tahrirlashi mumkin")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data and data["name"] is not None:
+        name = str(data["name"]).strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Nom bo'sh bo'lishi mumkin emas")
+        company.name = name
+
+    if "logo_url" in data:
+        logo = (data["logo_url"] or "").strip() or None
+        if logo and not (
+            logo.startswith("data:image/") or logo.startswith("http://") or logo.startswith("https://")
+        ):
+            raise HTTPException(status_code=400, detail="Brand rasm formati noto'g'ri")
+        company.logo_url = logo
+
+    if "location_region" in data:
+        region = (data["location_region"] or "").strip() or None
+        if not region:
+            raise HTTPException(status_code=400, detail="Joylashuv (viloyat/shahar) majburiy")
+        if region not in UZ_REGIONS:
+            raise HTTPException(status_code=400, detail="Noto'g'ri joylashuv (viloyat/shahar)")
+        company.location_region = region
+
+    if "location_address" in data:
+        address = (data["location_address"] or "").strip() or None
+        if address and len(address) > 255:
+            raise HTTPException(status_code=400, detail="Manzil juda uzun")
+        company.location_address = address
+
+    if "inn" in data:
+        inn = _normalize_inn(data["inn"])
+        if not inn or not _INN_RE.match(inn):
+            raise HTTPException(status_code=400, detail="INN (STIR) 9 ta raqam bo‘lishi kerak")
+        company.inn = inn
+
+    if "latitude" in data or "longitude" in data:
+        lat = data.get("latitude", company.latitude)
+        lng = data.get("longitude", company.longitude)
+        if lat is None or lng is None:
+            raise HTTPException(status_code=400, detail="Kartadan aniq joylashuvni tanlang")
+        if not (-90 <= float(lat) <= 90) or not (-180 <= float(lng) <= 180):
+            raise HTTPException(status_code=400, detail="Noto‘g‘ri geolokatsiya")
+        if not (37.0 <= float(lat) <= 46.0) or not (55.5 <= float(lng) <= 73.5):
+            raise HTTPException(
+                status_code=400,
+                detail="Joylashuv O‘zbekiston hududida bo‘lishi kerak",
+            )
+        company.latitude = float(lat)
+        company.longitude = float(lng)
+
+    if "geo_label" in data:
+        geo_label = (data["geo_label"] or "").strip() or None
+        if geo_label and len(geo_label) > 500:
+            geo_label = geo_label[:500]
+        company.geo_label = geo_label
+
+    await db.commit()
+    await db.refresh(company)
+    from app.api.routes.warehouse import _ensure_legacy_warehouses
+
+    warehouses = await _ensure_legacy_warehouses(db, company)
+    return _company_out(company, warehouses)
 
 
 @router.get("/{company_id}/members", response_model=list[TeamMemberOut])

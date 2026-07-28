@@ -20,6 +20,17 @@ class CompanyCreate(BaseModel):
     geo_label: str | None = None
 
 
+class CompanyUpdate(BaseModel):
+    name: str | None = None
+    logo_url: str | None = None
+    location_region: str | None = None
+    location_address: str | None = None
+    inn: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    geo_label: str | None = None
+
+
 class CompanyOut(BaseModel):
     id: uuid.UUID
     name: str

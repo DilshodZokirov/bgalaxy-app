@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +45,8 @@ class WarehouseProduct(Base):
     # from. Null for a manufacturer's (kompaniya) own self-added products.
     source_company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
     source_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Only listed products appear for buyers on Marketplace.
+    listed_on_marketplace: Mapped[bool] = mapped_column(Boolean, default=True)
     # Type-specific fields — left null when they don't apply to the
     # warehouse's type (e.g. size stays null for a food warehouse).
     size: Mapped[str | None] = mapped_column(String(50), nullable=True)  # clothing
@@ -59,16 +61,17 @@ class WarehouseProduct(Base):
 
 
 class WarehouseOrder(Base):
-    """Distributor marketplace order with multi-stage fulfillment.
+    """Marketplace order with multi-stage fulfillment.
 
     On place: seller stock is reserved (not deducted). On complete: seller
-    stock is finalized, buyer warehouse is credited, seller accounting
-    income is recorded. See warehouse routes order pipeline.
+    stock is finalized, buyer warehouse is credited, seller income + buyer
+    expense are recorded. Cart checkout shares a batch_id across line orders.
     """
 
     __tablename__ = "warehouse_orders"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     buyer_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
     seller_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
     seller_product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("warehouse_products.id"))
@@ -92,6 +95,23 @@ class WarehouseOrder(Base):
     courier_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     arrived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CompanyRating(Base):
+    """Buyer rates seller after successful delivery confirmation."""
+
+    __tablename__ = "company_ratings"
+    __table_args__ = (
+        UniqueConstraint("rater_company_id", "order_id", name="uq_company_ratings_rater_order"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rater_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"), index=True)
+    rated_company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"), index=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("warehouse_orders.id"))
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    score: Mapped[int] = mapped_column(Integer)  # 1–5
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
