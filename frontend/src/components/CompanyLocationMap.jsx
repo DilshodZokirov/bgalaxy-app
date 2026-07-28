@@ -199,7 +199,7 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
         setSearchError(
           regionHint
             ? "Natija topilmadi — viloyatni tekshiring yoki kartadan pin qo‘ying"
-            : "Avval viloyat/shaharni tanlang, keyin ko‘cha nomini yozing — yoki kartani bosing"
+                    : "Avval yuqoridan viloyat/shaharni tanlang — qidiruv faqat shu hududdan chiqadi"
         );
       }
     } catch (err) {
@@ -273,7 +273,8 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       {searchError && <p className="os-geo-hint os-geo-hint-warn">{searchError}</p>}
       <div ref={mapEl} className="os-geo-map" role="application" aria-label="Kompaniya joylashuvi xaritasi" />
       <p className="os-geo-hint">
-        Yozganingizcha o‘xshash ko‘chalar chiqadi (Google/Yandex uslubida). Yoki kartani bosing / pinni suring.
+        Qidiruv tanlangan viloyat ichida ishlaydi (masalan Toshkent tanlansa Namangan/Farg‘ona chiqmaydi).
+        Yoki kartani bosing / pinni suring.
       </p>
       {value?.latitude != null && value?.longitude != null && (
         <div className="os-geo-coords">

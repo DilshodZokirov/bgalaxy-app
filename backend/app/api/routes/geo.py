@@ -25,23 +25,99 @@ _HEADERS = {
 # Uzbekistan rough bounding box (minLon, minLat, maxLon, maxLat)
 _UZ_BBOX = (55.9, 37.0, 73.2, 45.6)
 
-# Tighter bbox per selected region — improves “yaqin ko‘chalar” ranking
+# Tighter bbox per selected region (minLon, minLat, maxLon, maxLat).
+# Kept non-overlapping where possible so Namangan/Farg‘ona never leak into Toshkent.
 _REGION_BBOX: dict[str, tuple[float, float, float, float]] = {
-    "Toshkent shahri": (69.10, 41.20, 69.45, 41.42),
-    "Toshkent viloyati": (68.70, 40.70, 71.20, 41.75),
-    "Andijon viloyati": (71.50, 40.40, 72.90, 41.10),
+    "Toshkent shahri": (69.10, 41.20, 69.40, 41.40),
+    "Toshkent viloyati": (68.55, 40.70, 70.15, 41.75),
+    "Andijon viloyati": (71.55, 40.35, 72.95, 41.05),
     "Buxoro viloyati": (63.20, 39.20, 65.20, 40.80),
-    "Farg'ona viloyati": (70.80, 40.10, 72.10, 40.70),
-    "Jizzax viloyati": (66.80, 39.50, 68.80, 41.20),
+    "Farg'ona viloyati": (70.85, 40.10, 72.05, 40.65),
+    "Jizzax viloyati": (66.80, 39.50, 68.70, 41.10),
     "Xorazm viloyati": (60.00, 41.00, 62.00, 42.20),
-    "Namangan viloyati": (70.80, 40.70, 72.20, 41.30),
+    "Namangan viloyati": (70.85, 40.75, 72.15, 41.30),
     "Navoiy viloyati": (62.50, 39.50, 66.50, 43.00),
     "Qashqadaryo viloyati": (65.20, 38.20, 67.80, 39.60),
     "Samarqand viloyati": (65.50, 39.20, 67.80, 40.40),
-    "Sirdaryo viloyati": (67.80, 40.20, 69.20, 41.00),
+    "Sirdaryo viloyati": (67.85, 40.20, 69.15, 41.00),
     "Surxondaryo viloyati": (66.50, 37.10, 68.50, 38.80),
     "Qoraqalpog'iston Respublikasi": (56.00, 41.20, 62.50, 45.60),
 }
+
+# Text aliases that confirm a hit belongs to the selected region
+_REGION_ALIASES: dict[str, tuple[str, ...]] = {
+    "Toshkent shahri": ("toshkent shahri", "tashkent", "toshkent city", "город ташкент"),
+    "Toshkent viloyati": (
+        "toshkent viloyati",
+        "tashkent region",
+        "tashkent province",
+        "qibray",
+        "кибрай",
+        "yangiyo'l",
+        "yangiyul",
+        "angren",
+        "chirchiq",
+        "chirchik",
+        "bekobod",
+        "bekabad",
+        "nurafshon",
+        "ohangaron",
+        "parkent",
+        "boka",
+        "bo'ka",
+        "piskent",
+        "zangiota",
+        "yuqorichirchiq",
+        "ortachirchiq",
+        "chinoz",
+        "quyichirchiq",
+    ),
+    "Andijon viloyati": ("andijon", "andijan"),
+    "Buxoro viloyati": ("buxoro", "bukhara", "бухар"),
+    "Farg'ona viloyati": ("farg'ona", "fargona", "fergana", "фаргон", "ферган"),
+    "Jizzax viloyati": ("jizzax", "jizakh", "джизак"),
+    "Xorazm viloyati": ("xorazm", "khorezm", "urganch", "хорезм"),
+    "Namangan viloyati": ("namangan", "наманган"),
+    "Navoiy viloyati": ("navoiy", "navoi", "навои"),
+    "Qashqadaryo viloyati": ("qashqadaryo", "kashkadarya", "qarshi", "кашкадар"),
+    "Samarqand viloyati": ("samarqand", "samarkand", "самарканд"),
+    "Sirdaryo viloyati": ("sirdaryo", "syrdarya", "guliston", "yangiyer", "сырдар"),
+    "Surxondaryo viloyati": ("surxondaryo", "surkhandarya", "termiz", "сурхандар"),
+    "Qoraqalpog'iston Respublikasi": ("qoraqalpog", "karakalpak", "nukus", "каракалпак"),
+}
+
+# If selected region is X, reject hits whose label clearly names another region
+_FOREIGN_MARKERS: tuple[str, ...] = (
+    "namangan",
+    "наманган",
+    "farg'ona",
+    "fargona",
+    "fergana",
+    "фаргон",
+    "ферган",
+    "andijon",
+    "andijan",
+    "buxoro",
+    "bukhara",
+    "jizzax",
+    "xorazm",
+    "khorezm",
+    "navoiy",
+    "navoi",
+    "qashqadaryo",
+    "kashkadarya",
+    "samarqand",
+    "samarkand",
+    "sirdaryo",
+    "syrdarya",
+    "yangiyer",
+    "guliston",
+    "surxondaryo",
+    "surkhandarya",
+    "qoraqalpog",
+    "karakalpak",
+    "nukus",
+)
 
 _APOSTROPHE_CHARS = ("ʼ", "ʻ", "‘", "’", "`", "´", "ʹ", "ʽ", "՚")
 _STREET_SUFFIX_RE = re.compile(
@@ -130,23 +206,72 @@ def _bbox_for(region: str | None) -> tuple[float, float, float, float]:
     return _UZ_BBOX
 
 
-def _nominatim_search(q: str, limit: int = 10) -> list[GeoPlace]:
-    data = _get_json(
-        f"{_NOMINATIM}/search",
-        {
-            "format": "jsonv2",
-            "limit": limit,
-            "countrycodes": "uz",
-            "q": q,
-            "addressdetails": 0,
-            "dedupe": 1,
-        },
-    )
+def _in_bbox(lat: float, lng: float, bbox: tuple[float, float, float, float]) -> bool:
+    min_lon, min_lat, max_lon, max_lat = bbox
+    return min_lat <= lat <= max_lat and min_lon <= lng <= max_lon
+
+
+def _norm_text(s: str) -> str:
+    return _unify_apostrophes(s or "").lower()
+
+
+def _belongs_to_region(place: GeoPlace, region: str) -> bool:
+    """Strict: coordinates must sit inside the selected region bbox; drop other-viloyat labels."""
+    bbox = _REGION_BBOX.get(region)
+    if not bbox or not _in_bbox(place.lat, place.lng, bbox):
+        return False
+
+    hay = _norm_text(f"{place.label} {place.subtitle or ''} {place.title or ''}")
+    aliases = _REGION_ALIASES.get(region, ())
+    region_norm = _norm_text(region)
+
+    # Tokens this region is allowed to mention
+    allowed_tokens = set(aliases)
+    if region.startswith("Toshkent"):
+        allowed_tokens.update(("toshkent", "tashkent"))
+
+    for marker in _FOREIGN_MARKERS:
+        if marker not in hay:
+            continue
+        if marker in region_norm:
+            continue
+        if marker in allowed_tokens or any(marker in a for a in aliases):
+            continue
+        # Label explicitly names another viloyat/city → reject
+        return False
+
+    return True
+
+
+def _filter_by_region(places: list[GeoPlace], region: str | None) -> list[GeoPlace]:
+    if not region:
+        return places
+    return [p for p in places if _belongs_to_region(p, region)]
+
+
+def _nominatim_search(q: str, limit: int = 10, region: str | None = None) -> list[GeoPlace]:
+    params: dict = {
+        "format": "jsonv2",
+        "limit": limit,
+        "countrycodes": "uz",
+        "q": q,
+        "addressdetails": 0,
+        "dedupe": 1,
+    }
+    if region and region in _REGION_BBOX:
+        min_lon, min_lat, max_lon, max_lat = _REGION_BBOX[region]
+        # Nominatim viewbox is lon_left,lat_top,lon_right,lat_bottom
+        params["viewbox"] = f"{min_lon},{max_lat},{max_lon},{min_lat}"
+        params["bounded"] = 1
+    data = _get_json(f"{_NOMINATIM}/search", params)
     if not isinstance(data, list):
         return []
     out: list[GeoPlace] = []
     for item in data:
         if item.get("lat") is None or item.get("lon") is None:
+            continue
+        lat, lng = float(item["lat"]), float(item["lon"])
+        if region and region in _REGION_BBOX and not _in_bbox(lat, lng, _REGION_BBOX[region]):
             continue
         category = (item.get("category") or "").lower()
         itype = (item.get("type") or "").lower()
@@ -157,8 +282,8 @@ def _nominatim_search(q: str, limit: int = 10) -> list[GeoPlace]:
         subtitle = ", ".join(parts[:3]) if parts else None
         out.append(
             GeoPlace(
-                lat=float(item["lat"]),
-                lng=float(item["lon"]),
+                lat=lat,
+                lng=lng,
                 label=label,
                 title=title,
                 subtitle=subtitle,
@@ -192,6 +317,7 @@ def _photon_search(
     if not features:
         return []
     out: list[GeoPlace] = []
+    bbox = _REGION_BBOX.get(region) if region else None
     for feat in features:
         props = feat.get("properties") or {}
         cc = (props.get("countrycode") or "").upper()
@@ -201,6 +327,9 @@ def _photon_search(
         if len(coords) < 2:
             continue
         lng, lat = float(coords[0]), float(coords[1])
+        # Photon bbox is soft — enforce hard region clip
+        if bbox and not _in_bbox(lat, lng, bbox):
+            continue
         name = props.get("name") or props.get("street")
         if not name:
             continue
@@ -293,15 +422,18 @@ def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
     # 2) Photon general (POIs / places) for fuller coverage
     photon_places = _photon_search(stem, region=region, highway_only=False, limit=8)
 
-    # 3) Nominatim on a few variants (fills gaps Photon misses)
+    # 3) Nominatim — bounded to region viewbox when selected
     nom_hits: list[GeoPlace] = []
     for variant in variants[:4]:
-        nom_hits = _merge_places(nom_hits, _nominatim_search(variant, limit=8), limit=16)
+        nom_hits = _merge_places(
+            nom_hits, _nominatim_search(variant, limit=8, region=region), limit=16
+        )
         if len(nom_hits) >= 8:
             break
 
-    # Prefer streets first in merge order, then rank
-    merged = _merge_places(photon_streets, nom_hits, photon_places, limit=20)
+    # Prefer streets first in merge order, then hard-filter by selected viloyat, then rank
+    merged = _merge_places(photon_streets, nom_hits, photon_places, limit=24)
+    merged = _filter_by_region(merged, region)
     ranked = _rank(merged, q, region)
     return ranked[:12]
 
