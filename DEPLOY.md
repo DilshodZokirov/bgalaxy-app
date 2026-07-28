@@ -107,3 +107,15 @@ git push -u origin main
 
 ## Eslatma — "uxlab qolish" haqida
 Render'ning bepul tarifi — 15 daqiqa hech kim foydalanmasa, backend "uxlab qoladi". Birinchi kirishda 30-60 soniya kutish kerak bo'ladi (server "uyg'onadi"), keyin tezlashadi. Bu — normal holat, xato emas.
+
+---
+
+## Android ilova (MVP)
+
+Telefon uchun qobiq **Capacitor** orqali qo‘yilgan. Batafsil: [`docs/ANDROID.md`](docs/ANDROID.md).
+
+Qisqa:
+1. `cd frontend && npm run build:android`
+2. Android Studio da ochib Run
+3. Render `CORS_ORIGINS` ga `https://localhost` qo‘shing
+

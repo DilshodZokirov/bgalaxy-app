@@ -108,8 +108,21 @@ Kalit qo'shilmasa, "Guruh uchrashuvi" sahifasi ochiladi, lekin qo'shilishga urin
 - AI Ziyo — Google Gemini API bilan ishlaydigan shaxsiy AI yordamchi (bepul)
 - Buxgalteriya moduli — kirim/chiqim, hisob-fakturalar, ish haqi, oylik hisobot (faqat "manage_accounting" ruxsatiga ega lavozimlarga ko'rinadi)
 
+## Android MVP (Capacitor)
+
+Web UI ni telefon ilovasiga o‘raydi (yangi native dastur emas).
+
+```bash
+cd frontend
+npm run build:android   # dist → android sync
+npm run cap:open        # Android Studio
+```
+
+Batafsil: [`docs/ANDROID.md`](docs/ANDROID.md) · Deploy: [`DEPLOY.md`](DEPLOY.md)
+
 ## Hali qo'shilmagan (keyingi qadamlar)
 
 - Avatar yuklash (fayl saqlash — S3/local storage)
 - Frontend'da xatoliklarni to'liq boshqarish, loading holatlari
 - Testlar
+- Android: Firebase push, Play Store AAB, mobilga mos UI soddalashtirish

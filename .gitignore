@@ -13,6 +13,11 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 
+# Android local SDK path (har kompyuterda boshqa)
+frontend/android/local.properties
+frontend/android/.gradle/
+frontend/android/**/build/
+
 # --- General ---
 .DS_Store
 *.log
