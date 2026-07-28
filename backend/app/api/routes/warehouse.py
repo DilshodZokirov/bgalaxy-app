@@ -1194,7 +1194,7 @@ async def get_finance_ledger(
         db,
         company_id,
         current_user.id,
-        ["manage_warehouse", "manage_accounting", "ombor_ishchi"],
+        ["manage_warehouse", "manage_accounting", "ombor_ishchi", "view_analytics"],
     )
     await _require_warehouse_enabled(db, company_id)
     if warehouse_id:
@@ -1259,7 +1259,7 @@ async def export_finance_ledger(
         db,
         company_id,
         current_user.id,
-        ["manage_warehouse", "manage_accounting", "ombor_ishchi"],
+        ["manage_warehouse", "manage_accounting", "ombor_ishchi", "view_analytics"],
     )
     await _require_warehouse_enabled(db, company_id)
     if warehouse_id:
