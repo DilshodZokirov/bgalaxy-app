@@ -192,10 +192,13 @@ export default function WarehouseFinanceStats({ companyId, warehouseId, multi })
 
   return (
     <div className="wh-finance-stats">
+      <div className="wh-panel-head" style={{ marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>Statistika — ombor va buxgalteriya</h3>
+      </div>
       <p className="wh-hint">
         {multi && !warehouseId
-          ? "Barcha omborlar + buxgalteriya manbalari. Kerakli turlarni belgilang — grafik va jadval shunga qarab yangilanadi."
-          : "Tanlangan ombor + buxgalteriya. Pastda tartibli jurnal, filter va paginatsiya."}
+          ? "Ombor kirim/chiqim, buxgalteriya, faktura va oylik — barchasi shu yerda. Kerakli turlarni belgilang; grafik, jurnal va eksport yangilanadi."
+          : "Tanlangan ombor + buxgalteriya (kirim/chiqim, faktura, oylik). Pastda tartibli jurnal, filter, paginatsiya va CSV/Excel eksport."}
       </p>
 
       <div className="wh-kind-bar">
