@@ -11728,6 +11728,11 @@ html[data-custom-bg="1"] .galaxy-sky {
   margin: 0 auto;
   padding: 24px 20px 64px;
 }
+.mp-page.mp-embedded {
+  max-width: none;
+  margin: 0;
+  padding: 8px 0 32px;
+}
 .mp-hero {
   margin-bottom: 22px;
 }
