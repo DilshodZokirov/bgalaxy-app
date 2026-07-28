@@ -133,6 +133,7 @@ npm run android
 | `frontend/src/native.js` | Status bar, splash, orqaga tugmasi |
 | `frontend/.env.capacitor` | APK buildida API manzili (Render) |
 | `npm run build:android` | Web → Android sync |
+| AGP / Gradle | Studio mosligi uchun AGP **8.7.3** + Gradle **8.9** (eski Studio ham ochadi) |
 
 ---
 
@@ -144,6 +145,7 @@ npm run android
 | Bo‘sh oq ekran | `npm run build:android` qayta ishga tushiring |
 | `cap open` xato | Android Studio o‘rnatilganini tekshiring |
 | Eski UI chiqadi | Sync qilmagansiz — yana `build:android` |
+| `incompatible version (AGP 8.13...)` | Studio eski. Loyihada AGP 8.7.3 qo‘yilgan — `git pull` qiling yoki Studio’ni yangilang |
 
 ---
 
