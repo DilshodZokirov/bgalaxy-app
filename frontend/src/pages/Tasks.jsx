@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, API_BASE, wsUrl } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 
@@ -594,7 +594,7 @@ function RatingPanel({ companyId }) {
 
 export default function Tasks() {
   const { user } = useAuth();
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [perms, setPerms] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -609,10 +609,6 @@ export default function Tasks() {
   const [live, setLive] = useState(false);
   const [liveTick, setLiveTick] = useState(0);
   const refreshTimer = useRef(null);
-
-  useEffect(() => {
-    api.getMyCompanies().then((list) => setCompany(pickActiveCompany(list))).catch(() => {});
-  }, []);
 
   function refreshTasks() {
     if (!company) return;
@@ -630,7 +626,7 @@ export default function Tasks() {
     api.getRoles(company.id).then(setRoles).catch(() => {});
     refreshTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company]);
+  }, [company?.id]);
 
   useEffect(() => {
     if (!company) return undefined;
@@ -729,11 +725,20 @@ export default function Tasks() {
     }
   }
 
-  if (!company) {
+  if (companyLoading) {
     return (
       <AppShell>
         <TasksHeading />
         <p className="tasks-empty-inline">Kompaniya yuklanmoqda...</p>
+      </AppShell>
+    );
+  }
+
+  if (!company) {
+    return (
+      <AppShell>
+        <TasksHeading />
+        <p className="tasks-empty-inline">Avval kompaniya yarating yoki tanlang.</p>
       </AppShell>
     );
   }

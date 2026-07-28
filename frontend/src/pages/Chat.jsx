@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { wsUrl, api, API_BASE } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
@@ -441,6 +441,7 @@ export default function Chat() {
   const params = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { company, loading: companyLoading } = useActiveCompany();
 
   const [companyId, setCompanyId] = useState(params.companyId || null);
   const [channels, setChannels] = useState([]);
@@ -495,8 +496,9 @@ export default function Chat() {
       setCompanyId(params.companyId);
       return;
     }
-    api.getMyCompanies().then((list) => setCompanyId(pickActiveCompany(list)?.id || null)).catch(() => setCompanyId(null));
-  }, [params.companyId]);
+    if (companyLoading) return;
+    setCompanyId(company?.id || null);
+  }, [params.companyId, company?.id, companyLoading]);
 
   function refreshChannels() {
     if (!companyId) return;
@@ -796,6 +798,19 @@ export default function Chat() {
     const conv = await api.startConversation(partnerIds, "chat", true);
     refreshConversations();
     selectConversation(conv.id);
+  }
+
+  if (companyLoading && !params.companyId && channels.length === 0 && conversations.length === 0) {
+    return (
+      <AppShell>
+        <div className="chat-workspace">
+          <div className="chat-empty-hero">
+            <h2>Chat markazi</h2>
+            <p>Yuklanmoqda...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
   }
 
   if (!companyId && channels.length === 0 && conversations.length === 0) {

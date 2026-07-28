@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../api/client";
-import { getActiveCompanyId, setActiveCompanyId } from "../hooks/useCompany";
+import {
+  fetchMyCompanies,
+  getActiveCompanyId,
+  getCachedNavFlags,
+  pickActiveCompany,
+  setActiveCompanyId,
+  setCachedNavFlags,
+} from "../hooks/useCompany";
 import Logo from "./Logo";
 import RafiqAvatar from "./RafiqAvatar";
 
@@ -20,17 +27,17 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isGalaxy = variant === "galaxy";
+  const cachedFlags = getCachedNavFlags();
   const [companies, setCompanies] = useState([]);
   const [activeId, setActiveIdState] = useState(getActiveCompanyId());
-  const [canManageAccounting, setCanManageAccounting] = useState(false);
-  const [canViewAnalytics, setCanViewAnalytics] = useState(false);
-  const [hasWarehouse, setHasWarehouse] = useState(false);
-  const [canViewWarehouse, setCanViewWarehouse] = useState(false);
+  const [canManageAccounting, setCanManageAccounting] = useState(!!cachedFlags?.accounting);
+  const [canViewAnalytics, setCanViewAnalytics] = useState(!!cachedFlags?.analytics);
+  const [hasWarehouse, setHasWarehouse] = useState(!!cachedFlags?.warehouse);
+  const [canViewWarehouse, setCanViewWarehouse] = useState(!!cachedFlags?.warehouse);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("bgalaxy_sidebar_collapsed") === "1");
 
   useEffect(() => {
-    api
-      .getMyCompanies()
+    fetchMyCompanies()
       .then((list) => {
         setCompanies(list);
         const id = getActiveCompanyId() || list[0]?.id;
@@ -46,15 +53,25 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
     api
       .getMyPermissions(id)
       .then((info) => {
-        setCanManageAccounting(info.is_owner || !!info.permissions?.manage_accounting);
-        setCanViewAnalytics(info.is_owner || !!info.permissions?.view_analytics);
-        setCanViewWarehouse(
+        const accounting = info.is_owner || !!info.permissions?.manage_accounting;
+        const analytics = info.is_owner || !!info.permissions?.view_analytics;
+        const warehouse =
           info.is_owner ||
-            !!info.permissions?.manage_warehouse ||
-            !!info.permissions?.ombor_ishchi ||
-            !!info.permissions?.warehouse_loader ||
-            !!info.permissions?.warehouse_courier
-        );
+          !!info.permissions?.manage_warehouse ||
+          !!info.permissions?.ombor_ishchi ||
+          !!info.permissions?.warehouse_loader ||
+          !!info.permissions?.warehouse_courier;
+        setCanManageAccounting(accounting);
+        setCanViewAnalytics(analytics);
+        setCanViewWarehouse(warehouse);
+        const active = pickActiveCompany(companies) || companies.find((c) => c.id === id);
+        const hasWh = !!active?.has_warehouse || (active?.warehouses?.length > 0);
+        setHasWarehouse(hasWh);
+        setCachedNavFlags({
+          accounting,
+          analytics,
+          warehouse: hasWh && warehouse,
+        });
       })
       .catch(() => {
         setCanManageAccounting(false);

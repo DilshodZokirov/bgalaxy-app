@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { wsUrl, api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 
 // MVP: 1-to-1 only. STUN/TURN comes from the coturn instance in docker-compose.yml.
@@ -18,7 +18,7 @@ const ICE_SERVERS = [
 export default function Meeting() {
   const params = useParams();
   const navigate = useNavigate();
-  const [activeCompany, setActiveCompany] = useState(null);
+  const { company: activeCompany } = useActiveCompany();
   const callId = params.callId || (activeCompany ? `${activeCompany.id}-call` : null);
 
   const localVideoRef = useRef(null);
@@ -49,13 +49,6 @@ export default function Meeting() {
   const [callCreatorName, setCallCreatorName] = useState(null);
   const [joinRequestStatus, setJoinRequestStatus] = useState(null); // null | pending | denied
   const [pendingApprovals, setPendingApprovals] = useState([]);
-
-  useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setActiveCompany(pickActiveCompany(list)))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!activeCompany) return;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import GalaxyOrbitHub from "../components/GalaxyOrbitHub";
@@ -50,22 +50,11 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const skyMode = (user?.theme || "dark") === "light" ? "day" : "night";
-  const [company, setCompany] = useState(null);
-  const [companyCount, setCompanyCount] = useState(0);
-  const [loadingCompany, setLoadingCompany] = useState(true);
+  const { company, companies, loading: loadingCompany } = useActiveCompany();
+  const companyCount = companies.length;
   const [memberCount, setMemberCount] = useState(0);
   const [channelCount, setChannelCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
-
-  useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => {
-        setCompanyCount(list.length);
-        setCompany(pickActiveCompany(list));
-      })
-      .finally(() => setLoadingCompany(false));
-  }, []);
 
   useEffect(() => {
     if (!company) {
@@ -75,7 +64,7 @@ export default function Dashboard() {
     }
     api.getMembers(company.id).then((m) => setMemberCount(m.length)).catch(() => setMemberCount(0));
     api.getChannels(company.id).then((c) => setChannelCount(c.length)).catch(() => setChannelCount(0));
-  }, [company]);
+  }, [company?.id]);
 
   useEffect(() => {
     api.getConversations().then((list) => setConversationCount(list.length)).catch(() => setConversationCount(0));

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { pickActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
+import { useActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import CountdownBadge from "../components/CountdownBadge";
@@ -32,6 +32,7 @@ export default function MeetingsHub() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { company, loading: companyLoading } = useActiveCompany();
   const [showPartnerSearch, setShowPartnerSearch] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -39,7 +40,6 @@ export default function MeetingsHub() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
 
-  const [company, setCompany] = useState(null);
   const [activeGroupCall, setActiveGroupCall] = useState(null);
   const [activePartnerMeetings, setActivePartnerMeetings] = useState([]);
   const [scheduled, setScheduled] = useState([]);
@@ -49,13 +49,6 @@ export default function MeetingsHub() {
   const [schedAt, setSchedAt] = useState(defaultSchedAt);
   const [schedSaving, setSchedSaving] = useState(false);
   const [schedError, setSchedError] = useState(null);
-
-  useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setCompany(pickActiveCompany(list)))
-      .catch(() => {});
-  }, []);
 
   function refreshScheduled() {
     api.getScheduledMeetings().then(setScheduled).catch(() => setScheduled([]));

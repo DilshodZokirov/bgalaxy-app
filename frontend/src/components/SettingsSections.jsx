@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { fetchMyCompanies, pickActiveCompany } from "../hooks/useCompany";
 import { BACKGROUND_PRESETS } from "../data/backgrounds";
 import { UI_THEMES } from "../data/uiThemes";
 
@@ -568,7 +568,7 @@ export function WarehouseSection() {
   async function reload() {
     setLoading(true);
     try {
-      const list = await api.getMyCompanies();
+      const list = await fetchMyCompanies({ force: true });
       const active = pickActiveCompany(list);
       setCompany(active);
       if (active) {

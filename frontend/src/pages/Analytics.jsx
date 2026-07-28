@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import Wh3DBarChart from "../components/Wh3DBarChart";
 
@@ -439,7 +439,7 @@ function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
 }
 
 export default function Analytics() {
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [data, setData] = useState(null);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState(null);
@@ -460,10 +460,6 @@ export default function Analytics() {
   }
 
   useEffect(() => {
-    api.getMyCompanies().then((list) => setCompany(pickActiveCompany(list))).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (!company) return;
     api
       .getCompanyAnalytics(company.id, {
@@ -476,7 +472,7 @@ export default function Analytics() {
         if (err.message?.includes("ruxsat")) setDenied(true);
         else setError(err.message);
       });
-  }, [company, taskPeriod, perfPeriod, finPeriod]);
+  }, [company?.id, taskPeriod, perfPeriod, finPeriod]);
 
   useEffect(() => {
     if (!company) {
@@ -484,7 +480,7 @@ export default function Analytics() {
       return;
     }
     api.getMonthlyChampion(company.id).then(setChampion).catch(() => setChampion(null));
-  }, [company]);
+  }, [company?.id]);
 
   const kpis = useMemo(() => {
     if (!data) return null;
@@ -502,6 +498,20 @@ export default function Analytics() {
     return [...data.member_performance].sort((a, b) => (b.score || 0) - (a.score || 0));
   }, [data]);
 
+  if (companyLoading) {
+    return (
+      <AppShell>
+        <div className="wh-page">
+          <div className="galaxy-page-heading">
+            <p className="galaxy-page-kicker">Stats Orbit</p>
+            <h1>Statistika</h1>
+            <p>Yuklanmoqda...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (!company) {
     return (
       <AppShell>
@@ -509,7 +519,7 @@ export default function Analytics() {
           <div className="galaxy-page-heading">
             <p className="galaxy-page-kicker">Stats Orbit</p>
             <h1>Statistika</h1>
-            <p>Kompaniya tanlanmoqda...</p>
+            <p>Avval kompaniya yarating yoki tanlang.</p>
           </div>
         </div>
       </AppShell>

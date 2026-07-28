@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 
 const TABS = [
@@ -99,16 +99,9 @@ function StatsTooltip({ active, payload, label }) {
 }
 
 export default function Accounting() {
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [denied, setDenied] = useState(false);
   const [tab, setTab] = useState("summary");
-
-  useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => setCompany(pickActiveCompany(list)))
-      .catch(() => {});
-  }, []);
 
   if (denied) {
     return (
@@ -120,11 +113,23 @@ export default function Accounting() {
     );
   }
 
+  if (companyLoading) {
+    return (
+      <AppShell>
+        <div className="page-header">
+          <h1>Buxgalteriya</h1>
+          <p>Yuklanmoqda...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (!company) {
     return (
       <AppShell>
         <div className="page-header">
           <h1>Buxgalteriya</h1>
+          <p>Avval kompaniya yarating yoki tanlang.</p>
         </div>
       </AppShell>
     );

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../api/client";
-import { pickActiveCompany } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import Wh3DBarChart from "../components/Wh3DBarChart";
 
@@ -921,7 +921,7 @@ function MarketplaceTab({ company, onOrdered }) {
 export default function Warehouse() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [company, setCompany] = useState(null);
+  const { company, loading: companyLoading } = useActiveCompany();
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(null); // null = all (multi only)
   const [products, setProducts] = useState([]);
@@ -950,21 +950,18 @@ export default function Warehouse() {
   }, [searchParams]);
 
   useEffect(() => {
-    api
-      .getMyCompanies()
-      .then((list) => {
-        const active = pickActiveCompany(list);
-        setCompany(active);
-        const rows = active?.warehouses || [];
-        setWarehouses(rows);
-        if (rows.length === 1) setSelectedWarehouseId(rows[0].id);
-        else setSelectedWarehouseId(null);
-        if (active?.id) {
-          api.getMyPermissions(active.id).then(setPerms).catch(() => setPerms(null));
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (!company) {
+      setWarehouses([]);
+      setSelectedWarehouseId(null);
+      setPerms(null);
+      return;
+    }
+    const rows = company.warehouses || [];
+    setWarehouses(rows);
+    if (rows.length === 1) setSelectedWarehouseId(rows[0].id);
+    else setSelectedWarehouseId(null);
+    api.getMyPermissions(company.id).then(setPerms).catch(() => setPerms(null));
+  }, [company?.id]);
 
   const multi = warehouses.length > 1;
   const activeWarehouse =
@@ -980,7 +977,7 @@ export default function Warehouse() {
   useEffect(() => {
     if (!company) return;
     refreshProducts();
-  }, [company, selectedWarehouseId]);
+  }, [company?.id, selectedWarehouseId]);
 
   function refreshProducts() {
     if (!company) return;
@@ -1093,6 +1090,19 @@ export default function Warehouse() {
   ];
   if (company?.company_type === "distributor") {
     tabs.push({ key: "marketplace", label: "Bozor" });
+  }
+
+  if (companyLoading) {
+    return (
+      <AppShell>
+        <div className="wh-page">
+          <WarehouseHeading />
+          <div className="wh-empty">
+            <p className="wh-empty-inline">Ombor yuklanmoqda...</p>
+          </div>
+        </div>
+      </AppShell>
+    );
   }
 
   if (!company) {
