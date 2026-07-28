@@ -127,6 +127,12 @@ export const api = {
   getWarehouseStockHistory: (companyId, productId) =>
     request(`/companies/${companyId}/warehouse/products/${productId}/history`),
   getMe: () => request("/auth/me"),
+  getBootstrap: (activeCompanyId = null) =>
+    request(
+      `/auth/bootstrap${
+        activeCompanyId ? `?active_company_id=${encodeURIComponent(activeCompanyId)}` : ""
+      }`
+    ),
   getChannels: (companyId) => request(`/companies/${companyId}/channels`),
   createChannel: (companyId, data) =>
     request(`/companies/${companyId}/channels`, { method: "POST", body: data }),

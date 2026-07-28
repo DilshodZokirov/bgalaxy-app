@@ -1,15 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { api } from "../api/client";
-import {
-  fetchMyCompanies,
-  getActiveCompanyId,
-  getCachedNavFlags,
-  pickActiveCompany,
-  setActiveCompanyId,
-  setCachedNavFlags,
-} from "../hooks/useCompany";
+import { useBootstrap } from "../hooks/useCompany";
 import Logo from "./Logo";
 import RafiqAvatar from "./RafiqAvatar";
 
@@ -27,64 +19,17 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isGalaxy = variant === "galaxy";
-  const cachedFlags = getCachedNavFlags();
-  const [companies, setCompanies] = useState([]);
-  const [activeId, setActiveIdState] = useState(getActiveCompanyId());
-  const [canManageAccounting, setCanManageAccounting] = useState(!!cachedFlags?.accounting);
-  const [canViewAnalytics, setCanViewAnalytics] = useState(!!cachedFlags?.analytics);
-  const [hasWarehouse, setHasWarehouse] = useState(!!cachedFlags?.warehouse);
-  const [canViewWarehouse, setCanViewWarehouse] = useState(!!cachedFlags?.warehouse);
+  const { companies, company, nav, switchCompany } = useBootstrap();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("bgalaxy_sidebar_collapsed") === "1");
 
-  useEffect(() => {
-    fetchMyCompanies()
-      .then((list) => {
-        setCompanies(list);
-        const id = getActiveCompanyId() || list[0]?.id;
-        const active = list.find((c) => c.id === id) || list[0];
-        setHasWarehouse(!!active?.has_warehouse || (active?.warehouses?.length > 0));
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const id = activeId || companies[0]?.id;
-    if (!id) return;
-    api
-      .getMyPermissions(id)
-      .then((info) => {
-        const accounting = info.is_owner || !!info.permissions?.manage_accounting;
-        const analytics = info.is_owner || !!info.permissions?.view_analytics;
-        const warehouse =
-          info.is_owner ||
-          !!info.permissions?.manage_warehouse ||
-          !!info.permissions?.ombor_ishchi ||
-          !!info.permissions?.warehouse_loader ||
-          !!info.permissions?.warehouse_courier;
-        setCanManageAccounting(accounting);
-        setCanViewAnalytics(analytics);
-        setCanViewWarehouse(warehouse);
-        const active = pickActiveCompany(companies) || companies.find((c) => c.id === id);
-        const hasWh = !!active?.has_warehouse || (active?.warehouses?.length > 0);
-        setHasWarehouse(hasWh);
-        setCachedNavFlags({
-          accounting,
-          analytics,
-          warehouse: hasWh && warehouse,
-        });
-      })
-      .catch(() => {
-        setCanManageAccounting(false);
-        setCanViewAnalytics(false);
-        setCanViewWarehouse(false);
-      });
-  }, [activeId, companies]);
+  const canManageAccounting = !!nav?.accounting;
+  const canViewAnalytics = !!nav?.analytics;
+  const showWarehouse = !!nav?.warehouse;
+  const activeId = company?.id || "";
 
   function handleSwitch(e) {
     const id = e.target.value;
-    setActiveCompanyId(id);
-    setActiveIdState(id);
-    window.location.reload();
+    if (id) switchCompany(id);
   }
 
   function toggleCollapsed() {
@@ -110,7 +55,7 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
       ...finalNavItems.slice(4),
     ];
   }
-  if (hasWarehouse && canViewWarehouse) {
+  if (showWarehouse) {
     finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Mahsulot oqimi", to: "/warehouse" }];
   }
   if (canViewAnalytics) {
