@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, getToken } from "../api/client";
+import {
+  fetchBootstrap,
+  getActiveCompanyId,
+  invalidateBootstrapCache,
+} from "./useCompany";
 
 const AuthContext = createContext(null);
 
@@ -14,11 +19,12 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
-    api
-      .getMe()
-      .then(setUser)
+    // One round-trip: user + companies + nav (shared cache for the rest of the app)
+    fetchBootstrap({ force: true, activeCompanyId: getActiveCompanyId() })
+      .then((data) => setUser(data.user))
       .catch(() => {
         localStorage.removeItem("bgalaxy_token");
+        invalidateBootstrapCache();
         setUser(null);
       })
       .finally(() => setLoading(false));
@@ -27,6 +33,9 @@ export function AuthProvider({ children }) {
   function login(tokenResponse) {
     localStorage.setItem("bgalaxy_token", tokenResponse.access_token);
     setUser(tokenResponse.user);
+    invalidateBootstrapCache();
+    // Warm bootstrap cache in background after login
+    fetchBootstrap({ force: true, activeCompanyId: getActiveCompanyId() }).catch(() => {});
   }
 
   async function refreshUser() {
@@ -38,6 +47,8 @@ export function AuthProvider({ children }) {
   function logout() {
     localStorage.removeItem("bgalaxy_token");
     localStorage.removeItem("bgalaxy_active_company_id");
+    sessionStorage.removeItem("bgalaxy_nav_flags");
+    invalidateBootstrapCache();
     setUser(null);
     setLocked(false);
   }

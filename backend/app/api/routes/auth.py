@@ -18,11 +18,13 @@ from app.db.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
     AutoLockRequest,
+    BootstrapOut,
     ChangePasswordRequest,
     ChangePinRequest,
     ForgotPasswordRequest,
     GoogleLogin,
     MessageOut,
+    NavFlagsOut,
     ResendVerificationRequest,
     ResetPasswordRequest,
     ResetPinRequest,
@@ -34,6 +36,7 @@ from app.schemas.auth import (
     VerifyPinRequest,
 )
 from app.schemas.user import UserUpdate
+from app.services.permissions import get_permissions
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -363,6 +366,80 @@ async def update_lock_settings(
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/bootstrap", response_model=BootstrapOut)
+async def bootstrap(
+    active_company_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One round-trip for app shell: user + companies + active permissions/nav."""
+    from sqlalchemy import or_
+
+    from app.api.routes.companies import _company_out
+    from app.api.routes.warehouse import _ensure_legacy_warehouses
+    from app.models.company import Company, TeamMembership
+
+    result = await db.execute(
+        select(Company)
+        .join(TeamMembership, TeamMembership.company_id == Company.id)
+        .where(
+            TeamMembership.user_id == current_user.id,
+            or_(TeamMembership.approved == True, Company.owner_id == current_user.id),  # noqa: E712
+        )
+    )
+    companies = list(result.scalars().all())
+
+    company_outs = []
+    by_company = {}
+    dirty = False
+    for company in companies:
+        warehouses = await _ensure_legacy_warehouses(db, company)
+        by_company[str(company.id)] = warehouses
+        if warehouses and (not company.has_warehouse or company.warehouse_type is None):
+            company.has_warehouse = True
+            if len(warehouses) == 1:
+                company.warehouse_type = warehouses[0].warehouse_type
+            dirty = True
+        company_outs.append(_company_out(company, warehouses))
+
+    if dirty:
+        await db.commit()
+
+    active = None
+    if active_company_id:
+        active = next((c for c in company_outs if str(c.id) == str(active_company_id)), None)
+    if active is None and company_outs:
+        active = company_outs[0]
+
+    perms = None
+    nav = NavFlagsOut()
+    if active is not None:
+        perms_raw = await get_permissions(db, active.id, current_user.id)
+        perms = perms_raw
+        p = perms_raw.get("permissions") or {}
+        has_wh = bool(active.has_warehouse) or bool(active.warehouses)
+        can_wh = bool(
+            perms_raw.get("is_owner")
+            or p.get("manage_warehouse")
+            or p.get("ombor_ishchi")
+            or p.get("warehouse_loader")
+            or p.get("warehouse_courier")
+        )
+        nav = NavFlagsOut(
+            accounting=bool(perms_raw.get("is_owner") or p.get("manage_accounting")),
+            analytics=bool(perms_raw.get("is_owner") or p.get("view_analytics")),
+            warehouse=has_wh and can_wh,
+        )
+
+    return BootstrapOut(
+        user=current_user,
+        companies=company_outs,
+        active_company_id=active.id if active else None,
+        permissions=perms,
+        nav=nav,
+    )
 
 
 @router.patch("/me", response_model=UserOut)

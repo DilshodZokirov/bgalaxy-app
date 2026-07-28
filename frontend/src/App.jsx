@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./hooks/useAuth";
+import { BootstrapProvider } from "./hooks/useCompany";
 import ThemeApplier from "./components/ThemeApplier";
 import LockManager from "./components/LockManager";
 import LockScreen from "./components/LockScreen";
@@ -41,6 +42,7 @@ function LockGate() {
 export default function App() {
   const body = (
     <AuthProvider>
+      <BootstrapProvider>
       <ThemeApplier />
       <LockManager />
       <LockGate />
@@ -208,6 +210,7 @@ export default function App() {
           }
         />
       </Routes>
+      </BootstrapProvider>
     </AuthProvider>
   );
 

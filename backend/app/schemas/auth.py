@@ -2,6 +2,9 @@ import uuid
 
 from pydantic import BaseModel, EmailStr
 
+from app.schemas.company import CompanyOut
+from app.schemas.role import MyPermissions
+
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -80,6 +83,22 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class NavFlagsOut(BaseModel):
+    accounting: bool = False
+    analytics: bool = False
+    warehouse: bool = False
+
+
+class BootstrapOut(BaseModel):
+    """Single payload for app shell: user + companies + active perms/nav."""
+
+    user: UserOut
+    companies: list[CompanyOut]
+    active_company_id: uuid.UUID | None = None
+    permissions: MyPermissions | None = None
+    nav: NavFlagsOut = NavFlagsOut()
 
 
 class TokenOut(BaseModel):
