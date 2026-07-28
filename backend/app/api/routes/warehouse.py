@@ -1610,6 +1610,30 @@ async def get_order(
     return await _order_out(db, order)
 
 
+async def _batch_lines(
+    db: AsyncSession,
+    order: WarehouseOrder,
+    *,
+    status: str | None = None,
+) -> list[WarehouseOrder]:
+    """Return cart siblings sharing batch_id (or just the order)."""
+    if order.batch_id is None:
+        return [order]
+    query = select(WarehouseOrder).where(WarehouseOrder.batch_id == order.batch_id)
+    if status is not None:
+        query = query.where(WarehouseOrder.status == status)
+    lines = list((await db.execute(query)).scalars().all())
+    return lines or [order]
+
+
+def _batch_label(lines: list[WarehouseOrder]) -> str:
+    if len(lines) == 1:
+        return f"{lines[0].product_name} × {lines[0].quantity} {lines[0].unit}"
+    names = ", ".join(f"{o.product_name}" for o in lines[:3])
+    extra = f" (+{len(lines) - 3})" if len(lines) > 3 else ""
+    return f"Savatcha ({len(lines)} ta): {names}{extra}"
+
+
 @router.post("/orders/{order_id}/transition", response_model=OrderOut)
 async def transition_order(
     company_id: str,
@@ -1618,7 +1642,7 @@ async def transition_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Buyurtma bosqichini o'tkazish."""
+    """Buyurtma bosqichini o'tkazish. Savatcha (batch_id) bo'lsa — barcha qatorlar birga."""
     order = (
         await db.execute(select(WarehouseOrder).where(WarehouseOrder.id == order_id))
     ).scalar_one_or_none()
@@ -1634,14 +1658,19 @@ async def transition_order(
         if str(company_id) not in {str(order.buyer_company_id), str(order.seller_company_id)}:
             raise HTTPException(status_code=403, detail="Bu amal uchun ruxsat yo'q")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        await _cancel_order(db, order)
+        lines = await _batch_lines(db, order)
+        cancellable = [o for o in lines if o.status in {"ordered", "loading"}]
+        if not cancellable:
+            raise HTTPException(status_code=400, detail="Bu bosqichda bekor qilib bo'lmaydi")
+        for line in cancellable:
+            await _cancel_order(db, line)
         notify_ids = await users_with_permission(db, order.buyer_company_id, "manage_warehouse")
         notify_ids += await users_with_permission(db, order.seller_company_id, "manage_warehouse")
         await notify_users(
             db,
             user_ids=notify_ids,
             ntype="warehouse_order",
-            message=f"Buyurtma bekor qilindi: {order.product_name}",
+            message=f"Buyurtma bekor qilindi: {_batch_label(cancellable)}",
             company_id=company_id,
             invite_token=str(order.id),
         )
@@ -1653,16 +1682,18 @@ async def transition_order(
         if str(company_id) != str(order.seller_company_id):
             raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        if order.status != "ordered":
+        lines = await _batch_lines(db, order, status="ordered")
+        if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma 'Buyurtma qilindi' holatida emas")
-        order.status = "loading"
-        order.status_note = payload.note or "Yuklash boshlandi"
+        for line in lines:
+            line.status = "loading"
+            line.status_note = payload.note or "Yuklash boshlandi"
         loader_ids = await users_with_permission(db, seller.id, "warehouse_loader")
         await notify_users(
             db,
             user_ids=loader_ids,
             ntype="warehouse_order",
-            message=f"Yuklash: {order.product_name} → {buyer.name} ({order.quantity} {order.unit})",
+            message=f"Yuklash: {_batch_label(lines)} → {buyer.name}",
             company_id=seller.id,
             invite_token=str(order.id),
         )
@@ -1673,17 +1704,19 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_loader", "manage_warehouse"]
         )
-        if order.status != "loading":
+        lines = await _batch_lines(db, order, status="loading")
+        if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma yuklash holatida emas")
-        order.status = "loaded"
-        order.loaded_at = now
-        order.status_note = payload.note or "Yuklandi"
+        for line in lines:
+            line.status = "loaded"
+            line.loaded_at = now
+            line.status_note = payload.note or "Yuklandi"
         mgr_ids = await users_with_permission(db, seller.id, "manage_warehouse")
         await notify_users(
             db,
             user_ids=mgr_ids,
             ntype="warehouse_order",
-            message=f"Yuklandi — yo'lga chiqarish mumkin: {order.product_name} → {buyer.name}",
+            message=f"Yuklandi — yo'lga chiqarish mumkin: {_batch_label(lines)} → {buyer.name}",
             company_id=seller.id,
             invite_token=str(order.id),
         )
@@ -1692,17 +1725,20 @@ async def transition_order(
         if str(company_id) != str(order.seller_company_id):
             raise HTTPException(status_code=403, detail="Faqat sotuvchi ombori")
         await require_permission(db, company_id, current_user.id, "manage_warehouse")
-        if order.status != "loaded":
+        lines = await _batch_lines(db, order, status="loaded")
+        if not lines:
             raise HTTPException(status_code=400, detail="Avval yuklashni tasdiqlang")
-        order.status = "on_road"
-        order.dispatched_at = now
-        order.status_note = payload.note or "Yo'lga chiqarildi"
+        for line in lines:
+            line.status = "on_road"
+            line.dispatched_at = now
+            line.status_note = payload.note or "Yo'lga chiqarildi"
+        label = _batch_label(lines)
         courier_ids = await users_with_permission(db, seller.id, "warehouse_courier")
         await notify_users(
             db,
             user_ids=courier_ids,
             ntype="warehouse_order",
-            message=f"Yo'lda ariza: {order.product_name} → {buyer.name} ({order.quantity} {order.unit})",
+            message=f"Yo'lda ariza: {label} → {buyer.name}",
             company_id=seller.id,
             invite_token=str(order.id),
         )
@@ -1711,7 +1747,7 @@ async def transition_order(
             db,
             user_ids=buyer_ids,
             ntype="warehouse_order",
-            message=f"Buyurtmangiz yo'lda: {order.product_name} ({seller.name})",
+            message=f"Buyurtmangiz yo'lda: {label} ({seller.name})",
             company_id=buyer.id,
             invite_token=str(order.id),
         )
@@ -1722,14 +1758,16 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
         )
-        if order.status != "on_road":
+        lines = await _batch_lines(db, order, status="on_road")
+        if not lines:
             raise HTTPException(status_code=400, detail="Buyurtma yo'lda emas")
-        if order.courier_user_id and str(order.courier_user_id) != str(current_user.id):
-            raise HTTPException(status_code=400, detail="Bu arizani boshqa yetkazuvchi olgan")
-        order.status = "courier_accepted"
-        order.courier_user_id = current_user.id
-        order.courier_accepted_at = now
-        order.status_note = payload.note or f"Yetkazuvchi: {current_user.full_name}"
+        for line in lines:
+            if line.courier_user_id and str(line.courier_user_id) != str(current_user.id):
+                raise HTTPException(status_code=400, detail="Bu arizani boshqa yetkazuvchi olgan")
+            line.status = "courier_accepted"
+            line.courier_user_id = current_user.id
+            line.courier_accepted_at = now
+            line.status_note = payload.note or f"Yetkazuvchi: {current_user.full_name}"
 
     elif action == "confirm_arrival":
         if str(company_id) != str(order.seller_company_id):
@@ -1737,23 +1775,24 @@ async def transition_order(
         await require_any_permission(
             db, company_id, current_user.id, ["warehouse_courier", "manage_warehouse"]
         )
-        if order.status != "courier_accepted":
+        lines = await _batch_lines(db, order, status="courier_accepted")
+        if not lines:
             raise HTTPException(status_code=400, detail="Avval arizani qabul qiling")
-        if order.courier_user_id and str(order.courier_user_id) != str(current_user.id):
-            perms = await get_permissions(db, company_id, current_user.id)
-            if not perms["is_owner"] and not perms["permissions"].get("manage_warehouse"):
-                raise HTTPException(status_code=403, detail="Faqat o'z arizangizni tasdiqlashingiz mumkin")
-        order.status = "awaiting_receipt"
-        order.arrived_at = now
-        order.status_note = payload.note or "Korxonaga yetib keldi — qabul qilish kutilmoqda"
+        for line in lines:
+            if line.courier_user_id and str(line.courier_user_id) != str(current_user.id):
+                perms = await get_permissions(db, company_id, current_user.id)
+                if not perms["is_owner"] and not perms["permissions"].get("manage_warehouse"):
+                    raise HTTPException(status_code=403, detail="Faqat o'z arizangizni tasdiqlashingiz mumkin")
+            line.status = "awaiting_receipt"
+            line.arrived_at = now
+            line.status_note = payload.note or "Korxonaga yetib keldi — qabul qilish kutilmoqda"
         receipt_ids = await users_with_permission(db, buyer.id, "manage_warehouse")
         await notify_users(
             db,
             user_ids=receipt_ids,
             ntype="warehouse_receipt",
             message=(
-                f"Qabul qilish: {order.product_name} × {order.quantity} {order.unit} "
-                f"({seller.name}) — tekshirish bo'limiga o'ting"
+                f"Qabul qilish: {_batch_label(lines)} ({seller.name}) — tekshirish bo'limiga o'ting"
             ),
             company_id=buyer.id,
             invite_token=str(order.id),
@@ -1766,18 +1805,7 @@ async def transition_order(
         if order.status != "awaiting_receipt":
             raise HTTPException(status_code=400, detail="Buyurtma qabul qilish holatida emas")
 
-        # Confirm whole cart batch when present
-        to_complete = [order]
-        if order.batch_id is not None:
-            batch_result = await db.execute(
-                select(WarehouseOrder).where(
-                    WarehouseOrder.batch_id == order.batch_id,
-                    WarehouseOrder.buyer_company_id == company_id,
-                    WarehouseOrder.status == "awaiting_receipt",
-                )
-            )
-            to_complete = list(batch_result.scalars().all())
-
+        to_complete = await _batch_lines(db, order, status="awaiting_receipt")
         total_amount = 0.0
         for line in to_complete:
             await _complete_order(db, line, actor=current_user, buyer=buyer, seller=seller)
