@@ -8877,6 +8877,72 @@ html[data-custom-bg="1"] .galaxy-sky {
 
 .companies-modal-sm { max-width: 400px; }
 
+.companies-modal-create {
+  max-width: 820px;
+  max-height: 92vh;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.companies-modal-create .os-create-form {
+  overflow-y: auto;
+  max-height: calc(92vh - 120px);
+}
+
+.os-create-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.os-create-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.45);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.os-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.os-geo-hint-ok {
+  color: #7dd3fc;
+  margin: 0 0 8px;
+}
+
+.os-geo-kind.is-metro {
+  color: #fde68a;
+  background: rgba(234, 179, 8, 0.18);
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+.os-geo-metro-icon {
+  background: transparent;
+  border: none;
+}
+
+.os-geo-metro-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
 .companies-modal-head {
   display: flex;
   justify-content: space-between;

@@ -28,7 +28,7 @@ _UZ_BBOX = (55.9, 37.0, 73.2, 45.6)
 # Tighter bbox per selected region (minLon, minLat, maxLon, maxLat).
 # Kept non-overlapping where possible so Namangan/Farg‘ona never leak into Toshkent.
 _REGION_BBOX: dict[str, tuple[float, float, float, float]] = {
-    "Toshkent shahri": (69.10, 41.20, 69.40, 41.40),
+    "Toshkent shahri": (69.12, 41.20, 69.38, 41.39),
     "Toshkent viloyati": (68.55, 40.70, 70.15, 41.75),
     "Andijon viloyati": (71.55, 40.35, 72.95, 41.05),
     "Buxoro viloyati": (63.20, 39.20, 65.20, 40.80),
@@ -131,7 +131,53 @@ class GeoPlace(BaseModel):
     label: str
     title: str | None = None
     subtitle: str | None = None
-    kind: str = "place"  # street | place
+    kind: str = "place"  # street | place | metro
+
+
+_METRO_QUERY_RE = re.compile(r"(?i)^\s*(metro|метро|subway|метро\s*bekati|metro\s*bekati)s?\s*$")
+_METRO_WORD_RE = re.compile(r"(?i)\b(metro|метро|subway|bekati)\b")
+
+# Reliable Toshkent metro stations (OSM-aligned) — plain "metro" query alone is too weak
+_TASHKENT_METRO: tuple[tuple[str, float, float], ...] = (
+    ("Chilonzor", 41.2753, 69.2035),
+    ("Olmazor", 41.2788, 69.2125),
+    ("Novza", 41.2845, 69.2218),
+    ("Milliy bogʻ", 41.2912, 69.2315),
+    ("Mirzo Ulugʻbek", 41.2980, 69.2410),
+    ("Chorsu", 41.3255, 69.2355),
+    ("Gafur Gʻulom", 41.3188, 69.2488),
+    ("Alisher Navoiy", 41.3165, 69.2595),
+    ("Paxtakor", 41.3180, 69.2615),
+    ("Ozodlik maydoni", 41.3142, 69.2655),
+    ("Mustaqillik maydoni", 41.3149, 69.2711),
+    ("Amir Temur xiyoboni", 41.3115, 69.2797),
+    ("Hamid Olimjon", 41.3182, 69.2957),
+    ("Pushkin", 41.3219, 69.3111),
+    ("Buyuk Ipak Yoʻli", 41.3261, 69.3286),
+    ("Yunus Rajabiy", 41.3139, 69.2835),
+    ("Ming oʻrik", 41.3075, 69.2820),
+    ("Oybek", 41.2995, 69.2755),
+    ("Kosmonavtlar", 41.2925, 69.2735),
+    ("Yunusbod", 41.3455, 69.2855),
+    ("Shahriston", 41.3535, 69.2885),
+    ("Bodomzor", 41.3375, 69.2865),
+    ("Minor", 41.3295, 69.2825),
+    ("Abdulla Qodiriy", 41.3225, 69.2785),
+    ("Bunyodkor", 41.3055, 69.2485),
+    ("Doʻstlik", 41.2955, 69.2285),
+    ("Mashinasozlar", 41.2885, 69.2185),
+    ("Texnopark", 41.2685, 69.3125),
+    ("Yashnobod", 41.2755, 69.3255),
+    ("Tuzel", 41.2825, 69.3385),
+    ("Olmos", 41.2895, 69.3515),
+    ("Rohat", 41.2965, 69.3645),
+)
+
+# Slightly wider city box for metro POIs (still excludes Namangan/Farg‘ona)
+_METRO_REGION_BBOX: dict[str, tuple[float, float, float, float]] = {
+    "Toshkent shahri": (69.10, 41.21, 69.40, 41.40),
+    "Toshkent viloyati": (68.55, 40.70, 70.15, 41.75),
+}
 
 
 def _get_json(url: str, params: dict | None = None) -> list | dict:
@@ -390,7 +436,10 @@ def _rank(places: list[GeoPlace], q: str, region: str | None) -> list[GeoPlace]:
 
 
 def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
-    """Google/Yandex-like: return several related streets for a partial name."""
+    """Google/Yandex-like suggest; special-case metro → all stations in region."""
+    if _is_metro_query(q):
+        return _metro_search(region)
+
     variants = _query_variants(q, region)
     if not variants:
         return []
@@ -436,6 +485,75 @@ def _search_sync(q: str, region: str | None) -> list[GeoPlace]:
     merged = _filter_by_region(merged, region)
     ranked = _rank(merged, q, region)
     return ranked[:12]
+
+
+def _is_metro_query(q: str) -> bool:
+    text = q.strip()
+    if _METRO_QUERY_RE.match(text):
+        return True
+    # "metro bekati", "Toshkent metro" etc.
+    return bool(_METRO_WORD_RE.search(text)) and len(text) <= 40
+
+
+def _metro_search(region: str | None) -> list[GeoPlace]:
+    """Return metro stations in the selected region (plotted as map markers on the client)."""
+    hits: list[GeoPlace] = []
+
+    def as_metro(p: GeoPlace) -> GeoPlace:
+        return GeoPlace(
+            lat=p.lat,
+            lng=p.lng,
+            label=p.label,
+            title=p.title or p.label,
+            subtitle=p.subtitle,
+            kind="metro",
+        )
+
+    for q in ("metro station", "метро бекати", "subway station"):
+        for p in _nominatim_search(q, limit=30, region=region):
+            hay = f"{p.title or ''} {p.label}".lower()
+            if any(k in hay for k in ("station", "metro", "метро", "subway", "bekati")):
+                hits.append(as_metro(p))
+
+    for p in _photon_search("metro", region=region, highway_only=False, limit=25):
+        hay = f"{p.title or ''} {p.label}".lower()
+        if any(k in hay for k in ("metro", "station", "bekati", "метро", "railway")):
+            hits.append(as_metro(p))
+
+    # Curated Toshkent list fills gaps when OSM/Nominatim return almost nothing for "metro"
+    if region in (None, "Toshkent shahri", "Toshkent viloyati"):
+        bbox = _METRO_REGION_BBOX.get(region or "Toshkent shahri")
+        for name, lat, lng in _TASHKENT_METRO:
+            if bbox and not _in_bbox(lat, lng, bbox):
+                continue
+            hits.append(
+                GeoPlace(
+                    lat=lat,
+                    lng=lng,
+                    label=f"{name} metro bekati, Toshkent shahri",
+                    title=f"{name} metro bekati",
+                    subtitle="Toshkent shahri",
+                    kind="metro",
+                )
+            )
+
+    if region:
+        if region in _METRO_REGION_BBOX:
+            bbox = _METRO_REGION_BBOX[region]
+            hits = [p for p in hits if _in_bbox(p.lat, p.lng, bbox)]
+        else:
+            hits = _filter_by_region(hits, region)
+
+    seen: set[str] = set()
+    unique: list[GeoPlace] = []
+    for p in hits:
+        key = re.sub(r"\s+", " ", (p.title or p.label).lower())
+        key = key.replace(" metro bekati", "").strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(as_metro(p))
+    return unique[:40]
 
 
 @router.get("/search", response_model=list[GeoPlace])
