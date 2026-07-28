@@ -44,10 +44,10 @@ async function reverseLabel(lat, lng) {
   }
 }
 
-async function searchPlaces(query) {
+async function searchPlaces(query, regionHint) {
   const q = query.trim();
   if (q.length < 2) return [];
-  const data = await api.geoSearch(q);
+  const data = await api.geoSearch(q, regionHint || null);
   return (data || []).map((item) => ({
     lat: Number(item.lat),
     lng: Number(item.lng),
@@ -156,9 +156,15 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
     setSearchError(null);
     setSearching(true);
     try {
-      const hits = await searchPlaces(query);
+      const hits = await searchPlaces(query, regionHint);
       setResults(hits);
-      if (!hits.length) setSearchError("Natija topilmadi — boshqacha yozing yoki kartani bosing");
+      if (!hits.length) {
+        setSearchError(
+          regionHint
+            ? "Natija topilmadi — viloyatni tekshiring yoki kartadan pin qo‘ying"
+            : "Avval viloyat/shaharni tanlang, keyin ko‘cha nomini qidiring — yoki kartani bosing"
+        );
+      }
     } catch (err) {
       setSearchError(err?.message || "Qidiruv vaqtincha ishlamayapti — kartadan pin qo‘ying");
     } finally {
@@ -172,7 +178,11 @@ export default function CompanyLocationMap({ value, onChange, regionHint }) {
       <div className="os-geo-search">
         <input
           type="search"
-          placeholder="Manzil yoki joy nomini qidirish..."
+          placeholder={
+            regionHint
+              ? `Masalan: Rayxon ko'chasi (${regionHint})`
+              : "Avval viloyatni tanlang, keyin ko‘cha nomi..."
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
