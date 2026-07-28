@@ -37,6 +37,11 @@ const DASHBOARD_VIEWS = [
   { key: "sold", label: "Aylanma" },
 ];
 
+/** Distributor + market: no manual inventoy — order via Bozor only. */
+function isBuyerOnlyCompany(company) {
+  return company?.company_type === "distributor" || company?.company_type === "market";
+}
+
 function emptyForm(type) {
   return {
     name: "",
@@ -706,16 +711,20 @@ function OrderPipelineCard({ order, actions, highlight }) {
 }
 
 function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
+  const isMarket = company.company_type === "market";
   const isDistributor = company.company_type === "distributor";
+  const isPurchaseBuyer = isBuyerOnlyCompany(company);
+  const canSell = !isMarket; // kompaniya + distributor (markets only buy)
   const canManage = !!(perms?.is_owner || perms?.permissions?.manage_warehouse);
   const canLoad = !!(perms?.is_owner || perms?.permissions?.warehouse_loader || canManage);
   const canCourier = !!(perms?.is_owner || perms?.permissions?.warehouse_courier || canManage);
 
   const scopes = [];
-  if (isDistributor) {
+  if (isPurchaseBuyer) {
     scopes.push({ key: "purchases", label: "Mening buyurtmalarim" });
     scopes.push({ key: "receipt", label: "Qabul qilish" });
-  } else {
+  }
+  if (canSell) {
     scopes.push({ key: "sales", label: "Ombor kuzatuv" });
     if (canLoad) scopes.push({ key: "loader", label: "Yuklash" });
     if (canCourier) scopes.push({ key: "courier", label: "Yetkazish" });
@@ -768,22 +777,22 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
   function actionsFor(order) {
     const busy = busyId === order.id;
     const list = [];
-    if (!isDistributor && scope === "sales" && canManage && order.status === "ordered") {
+    if (canSell && scope === "sales" && canManage && order.status === "ordered") {
       list.push({ action: "start_loading", label: "Yuklashni boshlash", busy, onClick: () => runAction(order.id, "start_loading") });
     }
-    if (!isDistributor && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
+    if (canSell && (scope === "loader" || scope === "sales") && canLoad && order.status === "loading") {
       list.push({ action: "confirm_loaded", label: "Yuklandi", busy, onClick: () => runAction(order.id, "confirm_loaded") });
     }
-    if (!isDistributor && scope === "sales" && canManage && order.status === "loaded") {
+    if (canSell && scope === "sales" && canManage && order.status === "loaded") {
       list.push({ action: "dispatch", label: "Yo'lga chiqarish", busy, onClick: () => runAction(order.id, "dispatch") });
     }
-    if (!isDistributor && scope === "courier" && canCourier && order.status === "on_road") {
+    if (canSell && scope === "courier" && canCourier && order.status === "on_road") {
       list.push({ action: "accept_courier", label: "Arizani qabul qilish", busy, onClick: () => runAction(order.id, "accept_courier") });
     }
-    if (!isDistributor && scope === "courier" && canCourier && order.status === "courier_accepted") {
+    if (canSell && scope === "courier" && canCourier && order.status === "courier_accepted") {
       list.push({ action: "confirm_arrival", label: "Yetib keldim", busy, onClick: () => runAction(order.id, "confirm_arrival") });
     }
-    if (isDistributor && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
+    if (isPurchaseBuyer && (scope === "receipt" || scope === "purchases") && canManage && order.status === "awaiting_receipt") {
       list.push({ action: "confirm_receipt", label: "Qabul qilishni tasdiqlash", busy, onClick: () => runAction(order.id, "confirm_receipt") });
     }
     if (canManage && (order.status === "ordered" || order.status === "loading")) {
@@ -802,13 +811,15 @@ function OrdersPipelineTab({ company, perms, focusOrderId, defaultScope }) {
     return list;
   }
 
+  const lead = isMarket
+    ? "Distributiv firmadan buyurtma holati va yetkazilgan yukni tekshirib qabul qiling — tasdiqlangandan keyin omborga avtomatik qo‘shiladi."
+    : isDistributor
+      ? "Xaridlaringizni qabul qiling; market buyurtmalarini yuklash → yo‘l → yetkazish orqali bajaring."
+      : "Barcha buyurtmalar: qaysi xaridor, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish.";
+
   return (
     <div className="wh-orders">
-      <p className="wh-section-lead">
-        {isDistributor
-          ? "Buyurtma holati, yo‘l kuzatuvi va yetkazilgan yukni tekshirib qabul qiling — tasdiqlangandan keyin omborga avtomatik qo‘shiladi."
-          : "Barcha buyurtmalar: qaysi distributiv, yuk miqdori, narx va bosqichlar. Yuklash → yo‘lga chiqarish → yetkazish."}
-      </p>
+      <p className="wh-section-lead">{lead}</p>
       <div className="wh-view-tabs" role="tablist">
         {scopes.map((s) => (
           <button
@@ -865,8 +876,9 @@ function MarketplaceTab({ company, onOrdered }) {
   return (
     <div className="wh-market">
       <p className="wh-section-lead">
-        Ishlab chiqaruvchi omboridan buyurtma bering. Mavjud miqdor — boshqa firmalar band qilgan zaxiradan tashqari qoldiq.
-        Buyurtma berilgach yuklash → yo‘l → qabul qilish bosqichlari boshlanadi; omborga faqat qabuldan keyin tushadi.
+        {company.company_type === "market"
+          ? "Distributiv firmalar omboridan buyurtma bering. Mahsulot qo‘lda qo‘shilmaydi — zaxira faqat buyurtma qabulidan keyin omborga tushadi."
+          : "Ishlab chiqaruvchi omboridan buyurtma bering. Mavjud miqdor — boshqa firmalar band qilgan zaxiradan tashqari qoldiq. Buyurtma berilgach yuklash → yo‘l → qabul qilish bosqichlari boshlanadi; omborga faqat qabuldan keyin tushadi."}
       </p>
       <input className="wh-search" type="text" placeholder="Nomi bo‘yicha qidirish..." value={search} onChange={(e) => setSearch(e.target.value)} />
       {error && <p className="error">{error}</p>}
@@ -1088,7 +1100,7 @@ export default function Warehouse() {
     { key: "products", label: "Mahsulotlar" },
     { key: "orders", label: "Buyurtmalar" },
   ];
-  if (company?.company_type === "distributor") {
+  if (isBuyerOnlyCompany(company)) {
     tabs.push({ key: "marketplace", label: "Bozor" });
   }
 
@@ -1133,14 +1145,17 @@ export default function Warehouse() {
     );
   }
 
+  const buyerOnly = isBuyerOnlyCompany(company);
   const subtitle =
     company.company_type === "distributor"
       ? "Distributiv firma — zaxira faqat Bozor buyurtmasi orqali to‘ldiriladi"
-      : multi
-        ? selectedWarehouseId
-          ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
-          : `Umumiy ko‘rinish — ${warehouses.length} ta ombor`
-        : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
+      : company.company_type === "market"
+        ? "Market — mahsulot faqat distributiv omboridan buyurtma orqali keladi"
+        : multi
+          ? selectedWarehouseId
+            ? `Ombor: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType}`
+            : `Umumiy ko‘rinish — ${warehouses.length} ta ombor`
+          : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
 
   return (
     <AppShell>
@@ -1204,7 +1219,7 @@ export default function Warehouse() {
         {tab === "products" && (
           <section className="wh-products">
             <div className="wh-tools">
-              {company.company_type !== "distributor" && (
+              {!buyerOnly && (
                 <button
                   type="button"
                   className="wh-cta"
@@ -1253,11 +1268,13 @@ export default function Warehouse() {
             {!loading && products.length === 0 && (
               <div className="wh-empty">
                 <p>
-                  {company.company_type === "distributor"
-                    ? "Hali mahsulot yo‘q — Bozor bo‘limidan buyurtma bering."
+                  {buyerOnly
+                    ? company.company_type === "market"
+                      ? "Hali mahsulot yo‘q — Bozor bo‘limidan distributiv firmalar omboridan buyurtma bering."
+                      : "Hali mahsulot yo‘q — Bozor bo‘limidan buyurtma bering."
                     : "Hali mahsulot qo‘shilmagan."}
                 </p>
-                {company.company_type === "distributor" && (
+                {buyerOnly && (
                   <button type="button" className="wh-cta" onClick={() => setTab("marketplace")}>
                     Bozorga o‘tish
                   </button>
@@ -1271,7 +1288,6 @@ export default function Warehouse() {
             <div className="wh-grid">
               {visibleProducts.map((p) => {
                 const tone = stockTone(p, isLowStock(p));
-                const isDistributor = company.company_type === "distributor";
                 return (
                   <article key={p.id} className={`wh-card tone-${tone}`}>
                     {p.image_url ? (
@@ -1297,7 +1313,7 @@ export default function Warehouse() {
                       {p.sku && <p className="wh-meta">SKU: {p.sku}</p>}
                       {p.notes && <p className="wh-meta">{p.notes}</p>}
                       <div className="wh-card-actions">
-                        {isDistributor ? (
+                        {buyerOnly ? (
                           <button
                             type="button"
                             className="wh-cta slim"
@@ -1326,7 +1342,7 @@ export default function Warehouse() {
         )}
       </div>
 
-      {showAdd && (
+      {showAdd && !buyerOnly && (
         <ProductModal
           company={company}
           products={products}
@@ -1336,7 +1352,7 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {editProduct && company.company_type !== "distributor" && (
+      {editProduct && !buyerOnly && (
         <ProductModal
           company={company}
           product={editProduct}
@@ -1347,7 +1363,7 @@ export default function Warehouse() {
           onSaved={refreshProducts}
         />
       )}
-      {stockProduct && company.company_type !== "distributor" && (
+      {stockProduct && !buyerOnly && (
         <StockModal company={company} product={stockProduct} onClose={() => setStockProduct(null)} onSaved={refreshProducts} />
       )}
       {reorderProduct && (
