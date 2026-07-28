@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import Wh3DBarChart from "../components/Wh3DBarChart";
+import { MarketplaceTab } from "./Marketplace";
 
 const TYPE_LABELS = { technology: "Texnologiya", clothing: "Kiyim-kechak", food: "Oziq-ovqat" };
 const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
@@ -1136,7 +1137,7 @@ export default function Warehouse() {
   }
 
   async function handleReorder() {
-    navigate("/marketplace");
+    setTab("marketplace");
   }
 
   function isLowStock(p) {
@@ -1179,8 +1180,11 @@ export default function Warehouse() {
   const tabs = [
     { key: "dashboard", label: "Dashboard" },
     { key: "products", label: "Mahsulotlar" },
-    { key: "orders", label: "Buyurtmalar" },
   ];
+  if (isBuyerOnlyCompany(company)) {
+    tabs.push({ key: "marketplace", label: "Marketplace" });
+  }
+  tabs.push({ key: "orders", label: "Buyurtmalar" });
 
   if (companyLoading) {
     return (
@@ -1286,6 +1290,13 @@ export default function Warehouse() {
             multi={multi}
           />
         )}
+        {tab === "marketplace" && buyerOnly && (
+          <MarketplaceTab
+            company={company}
+            onOrdered={refreshProducts}
+            onGoToOrders={() => setTab("orders")}
+          />
+        )}
         {tab === "orders" && (
           <OrdersPipelineTab
             company={company}
@@ -1314,7 +1325,7 @@ export default function Warehouse() {
                 </button>
               )}
               {buyerOnly && (
-                <button type="button" className="wh-cta" onClick={() => navigate("/marketplace")}>
+                <button type="button" className="wh-cta" onClick={() => setTab("marketplace")}>
                   Marketplace
                 </button>
               )}
@@ -1357,7 +1368,7 @@ export default function Warehouse() {
                     : "Hali mahsulot qo‘shilmagan."}
                 </p>
                 {buyerOnly && (
-                  <button type="button" className="wh-cta" onClick={() => navigate("/marketplace")}>
+                  <button type="button" className="wh-cta" onClick={() => setTab("marketplace")}>
                     Marketplacega o‘tish
                   </button>
                 )}

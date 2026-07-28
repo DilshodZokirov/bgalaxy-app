@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { api } from "../api/client";
-import { useActiveCompany } from "../hooks/useCompany";
-import AppShell from "../components/AppShell";
 
 const UNIT_LABELS = { dona: "dona", kg: "kg", litr: "litr" };
 const TYPE_LABELS = { kompaniya: "Ishlab chiqaruvchi", distributor: "Distributiv", market: "Market" };
@@ -33,7 +31,9 @@ function CartDrawer({ seller, items, onChangeQty, onRemove, onClose, onCheckout,
               <li key={item.id}>
                 <div>
                   <strong>{item.name}</strong>
-                  <p>{money(item.price)} / {UNIT_LABELS[item.unit] || item.unit}</p>
+                  <p>
+                    {money(item.price)} / {UNIT_LABELS[item.unit] || item.unit}
+                  </p>
                 </div>
                 <div className="mp-cart-qty">
                   <input
@@ -67,9 +67,8 @@ function CartDrawer({ seller, items, onChangeQty, onRemove, onClose, onCheckout,
   );
 }
 
-export default function Marketplace() {
-  const navigate = useNavigate();
-  const { company, loading: companyLoading } = useActiveCompany();
+/** Embedded warehouse tab — sellers list → shop → cart (one seller). */
+export function MarketplaceTab({ company, onOrdered, onGoToOrders }) {
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -84,12 +83,8 @@ export default function Marketplace() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
 
-  const canUse =
-    company?.has_warehouse &&
-    (company.company_type === "distributor" || company.company_type === "market");
-
   useEffect(() => {
-    if (!company?.id || !canUse) return;
+    if (!company?.id) return;
     setLoading(true);
     setError(null);
     api
@@ -97,7 +92,7 @@ export default function Marketplace() {
       .then(setSellers)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [company?.id, canUse]);
+  }, [company?.id]);
 
   useEffect(() => {
     if (!company?.id || !seller) return;
@@ -119,7 +114,7 @@ export default function Marketplace() {
   }, [sellers, search, filter]);
 
   const cartSeller = sellers.find((s) => s.company_id === cartSellerId) || seller;
-  const cartCount = cart.reduce((n, i) => n + 1, 0);
+  const cartCount = cart.length;
 
   function addToCart(product) {
     if (cartSellerId && cartSellerId !== product.company_id) {
@@ -173,7 +168,8 @@ export default function Marketplace() {
       setCart([]);
       setCartSellerId(null);
       setShowCart(false);
-      navigate("/warehouse?tab=orders&scope=purchases");
+      onOrdered?.();
+      onGoToOrders?.();
     } catch (err) {
       setCheckoutError(err.message);
     } finally {
@@ -181,170 +177,126 @@ export default function Marketplace() {
     }
   }
 
-  if (companyLoading) {
-    return (
-      <AppShell>
-        <div className="mp-page">
-          <p className="mp-empty-inline">Yuklanmoqda...</p>
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (!company) {
-    return (
-      <AppShell>
-        <div className="mp-page">
-          <div className="mp-empty">
-            <p>Avval kompaniya yarating.</p>
-            <button type="button" className="wh-cta" onClick={() => navigate("/companies")}>
-              Kompaniya yaratish
-            </button>
-          </div>
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (!canUse) {
-    return (
-      <AppShell>
-        <div className="mp-page">
-          <div className="mp-empty">
-            <p>Marketplace faqat Distributiv firma va Market uchun (ombor yoqilgan bo‘lishi kerak).</p>
-            <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/warehouse")}>
-              Omborga qaytish
-            </button>
-          </div>
-        </div>
-      </AppShell>
-    );
-  }
-
   return (
-    <AppShell>
-      <div className="mp-page">
-        <header className="mp-hero">
-          <p className="mp-kicker">05 MARKETPLACE</p>
-          <h1>{seller ? seller.company_name : "Marketplace"}</h1>
-          <p>
-            {company.company_type === "market"
-              ? "Distributiv firmalar — tanlang, savatchaga qo‘shing, buyurtma bering."
-              : "Ishlab chiqaruvchi kompaniyalar — tanlang, savatchaga qo‘shing, buyurtma bering."}
-          </p>
-        </header>
+    <div className="mp-page mp-embedded">
+      <header className="mp-hero">
+        <p className="mp-kicker">MARKETPLACE</p>
+        <h2>{seller ? seller.company_name : "Marketplace"}</h2>
+        <p>
+          {company.company_type === "market"
+            ? "Distributiv firmalar — tanlang, savatchaga qo‘shing, buyurtma bering."
+            : "Ishlab chiqaruvchi kompaniyalar — tanlang, savatchaga qo‘shing, buyurtma bering."}
+        </p>
+      </header>
 
-        <div className="mp-toolbar">
-          <input
-            className="mp-search"
-            type="search"
-            placeholder="Qidirish..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className="mp-filters" role="tablist">
-            <button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
-              Barchasi
-            </button>
-            <button type="button" className={filter === "top" ? "active" : ""} onClick={() => setFilter("top")}>
-              Top reyting
-            </button>
-          </div>
-          <button
-            type="button"
-            className="wh-cta slim mp-cart-btn"
-            onClick={() => setShowCart(true)}
-            disabled={cart.length === 0}
-          >
-            Savatcha{cartCount ? ` (${cartCount})` : ""}
+      <div className="mp-toolbar">
+        <input
+          className="mp-search"
+          type="search"
+          placeholder="Qidirish..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="mp-filters" role="tablist">
+          <button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
+            Barchasi
+          </button>
+          <button type="button" className={filter === "top" ? "active" : ""} onClick={() => setFilter("top")}>
+            Top reyting
           </button>
         </div>
-
-        {error && <p className="error">{error}</p>}
-
-        {!seller && (
-          <>
-            {loading && <p className="mp-empty-inline">Yuklanmoqda...</p>}
-            {!loading && visibleSellers.length === 0 && (
-              <div className="mp-empty">
-                <p>Hozircha Marketplace’da sotuvchi yo‘q.</p>
-              </div>
-            )}
-            <div className="mp-grid">
-              {visibleSellers.map((s) => (
-                <article key={s.company_id} className="mp-card">
-                  <div className="mp-card-icon">
-                    {s.logo_url ? (
-                      <img src={s.logo_url} alt="" />
-                    ) : (
-                      <span>{(s.company_name || "?").slice(0, 1).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div className="mp-card-body">
-                    <h3>{s.company_name}</h3>
-                    <p>
-                      {TYPE_LABELS[s.company_type] || s.company_type}
-                      {s.location_region ? ` · ${s.location_region}` : ""}
-                    </p>
-                    <p className="mp-rating">
-                      <span className="mp-star">★</span>{" "}
-                      {s.avg_rating != null ? s.avg_rating.toFixed(1) : "—"}
-                      {s.rating_count ? ` (${s.rating_count})` : ""}
-                      <span className="mp-muted"> · {s.product_count} mahsulot</span>
-                    </p>
-                  </div>
-                  <button type="button" className="mp-install" onClick={() => setSeller(s)}>
-                    Kirish
-                  </button>
-                </article>
-              ))}
-            </div>
-          </>
-        )}
-
-        {seller && (
-          <section className="mp-seller-shop">
-            <button type="button" className="secondary wh-soft-btn" onClick={() => setSeller(null)}>
-              ← Sotuvchilar ro‘yxati
-            </button>
-            <div className="mp-seller-banner">
-              <div>
-                <h2>{seller.company_name}</h2>
-                <p className="mp-rating">
-                  <span className="mp-star">★</span>{" "}
-                  {seller.avg_rating != null ? seller.avg_rating.toFixed(1) : "Baholar yo‘q"}
-                  {seller.rating_count ? ` · ${seller.rating_count} ta baho` : ""}
-                </p>
-              </div>
-            </div>
-            {productsLoading && <p className="mp-empty-inline">Mahsulotlar yuklanmoqda...</p>}
-            {!productsLoading && products.length === 0 && (
-              <div className="mp-empty">
-                <p>Bu sotuvchida Marketplacega chiqarilgan mahsulot yo‘q.</p>
-              </div>
-            )}
-            <div className="mp-product-grid">
-              {products.map((p) => (
-                <article key={p.id} className="mp-product-card">
-                  {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} />
-                  ) : (
-                    <div className="mp-product-ph" />
-                  )}
-                  <div>
-                    <h4>{p.name}</h4>
-                    <p>{money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}</p>
-                    <p className="ok">Mavjud: {p.quantity}</p>
-                    <button type="button" className="wh-cta slim" onClick={() => addToCart(p)}>
-                      Savatchaga
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
+        <button
+          type="button"
+          className="wh-cta slim mp-cart-btn"
+          onClick={() => setShowCart(true)}
+          disabled={cart.length === 0}
+        >
+          Savatcha{cartCount ? ` (${cartCount})` : ""}
+        </button>
       </div>
+
+      {error && <p className="error">{error}</p>}
+
+      {!seller && (
+        <>
+          {loading && <p className="mp-empty-inline">Yuklanmoqda...</p>}
+          {!loading && visibleSellers.length === 0 && (
+            <div className="mp-empty">
+              <p>Hozircha Marketplace’da sotuvchi yo‘q.</p>
+            </div>
+          )}
+          <div className="mp-grid">
+            {visibleSellers.map((s) => (
+              <article key={s.company_id} className="mp-card">
+                <div className="mp-card-icon">
+                  {s.logo_url ? (
+                    <img src={s.logo_url} alt="" />
+                  ) : (
+                    <span>{(s.company_name || "?").slice(0, 1).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="mp-card-body">
+                  <h3>{s.company_name}</h3>
+                  <p>
+                    {TYPE_LABELS[s.company_type] || s.company_type}
+                    {s.location_region ? ` · ${s.location_region}` : ""}
+                  </p>
+                  <p className="mp-rating">
+                    <span className="mp-star">★</span>{" "}
+                    {s.avg_rating != null ? s.avg_rating.toFixed(1) : "—"}
+                    {s.rating_count ? ` (${s.rating_count})` : ""}
+                    <span className="mp-muted"> · {s.product_count} mahsulot</span>
+                  </p>
+                </div>
+                <button type="button" className="mp-install" onClick={() => setSeller(s)}>
+                  Kirish
+                </button>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+
+      {seller && (
+        <section className="mp-seller-shop">
+          <button type="button" className="secondary wh-soft-btn" onClick={() => setSeller(null)}>
+            ← Sotuvchilar ro‘yxati
+          </button>
+          <div className="mp-seller-banner">
+            <div>
+              <h3>{seller.company_name}</h3>
+              <p className="mp-rating">
+                <span className="mp-star">★</span>{" "}
+                {seller.avg_rating != null ? seller.avg_rating.toFixed(1) : "Baholar yo‘q"}
+                {seller.rating_count ? ` · ${seller.rating_count} ta baho` : ""}
+              </p>
+            </div>
+          </div>
+          {productsLoading && <p className="mp-empty-inline">Mahsulotlar yuklanmoqda...</p>}
+          {!productsLoading && products.length === 0 && (
+            <div className="mp-empty">
+              <p>Bu sotuvchida Marketplacega chiqarilgan mahsulot yo‘q.</p>
+            </div>
+          )}
+          <div className="mp-product-grid">
+            {products.map((p) => (
+              <article key={p.id} className="mp-product-card">
+                {p.image_url ? <img src={p.image_url} alt={p.name} /> : <div className="mp-product-ph" />}
+                <div>
+                  <h4>{p.name}</h4>
+                  <p>
+                    {money(p.price)} / {UNIT_LABELS[p.unit] || p.unit}
+                  </p>
+                  <p className="ok">Mavjud: {p.quantity}</p>
+                  <button type="button" className="wh-cta slim" onClick={() => addToCart(p)}>
+                    Savatchaga
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {showCart && (
         <CartDrawer
@@ -366,6 +318,11 @@ export default function Marketplace() {
           onCheckout={checkout}
         />
       )}
-    </AppShell>
+    </div>
   );
+}
+
+/** Old /marketplace URL → Ombor Marketplace tabi */
+export default function Marketplace() {
+  return <Navigate to="/warehouse?tab=marketplace" replace />;
 }

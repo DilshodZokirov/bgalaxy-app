@@ -25,9 +25,6 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const canManageAccounting = !!nav?.accounting;
   const canViewAnalytics = !!nav?.analytics;
   const showWarehouse = !!nav?.warehouse;
-  const showMarketplace =
-    showWarehouse &&
-    (company?.company_type === "distributor" || company?.company_type === "market");
   const activeId = company?.id || "";
 
   function handleSwitch(e) {
@@ -60,12 +57,6 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
   }
   if (showWarehouse) {
     finalNavItems = [...finalNavItems, { icon: "📦", label: "Ombor", hint: "Mahsulot oqimi", to: "/warehouse" }];
-  }
-  if (showMarketplace) {
-    finalNavItems = [
-      ...finalNavItems,
-      { icon: "🛒", label: "Marketplace", hint: "Xarid bozori", to: "/marketplace" },
-    ];
   }
   if (canViewAnalytics) {
     finalNavItems = [...finalNavItems, { icon: "📈", label: "Statistika", hint: "Statistics", to: "/statistika" }];
