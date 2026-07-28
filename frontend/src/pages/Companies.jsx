@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api/client";
-import { getActiveCompanyId, setActiveCompanyId } from "../hooks/useCompany";
+import { getActiveCompanyId, invalidateCompaniesCache, setActiveCompanyId } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
@@ -305,6 +305,7 @@ export default function Companies() {
         location_address: locationAddress.trim() || null,
         logo_url: logoUrl || null,
       });
+      invalidateCompaniesCache();
       setActiveCompanyId(res.id);
       setName("");
       setCompanyType("kompaniya");
@@ -357,6 +358,7 @@ export default function Companies() {
     setDeleteError(null);
     try {
       await api.deleteCompany(deleteTarget.id);
+      invalidateCompaniesCache();
       if (getActiveCompanyId() === deleteTarget.id) {
         setActiveCompanyId(null);
       }
