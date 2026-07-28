@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart,
+  Area,
+  AreaChart,
   Bar,
-  LineChart,
-  Line,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
-import Wh3DBarChart from "../components/Wh3DBarChart";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(Number(n) || 0)) + " so'm";
@@ -61,11 +63,15 @@ const TABS = [
 ];
 
 const TOOLTIP = {
-  background: "#0f172a",
-  border: "1px solid rgba(148,163,184,0.25)",
-  borderRadius: 10,
+  background: "rgba(15, 23, 42, 0.96)",
+  border: "1px solid rgba(148,163,184,0.28)",
+  borderRadius: 12,
   color: "#f8fafc",
+  boxShadow: "0 12px 28px rgba(2,6,23,0.45)",
 };
+
+const FIN_COLORS = { income: "#22d3ee", expense: "#f59e0b", net: "#a78bfa" };
+const TASK_COLORS = { accepted: "#2dd4bf", rejected: "#fb7185" };
 
 function PeriodRow({ value, onChange }) {
   return (
@@ -90,7 +96,7 @@ function ChartSeg({ value, onChange }) {
       {[
         ["line", "Chiziq"],
         ["bar", "Ustun"],
-        ["3d", "3D"],
+        ["pie", "Aylana"],
       ].map(([t, label]) => (
         <button key={t} type="button" className={value === t ? "active" : ""} onClick={() => onChange(t)}>
           {label}
@@ -98,6 +104,10 @@ function ChartSeg({ value, onChange }) {
       ))}
     </div>
   );
+}
+
+function EmptyTrend({ text = "Bu davrda maʼlumot yoʻq." }) {
+  return <p className="wh-empty-inline st-chart-empty">{text}</p>;
 }
 
 function ChartPanel({ title, period, setPeriod, chartType, setChartType, hint, children }) {
@@ -241,6 +251,15 @@ function TaskCharts({ data, period, setPeriod, chartType, setChartType }) {
   );
   const stageEntries = Object.entries(data.stage_counts || {});
   const maxStage = Math.max(1, ...stageEntries.map(([, c]) => c));
+  const pieData = useMemo(() => {
+    const accepted = trend.reduce((s, r) => s + (Number(r.accepted) || 0), 0);
+    const rejected = trend.reduce((s, r) => s + (Number(r.rejected) || 0), 0);
+    return [
+      { name: "Bajarilgan", value: accepted, color: TASK_COLORS.accepted },
+      { name: "Rad etilgan", value: rejected, color: TASK_COLORS.rejected },
+    ].filter((d) => d.value > 0);
+  }, [trend]);
+  const hasTrend = trend.some((r) => (r.accepted || 0) + (r.rejected || 0) > 0);
 
   return (
     <div className="st-grid">
@@ -252,29 +271,81 @@ function TaskCharts({ data, period, setPeriod, chartType, setChartType }) {
         setChartType={setChartType}
         hint="Bajarilgan va rad etilgan vazifalar oqimi."
       >
-        {chartType === "3d" ? (
-          <Wh3DBarChart data={trend} dataKey="accepted" color="#2dd4bf" />
+        {!hasTrend ? (
+          <EmptyTrend text="Bu davrda vazifa tendensiyasi yoʻq." />
+        ) : chartType === "pie" ? (
+          <div className="st-pie-wrap">
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={68}
+                  outerRadius={104}
+                  paddingAngle={3}
+                  stroke="rgba(15,23,42,0.9)"
+                  strokeWidth={3}
+                >
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={260}>
             {chartType === "line" ? (
-              <LineChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+              <AreaChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="taskAcceptedFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={TASK_COLORS.accepted} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={TASK_COLORS.accepted} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="taskRejectedFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={TASK_COLORS.rejected} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={TASK_COLORS.rejected} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" vertical={false} />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={TOOLTIP} />
                 <Legend />
-                <Line type="monotone" dataKey="accepted" name="Bajarilgan" stroke="#2dd4bf" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="rejected" name="Rad etilgan" stroke="#fb7185" strokeWidth={2} dot={false} />
-              </LineChart>
+                <Area
+                  type="monotone"
+                  dataKey="accepted"
+                  name="Bajarilgan"
+                  stroke={TASK_COLORS.accepted}
+                  fill="url(#taskAcceptedFill)"
+                  strokeWidth={2.6}
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="rejected"
+                  name="Rad etilgan"
+                  stroke={TASK_COLORS.rejected}
+                  fill="url(#taskRejectedFill)"
+                  strokeWidth={2.2}
+                  dot={false}
+                />
+              </AreaChart>
             ) : (
-              <BarChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP} />
+              <BarChart data={trend} barGap={6} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" vertical={false} />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
                 <Legend />
-                <Bar dataKey="accepted" name="Bajarilgan" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="rejected" name="Rad etilgan" fill="#fb7185" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="accepted" name="Bajarilgan" fill={TASK_COLORS.accepted} radius={[8, 8, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="rejected" name="Rad etilgan" fill={TASK_COLORS.rejected} radius={[8, 8, 0, 0]} maxBarSize={36} />
               </BarChart>
             )}
           </ResponsiveContainer>
@@ -368,19 +439,34 @@ function PrevMonthChampion({ champion }) {
 
 function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
   const trend = useMemo(
-    () => (data.financial_trend || []).map((row) => ({ ...row, label: row.month })),
+    () =>
+      (data.financial_trend || []).map((row) => ({
+        ...row,
+        label: row.month,
+        income: Number(row.income) || 0,
+        expense: Number(row.expense) || 0,
+      })),
     [data.financial_trend]
   );
   const totals = useMemo(() => {
     return trend.reduce(
       (acc, row) => {
-        acc.income += Number(row.income) || 0;
-        acc.expense += Number(row.expense) || 0;
+        acc.income += row.income;
+        acc.expense += row.expense;
         return acc;
       },
       { income: 0, expense: 0 }
     );
   }, [trend]);
+  const pieData = useMemo(
+    () =>
+      [
+        { name: "Kirim", value: totals.income, color: FIN_COLORS.income },
+        { name: "Chiqim", value: totals.expense, color: FIN_COLORS.expense },
+      ].filter((d) => d.value > 0),
+    [totals]
+  );
+  const hasTrend = trend.some((r) => r.income > 0 || r.expense > 0);
 
   return (
     <>
@@ -405,30 +491,94 @@ function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
         setPeriod={setPeriod}
         chartType={chartType}
         setChartType={setChartType}
+        hint="Buxgalteriya kirim/chiqimlari va to‘langan hisob-fakturalar asosida."
       >
-        {chartType === "3d" ? (
-          <Wh3DBarChart data={trend} dataKey="income" color="#22d3ee" valueFormatter={money} />
+        {!hasTrend ? (
+          <EmptyTrend text="Bu davrda moliyaviy harakat yoʻq." />
+        ) : chartType === "pie" ? (
+          <div className="st-pie-wrap">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={72}
+                  outerRadius={112}
+                  paddingAngle={4}
+                  stroke="rgba(15,23,42,0.9)"
+                  strokeWidth={3}
+                >
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP} formatter={(v) => money(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="st-pie-legend">
+              <span>
+                Kirim ulushi:{" "}
+                <strong>
+                  {totals.income + totals.expense > 0
+                    ? Math.round((totals.income / (totals.income + totals.expense)) * 100)
+                    : 0}
+                  %
+                </strong>
+              </span>
+            </div>
+          </div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={280}>
             {chartType === "line" ? (
-              <LineChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
+              <AreaChart data={trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="finIncomeFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={FIN_COLORS.income} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={FIN_COLORS.income} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="finExpenseFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={FIN_COLORS.expense} stopOpacity={0.32} />
+                    <stop offset="100%" stopColor={FIN_COLORS.expense} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" vertical={false} />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                 <Tooltip contentStyle={TOOLTIP} formatter={(v) => money(v)} />
                 <Legend />
-                <Line type="monotone" dataKey="income" name="Kirim" stroke="#22d3ee" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="expense" name="Chiqim" stroke="#f59e0b" strokeWidth={2} dot={false} />
-              </LineChart>
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  name="Kirim"
+                  stroke={FIN_COLORS.income}
+                  fill="url(#finIncomeFill)"
+                  strokeWidth={2.8}
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expense"
+                  name="Chiqim"
+                  stroke={FIN_COLORS.expense}
+                  fill="url(#finExpenseFill)"
+                  strokeWidth={2.4}
+                  dot={false}
+                />
+              </AreaChart>
             ) : (
-              <BarChart data={trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip contentStyle={TOOLTIP} formatter={(v) => money(v)} />
+              <BarChart data={trend} barGap={8} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" vertical={false} />
+                <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v) => money(v)} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
                 <Legend />
-                <Bar dataKey="income" name="Kirim" fill="#22d3ee" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Chiqim" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="Kirim" fill={FIN_COLORS.income} radius={[10, 10, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="expense" name="Chiqim" fill={FIN_COLORS.expense} radius={[10, 10, 0, 0]} maxBarSize={40} />
               </BarChart>
             )}
           </ResponsiveContainer>
@@ -448,8 +598,8 @@ export default function Analytics() {
   const [taskPeriod, setTaskPeriod] = useState("month");
   const [perfPeriod, setPerfPeriod] = useState("month");
   const [finPeriod, setFinPeriod] = useState("month");
-  const [taskChartType, setTaskChartType] = useState("3d");
-  const [finChartType, setFinChartType] = useState("3d");
+  const [taskChartType, setTaskChartType] = useState("line");
+  const [finChartType, setFinChartType] = useState("line");
   const [selectedMember, setSelectedMember] = useState(null);
   const [detailPeriod, setDetailPeriod] = useState("month");
   const [champion, setChampion] = useState(null);
