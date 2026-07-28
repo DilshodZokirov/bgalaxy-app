@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   CartesianGrid,
@@ -182,6 +183,17 @@ export default function Companies() {
       setShowCreateForm(true);
     }
   }, [companies]);
+
+  const createOpen = showCreateForm || (companies && companies.length === 0);
+
+  useEffect(() => {
+    if (!createOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [createOpen]);
 
   function refreshCompanies() {
     setListLoading(true);
@@ -397,8 +409,6 @@ export default function Companies() {
     }
   }
 
-  const createOpen = showCreateForm || (companies && companies.length === 0);
-
   if (companies === null) {
     return (
       <AppShell topLeft={<CompaniesHeading />}>
@@ -446,204 +456,206 @@ export default function Companies() {
           </div>
         </div>
 
-        {createOpen && (
-          <div
-            className="companies-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="os-create-title"
-            onClick={(e) => {
-              if (e.target === e.currentTarget && companies.length > 0) {
-                setShowCreateForm(false);
-              }
-            }}
-          >
-            <section className="os-create os-create-pro companies-modal companies-modal-create">
-              <div className="os-create-hero">
-                <div className="os-create-hero-row">
-                  <span className="os-create-kicker">Yangi yozuv</span>
-                  {companies.length > 0 && (
-                    <button
-                      type="button"
-                      className="os-create-close"
-                      onClick={() => setShowCreateForm(false)}
-                      aria-label="Yopish"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <h3 id="os-create-title">Yangi kompaniya yaratish</h3>
-                <p>
-                  Nom, INN, brand va kartadagi aniq joylashuv — siz avtomatik egasi bo‘lasiz.
-                  Koordinatalar yetkazib berish uchun saqlanadi.
-                </p>
-              </div>
-              <form className="os-create-form" onSubmit={handleSubmit}>
-                <div className="os-create-section">
-                  <div className="os-create-section-head">
-                    <span className="os-create-step">01</span>
-                    <div>
-                      <h4>Asosiy ma’lumot</h4>
-                      <p>Kompaniya nomi, turi va soliq identifikatori</p>
-                    </div>
-                  </div>
-
-                  <div className="os-create-grid">
-                    <label className="os-field os-field-span">
-                      <span>Kompaniya nomi</span>
-                      <input
-                        type="text"
-                        placeholder="Tech Solutions LLC"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                      />
-                      {name.trim() && (
-                        <em className="os-field-hint">
-                          Ichki identifikator: /{slugify(name)} — URL va tizim uchun avtomatik
-                        </em>
-                      )}
-                    </label>
-
-                    <label className="os-field os-field-span">
-                      <span>INN (STIR)</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="123456789"
-                        value={inn}
-                        onChange={(e) => setInn(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                        maxLength={9}
-                        required
-                        autoComplete="off"
-                      />
-                      <em className="os-field-hint">9 raqam — yuridik shaxs STIR</em>
-                    </label>
-                  </div>
-
-                  <div className="os-type-grid" role="group" aria-label="Kompaniya turi">
-                    {COMPANY_TYPES.map((t) => (
+        {createOpen &&
+          createPortal(
+            <div
+              className="companies-modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="os-create-title"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && companies.length > 0) {
+                  setShowCreateForm(false);
+                }
+              }}
+            >
+              <section className="os-create os-create-pro companies-modal companies-modal-create">
+                <div className="os-create-hero">
+                  <div className="os-create-hero-row">
+                    <span className="os-create-kicker">Yangi yozuv</span>
+                    {companies.length > 0 && (
                       <button
-                        key={t.key}
                         type="button"
-                        className={`os-type-card ${companyType === t.key ? "active" : ""}`}
-                        onClick={() => setCompanyType(t.key)}
+                        className="os-create-close"
+                        onClick={() => setShowCreateForm(false)}
+                        aria-label="Yopish"
                       >
-                        <strong>{t.mark}</strong>
-                        <span>
-                          {t.label}
-                          <small>{t.industry}</small>
-                        </span>
+                        ✕
                       </button>
-                    ))}
+                    )}
                   </div>
+                  <h3 id="os-create-title">Yangi kompaniya yaratish</h3>
+                  <p>
+                    Nom, INN, brand va kartadagi aniq joylashuv — siz avtomatik egasi bo‘lasiz.
+                    Koordinatalar yetkazib berish uchun saqlanadi.
+                  </p>
                 </div>
-
-                <div className="os-create-section">
-                  <div className="os-create-section-head">
-                    <span className="os-create-step">02</span>
-                    <div>
-                      <h4>Brand</h4>
-                      <p>Logo — panel va marketplace’da ko‘rinadi</p>
+                <form className="os-create-form" onSubmit={handleSubmit}>
+                  <div className="os-create-section">
+                    <div className="os-create-section-head">
+                      <span className="os-create-step">01</span>
+                      <div>
+                        <h4>Asosiy ma’lumot</h4>
+                        <p>Kompaniya nomi, turi va soliq identifikatori</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <label className={`os-logo-drop ${logoUrl ? "has-file" : ""}`}>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={handleLogoFile}
-                      disabled={logoUploading}
-                    />
-                    <div className="os-logo os-logo-preview" aria-hidden>
-                      {logoUrl ? (
-                        <img src={logoUrl} alt="" />
-                      ) : (
-                        <span>{(name || "?").slice(0, 1).toUpperCase()}</span>
-                      )}
+                    <div className="os-create-grid">
+                      <label className="os-field os-field-span">
+                        <span>Kompaniya nomi</span>
+                        <input
+                          type="text"
+                          placeholder="Tech Solutions LLC"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                        />
+                        {name.trim() && (
+                          <em className="os-field-hint">
+                            Ichki identifikator: /{slugify(name)} — URL va tizim uchun avtomatik
+                          </em>
+                        )}
+                      </label>
+
+                      <label className="os-field os-field-span">
+                        <span>INN (STIR)</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="123456789"
+                          value={inn}
+                          onChange={(e) => setInn(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                          maxLength={9}
+                          required
+                          autoComplete="off"
+                        />
+                        <em className="os-field-hint">9 raqam — yuridik shaxs STIR</em>
+                      </label>
                     </div>
-                    <div className="os-logo-drop-copy">
-                      <strong>
-                        {logoUploading ? "Yuklanmoqda..." : logoUrl ? "Logo tanlandi" : "Logo yuklash"}
-                      </strong>
-                      <span>JPG / PNG / WEBP · kvadratga yaqin rasm tavsiya etiladi</span>
-                      {logoUrl && (
+
+                    <div className="os-type-grid" role="group" aria-label="Kompaniya turi">
+                      {COMPANY_TYPES.map((t) => (
                         <button
+                          key={t.key}
                           type="button"
-                          className="os-text-danger"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setLogoUrl(null);
-                          }}
+                          className={`os-type-card ${companyType === t.key ? "active" : ""}`}
+                          onClick={() => setCompanyType(t.key)}
                         >
-                          Rasmni olib tashlash
+                          <strong>{t.mark}</strong>
+                          <span>
+                            {t.label}
+                            <small>{t.industry}</small>
+                          </span>
                         </button>
-                      )}
-                    </div>
-                  </label>
-                </div>
-
-                <div className="os-create-section">
-                  <div className="os-create-section-head">
-                    <span className="os-create-step">03</span>
-                    <div>
-                      <h4>Joylashuv</h4>
-                      <p>Viloyat + kartadan pin — yetkazib berish uchun</p>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="os-create-grid">
-                    <label className="os-field">
-                      <span>Viloyat / shahar</span>
-                      <select
-                        value={locationRegion}
-                        onChange={(e) => setLocationRegion(e.target.value)}
-                        required
-                      >
-                        <option value="">Tanlang...</option>
-                        {UZ_REGIONS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  <div className="os-create-section">
+                    <div className="os-create-section-head">
+                      <span className="os-create-step">02</span>
+                      <div>
+                        <h4>Brand</h4>
+                        <p>Logo — panel va marketplace’da ko‘rinadi</p>
+                      </div>
+                    </div>
 
-                    <label className="os-field">
-                      <span>Manzil (ixtiyoriy)</span>
+                    <label className={`os-logo-drop ${logoUrl ? "has-file" : ""}`}>
                       <input
-                        type="text"
-                        placeholder="Ko‘cha, uy, ofis..."
-                        value={locationAddress}
-                        onChange={(e) => setLocationAddress(e.target.value)}
-                        maxLength={255}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleLogoFile}
+                        disabled={logoUploading}
                       />
+                      <div className="os-logo os-logo-preview" aria-hidden>
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="" />
+                        ) : (
+                          <span>{(name || "?").slice(0, 1).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="os-logo-drop-copy">
+                        <strong>
+                          {logoUploading ? "Yuklanmoqda..." : logoUrl ? "Logo tanlandi" : "Logo yuklash"}
+                        </strong>
+                        <span>JPG / PNG / WEBP · kvadratga yaqin rasm tavsiya etiladi</span>
+                        {logoUrl && (
+                          <button
+                            type="button"
+                            className="os-text-danger"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setLogoUrl(null);
+                            }}
+                          >
+                            Rasmni olib tashlash
+                          </button>
+                        )}
+                      </div>
                     </label>
                   </div>
 
-                  <CompanyLocationMap value={geo} onChange={setGeo} regionHint={locationRegion || null} />
-                </div>
+                  <div className="os-create-section">
+                    <div className="os-create-section-head">
+                      <span className="os-create-step">03</span>
+                      <div>
+                        <h4>Joylashuv</h4>
+                        <p>Viloyat + kartadan pin — yetkazib berish uchun</p>
+                      </div>
+                    </div>
 
-                {error && <p className="error">{error}</p>}
-                <div className="os-create-actions">
-                  {companies.length > 0 && (
-                    <button
-                      type="button"
-                      className="os-btn-ghost"
-                      onClick={() => setShowCreateForm(false)}
-                    >
-                      Bekor qilish
+                    <div className="os-create-grid">
+                      <label className="os-field">
+                        <span>Viloyat / shahar</span>
+                        <select
+                          value={locationRegion}
+                          onChange={(e) => setLocationRegion(e.target.value)}
+                          required
+                        >
+                          <option value="">Tanlang...</option>
+                          {UZ_REGIONS.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="os-field">
+                        <span>Manzil (ixtiyoriy)</span>
+                        <input
+                          type="text"
+                          placeholder="Ko‘cha, uy, ofis..."
+                          value={locationAddress}
+                          onChange={(e) => setLocationAddress(e.target.value)}
+                          maxLength={255}
+                        />
+                      </label>
+                    </div>
+
+                    <CompanyLocationMap value={geo} onChange={setGeo} regionHint={locationRegion || null} />
+                  </div>
+
+                  {error && <p className="error">{error}</p>}
+                  <div className="os-create-actions">
+                    {companies.length > 0 && (
+                      <button
+                        type="button"
+                        className="os-btn-ghost"
+                        onClick={() => setShowCreateForm(false)}
+                      >
+                        Bekor qilish
+                      </button>
+                    )}
+                    <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
+                      {loading ? "Yaratilmoqda..." : "Kompaniyani yaratish"}
                     </button>
-                  )}
-                  <button type="submit" className="os-btn-primary" disabled={loading || logoUploading}>
-                    {loading ? "Yaratilmoqda..." : "Kompaniyani yaratish"}
-                  </button>
-                </div>
-              </form>
-            </section>
-          </div>
-        )}
+                  </div>
+                </form>
+              </section>
+            </div>,
+            document.body
+          )}
 
         {!createOpen && activeCompany && (
           <section className="os-panel">
