@@ -3960,6 +3960,152 @@ video {
   }
 }
 
+.tasks-status-mover {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.tasks-status-mover-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.tasks-status-mover-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tasks-status-mover-row button {
+  width: auto !important;
+  flex: 1 1 auto;
+  min-height: 40px;
+  padding: 8px 10px !important;
+  border-radius: 11px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.45);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tasks-status-mover-row button.active {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(56, 189, 248, 0.18);
+  color: #e0f2fe;
+}
+
+.tasks-mobile-board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tasks-mobile-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tasks-mobile-status button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100% !important;
+  min-height: 58px;
+  padding: 10px 12px !important;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.5);
+  color: #94a3b8;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tasks-mobile-status button strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+  line-height: 1.2;
+}
+
+.tasks-mobile-status button span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.tasks-mobile-status button.active {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.16);
+}
+
+.tasks-mobile-status button.active strong {
+  color: #f8fafc;
+}
+
+.tasks-mobile-status button.active span {
+  color: #7dd3fc;
+}
+
+.tasks-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tasks-page.is-mobile .tasks-card {
+  cursor: pointer;
+}
+
+.tasks-page.is-mobile .galaxy-page-heading.is-compact h1 {
+  margin-bottom: 0;
+}
+
+.tasks-mobile-sub {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 900px) {
+  .tasks-page.is-mobile .tasks-toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .tasks-page.is-mobile .tasks-view-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .tasks-page.is-mobile .tasks-cta {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px !important;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .tasks-drawer {
+    max-height: calc(100dvh - 24px);
+    border-radius: 18px 18px 0 0;
+  }
+
+  .tasks-drawer-backdrop {
+    align-items: flex-end;
+  }
+}
+
 /* ---------- Direct (private) chat ---------- */
 .dm-layout {
   display: flex;
@@ -12470,10 +12616,9 @@ body.is-native-app {
     min-width: 44px;
   }
 
-  /* Tasks */
+  /* Tasks — mobile list handled in .tasks-mobile-board */
   .tasks-board {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
   }
 }
 

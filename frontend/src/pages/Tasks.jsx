@@ -3,6 +3,7 @@ import { api, API_BASE, wsUrl } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
+import { useIsMobileShell } from "../native";
 
 const COLUMNS = [
   { key: "todo", label: "Bajarilmagan" },
@@ -44,22 +45,25 @@ function formatWhen(value) {
   });
 }
 
-function TasksHeading({ companyName }) {
+function TasksHeading({ companyName, compact }) {
   return (
-    <div className="galaxy-page-heading">
+    <div className={`galaxy-page-heading ${compact ? "is-compact" : ""}`}>
       <p className="galaxy-page-kicker">Task Orbit</p>
       <h1>Vazifalar</h1>
-      <p>{companyName ? `${companyName} — board, izoh va fayllar bitta oqimda.` : "Kompaniya vazifalari."}</p>
+      {!compact && (
+        <p>{companyName ? `${companyName} — board, izoh va fayllar bitta oqimda.` : "Kompaniya vazifalari."}</p>
+      )}
+      {compact && companyName && <p className="tasks-mobile-sub">{companyName}</p>}
     </div>
   );
 }
 
-function TaskCard({ task, isPM, onDragStart, onOpen, onReview }) {
+function TaskCard({ task, isPM, enableDrag, onDragStart, onOpen, onReview }) {
   return (
     <article
       className="tasks-card"
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id)}
+      draggable={!!enableDrag}
+      onDragStart={enableDrag ? (e) => onDragStart(e, task.id) : undefined}
       onClick={() => onOpen(task)}
     >
       <div className="tasks-card-top">
@@ -286,6 +290,7 @@ function TaskDetailDrawer({
   onEdit,
   onDelete,
   onReview,
+  onStatusChange,
 }) {
   const [comments, setComments] = useState([]);
   const [text, setText] = useState("");
@@ -335,6 +340,8 @@ function TaskDetailDrawer({
     }
   }
 
+  const canMoveStatus = COLUMNS.some((c) => c.key === task.status);
+
   return (
     <div className="tasks-drawer-backdrop" onClick={onClose}>
       <aside className="tasks-drawer" onClick={(e) => e.stopPropagation()}>
@@ -360,6 +367,26 @@ function TaskDetailDrawer({
         </div>
 
         {task.description && <p className="tasks-drawer-desc">{task.description}</p>}
+
+        {canMoveStatus && onStatusChange && (
+          <div className="tasks-status-mover" role="group" aria-label="Holat">
+            <span className="tasks-status-mover-label">Holat</span>
+            <div className="tasks-status-mover-row">
+              {COLUMNS.map((col) => (
+                <button
+                  key={col.key}
+                  type="button"
+                  className={task.status === col.key ? "active" : ""}
+                  onClick={() => {
+                    if (task.status !== col.key) onStatusChange(task.id, col.key);
+                  }}
+                >
+                  {col.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="tasks-drawer-actions">
           {isPM && task.status === "testing" && (
@@ -595,11 +622,13 @@ function RatingPanel({ companyId }) {
 export default function Tasks() {
   const { user } = useAuth();
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
   const [perms, setPerms] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [view, setView] = useState("board");
+  const [mobileStatus, setMobileStatus] = useState("todo");
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -694,6 +723,15 @@ export default function Tasks() {
     }
   }
 
+  async function handleStatusChange(taskId, status) {
+    try {
+      await api.updateTask(company.id, taskId, { status });
+      refreshTasks();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleReview(taskId, status) {
     try {
       await api.updateTask(company.id, taskId, { status });
@@ -745,8 +783,8 @@ export default function Tasks() {
 
   return (
     <AppShell>
-      <div className="tasks-page">
-        <TasksHeading companyName={company.name} />
+      <div className={`tasks-page ${isMobile ? "is-mobile" : ""}`}>
+        <TasksHeading companyName={company.name} compact={isMobile} />
 
         <div className="tasks-toolbar">
           <div className="tasks-view-tabs" role="tablist">
@@ -767,7 +805,7 @@ export default function Tasks() {
             <span className={`tasks-live ${live ? "on" : ""}`}>{live ? "Jonli" : "Ulanmoqda"}</span>
             {isPM && view === "board" && (
               <button type="button" className="tasks-cta" onClick={() => setShowModal(true)}>
-                Vazifa qo&apos;shish
+                {isMobile ? "+" : <>Vazifa qo&apos;shish</>}
               </button>
             )}
           </div>
@@ -775,7 +813,50 @@ export default function Tasks() {
 
         {error && <p className="error">{error}</p>}
 
-        {view === "board" && (
+        {view === "board" && isMobile && (
+          <div className="tasks-mobile-board">
+            <div className="tasks-mobile-status" role="tablist" aria-label="Holat">
+              {COLUMNS.map((col) => {
+                const count = tasks.filter((t) => t.status === col.key).length;
+                return (
+                  <button
+                    key={col.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={mobileStatus === col.key}
+                    className={mobileStatus === col.key ? "active" : ""}
+                    onClick={() => setMobileStatus(col.key)}
+                  >
+                    <strong>{col.label}</strong>
+                    <span>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tasks-mobile-list">
+              {loading && <p className="tasks-empty-inline">Yuklanmoqda...</p>}
+              {!loading &&
+                tasks
+                  .filter((t) => t.status === mobileStatus)
+                  .map((t) => (
+                    <TaskCard
+                      key={t.id}
+                      task={t}
+                      isPM={isPM}
+                      enableDrag={false}
+                      onDragStart={handleDragStart}
+                      onOpen={setSelectedTask}
+                      onReview={handleReview}
+                    />
+                  ))}
+              {!loading && tasks.filter((t) => t.status === mobileStatus).length === 0 && (
+                <p className="tasks-empty-inline">Bu holatda vazifa yo‘q</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === "board" && !isMobile && (
           <div className="tasks-board">
             {COLUMNS.map((col) => {
               const colTasks = tasks.filter((t) => t.status === col.key);
@@ -801,6 +882,7 @@ export default function Tasks() {
                       key={t.id}
                       task={t}
                       isPM={isPM}
+                      enableDrag
                       onDragStart={handleDragStart}
                       onOpen={setSelectedTask}
                       onReview={handleReview}
@@ -840,6 +922,7 @@ export default function Tasks() {
           }}
           onDelete={handleDelete}
           onReview={handleReview}
+          onStatusChange={handleStatusChange}
         />
       )}
     </AppShell>
