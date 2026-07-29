@@ -18,6 +18,7 @@ import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import WarehouseFinanceStats from "../components/WarehouseFinanceStats";
+import { useIsMobileShell } from "../native";
 
 function money(n) {
   return new Intl.NumberFormat("uz-UZ").format(Math.round(Number(n) || 0)) + " so'm";
@@ -592,6 +593,7 @@ function FinanceCharts({ data, period, setPeriod, chartType, setChartType }) {
 
 export default function Analytics() {
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
   const [data, setData] = useState(null);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState(null);
@@ -652,10 +654,10 @@ export default function Analytics() {
 
   if (companyLoading) {
     return (
-      <AppShell>
+      <AppShell hideAppBar={isMobile}>
         <div className="wh-page">
-          <div className="galaxy-page-heading">
-            <p className="galaxy-page-kicker">Stats Orbit</p>
+          <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+            <p className="galaxy-page-kicker">Statistika</p>
             <h1>Statistika</h1>
             <p>Yuklanmoqda...</p>
           </div>
@@ -666,10 +668,10 @@ export default function Analytics() {
 
   if (!company) {
     return (
-      <AppShell>
+      <AppShell hideAppBar={isMobile}>
         <div className="wh-page">
-          <div className="galaxy-page-heading">
-            <p className="galaxy-page-kicker">Stats Orbit</p>
+          <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+            <p className="galaxy-page-kicker">Statistika</p>
             <h1>Statistika</h1>
             <p>Avval kompaniya yarating yoki tanlang.</p>
           </div>
@@ -680,10 +682,10 @@ export default function Analytics() {
 
   if (denied) {
     return (
-      <AppShell>
+      <AppShell hideAppBar={isMobile}>
         <div className="wh-page">
-          <div className="galaxy-page-heading">
-            <p className="galaxy-page-kicker">Stats Orbit</p>
+          <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+            <p className="galaxy-page-kicker">Statistika</p>
             <h1>Statistika</h1>
             <p>Kompaniya statistikasini ko'rish uchun sizda ruxsat yo'q.</p>
           </div>
@@ -693,12 +695,16 @@ export default function Analytics() {
   }
 
   return (
-    <AppShell>
-      <div className="wh-page st-page">
-        <div className="galaxy-page-heading">
-          <p className="galaxy-page-kicker">Stats Orbit</p>
-          <h1>Statistika{company.name ? ` — ${company.name}` : ""}</h1>
-          <p>Jamoa, vazifalar, buxgalteriya va ombor kirim/chiqim — barchasi shu sahifada.</p>
+    <AppShell hideAppBar={isMobile}>
+      <div className={`wh-page st-page ${isMobile ? "is-mobile" : ""}`}>
+        <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+          <p className="galaxy-page-kicker">{isMobile ? "Statistika" : "Stats Orbit"}</p>
+          <h1>{isMobile ? "Statistika" : `Statistika${company.name ? ` — ${company.name}` : ""}`}</h1>
+          {isMobile ? (
+            <p className="st-mobile-sub">{company.name}</p>
+          ) : (
+            <p>Jamoa, vazifalar, buxgalteriya va ombor kirim/chiqim — barchasi shu sahifada.</p>
+          )}
         </div>
 
         <div className="wh-toolbar">

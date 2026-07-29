@@ -17,6 +17,7 @@ import {
 import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
+import { useIsMobileShell } from "../native";
 
 const TABS = [
   { key: "summary", label: "Umumiy" },
@@ -100,12 +101,13 @@ function StatsTooltip({ active, payload, label }) {
 
 export default function Accounting() {
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
   const [denied, setDenied] = useState(false);
   const [tab, setTab] = useState("summary");
 
   if (denied) {
     return (
-      <AppShell>
+      <AppShell hideAppBar={isMobile}>
         <div className="empty-card">
           <p>Sizda buxgalteriya bo'limiga kirish ruxsati yo'q.</p>
         </div>
@@ -115,8 +117,9 @@ export default function Accounting() {
 
   if (companyLoading) {
     return (
-      <AppShell>
-        <div className="page-header">
+      <AppShell hideAppBar={isMobile}>
+        <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+          <p className="galaxy-page-kicker">Buxgalteriya</p>
           <h1>Buxgalteriya</h1>
           <p>Yuklanmoqda...</p>
         </div>
@@ -126,8 +129,9 @@ export default function Accounting() {
 
   if (!company) {
     return (
-      <AppShell>
-        <div className="page-header">
+      <AppShell hideAppBar={isMobile}>
+        <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+          <p className="galaxy-page-kicker">Buxgalteriya</p>
           <h1>Buxgalteriya</h1>
           <p>Avval kompaniya yarating yoki tanlang.</p>
         </div>
@@ -136,28 +140,34 @@ export default function Accounting() {
   }
 
   return (
-    <AppShell>
-      <div className="page-header">
-        <h1>Buxgalteriya — {company.name}</h1>
-        <p>Kirim/chiqim, hisob-fakturalar va ish haqi.</p>
-      </div>
+    <AppShell hideAppBar={isMobile}>
+      <div className={`acc-page ${isMobile ? "is-mobile" : ""}`}>
+        <div className={`galaxy-page-heading ${isMobile ? "is-compact" : ""}`}>
+          <p className="galaxy-page-kicker">Buxgalteriya</p>
+          <h1>{isMobile ? "Buxgalteriya" : `Buxgalteriya — ${company.name}`}</h1>
+          {isMobile ? <p className="acc-mobile-sub">{company.name}</p> : <p>Kirim/chiqim, hisob-fakturalar va ish haqi.</p>}
+        </div>
 
-      <div className="acc-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`acc-tab ${tab === t.key ? "active" : ""}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        <div className="acc-tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`acc-tab ${tab === t.key ? "active" : ""}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      {tab === "summary" && <SummaryTab companyId={company.id} onDenied={() => setDenied(true)} />}
-      {tab === "transactions" && <TransactionsTab companyId={company.id} onDenied={() => setDenied(true)} />}
-      {tab === "invoices" && <InvoicesTab companyId={company.id} onDenied={() => setDenied(true)} />}
-      {tab === "payroll" && <PayrollTab companyId={company.id} onDenied={() => setDenied(true)} />}
+        {tab === "summary" && <SummaryTab companyId={company.id} onDenied={() => setDenied(true)} />}
+        {tab === "transactions" && <TransactionsTab companyId={company.id} onDenied={() => setDenied(true)} />}
+        {tab === "invoices" && <InvoicesTab companyId={company.id} onDenied={() => setDenied(true)} />}
+        {tab === "payroll" && <PayrollTab companyId={company.id} onDenied={() => setDenied(true)} />}
+      </div>
     </AppShell>
   );
 }
