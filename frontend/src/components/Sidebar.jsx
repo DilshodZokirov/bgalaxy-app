@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { icon: "ziyo", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
 
-export default function Sidebar({ onOpenSettings, variant = "default" }) {
+export default function Sidebar({ onOpenSettings, variant = "default", mobileOpen = false, onMobileClose }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isGalaxy = variant === "galaxy";
@@ -65,16 +65,37 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
     finalNavItems = [...finalNavItems, { icon: "🛠️", label: "Developer", hint: "Panel", to: "/developer" }];
   }
 
+  // Mobil drawer ochiq bo‘lsa har doim to‘liq label ko‘rsatamiz
+  const showLabels = !collapsed || mobileOpen;
+
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""} ${isGalaxy ? "sidebar-galaxy" : ""}`}>
+    <aside
+      className={`sidebar ${collapsed ? "collapsed" : ""} ${isGalaxy ? "sidebar-galaxy" : ""} ${
+        mobileOpen ? "mobile-open" : ""
+      }`}
+    >
       <div className="sidebar-brand-row">
-        <Logo compact={collapsed} variant={isGalaxy ? "galaxy" : "default"} />
-        <button className="sidebar-collapse-btn" onClick={toggleCollapsed} title={collapsed ? "Kengaytirish" : "Siqish"}>
+        <Logo compact={!showLabels} variant={isGalaxy ? "galaxy" : "default"} />
+        <button
+          type="button"
+          className="sidebar-collapse-btn desktop-only"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Kengaytirish" : "Siqish"}
+        >
           {collapsed ? "»" : "«"}
+        </button>
+        <button
+          type="button"
+          className="sidebar-collapse-btn mobile-only"
+          onClick={() => onMobileClose?.()}
+          title="Yopish"
+          aria-label="Menyuni yopish"
+        >
+          ✕
         </button>
       </div>
 
-      {!collapsed && companies.length > 0 && (
+      {showLabels && companies.length > 0 && (
         <select
           className="sidebar-company-select"
           value={activeId || ""}
@@ -96,7 +117,8 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
               key={item.to}
               to={item.to}
               className={`sidebar-link ${active ? "active" : ""}`}
-              title={collapsed ? item.label : undefined}
+              title={!showLabels ? item.label : undefined}
+              onClick={() => onMobileClose?.()}
             >
               <span className="sidebar-link-icon">
                 {item.icon === "ziyo" ? (
@@ -105,7 +127,7 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
                   item.icon
                 )}
               </span>
-              {!collapsed && (
+              {showLabels && (
                 <span className="sidebar-link-copy">
                   <span className="sidebar-link-label">{item.label}</span>
                   {isGalaxy && item.hint && <span className="sidebar-link-hint">{item.hint}</span>}
@@ -117,20 +139,26 @@ export default function Sidebar({ onOpenSettings, variant = "default" }) {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-user" onClick={() => onOpenSettings?.()}>
+        <div
+          className="sidebar-user"
+          onClick={() => {
+            onMobileClose?.();
+            onOpenSettings?.();
+          }}
+        >
           {user?.avatar_url ? (
             <img src={user.avatar_url} alt="Avatar" className="sidebar-avatar-img" />
           ) : (
             <div className="avatar-circle">{initials}</div>
           )}
-          {!collapsed && (
+          {showLabels && (
             <div>
               <div className="name">{user?.full_name || "Foydalanuvchi"}</div>
               <div className="role">{user?.is_developer ? "Admin" : "A'zo"} · Sozlamalar</div>
             </div>
           )}
         </div>
-        {!collapsed && (
+        {showLabels && (
           <button className="secondary sidebar-logout" onClick={logout}>
             Chiqish
           </button>
