@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import NotificationBell from "./NotificationBell";
 import RafiqFloatingButton from "./RafiqFloatingButton";
 
-export default function GalaxyAppBar({ left = null }) {
+export default function GalaxyAppBar({ left = null, onMenuClick }) {
   const { user, refreshUser, lockScreen } = useAuth();
   const theme = user?.theme || "dark";
   const skyMode = theme === "light" ? "day" : "night";
@@ -21,6 +21,17 @@ export default function GalaxyAppBar({ left = null }) {
   return (
     <header className="galaxy-top galaxy-app-bar">
       <div className="galaxy-top-left">
+        {onMenuClick && (
+          <button
+            type="button"
+            className="galaxy-icon-btn mobile-menu-btn"
+            aria-label="Menyu"
+            title="Menyu"
+            onClick={onMenuClick}
+          >
+            ☰
+          </button>
+        )}
         {left || (
           <div className="galaxy-app-bar-fallback">
             <strong>BG</strong>

@@ -11,6 +11,9 @@ export function isNativeApp() {
 export async function initNativeShell() {
   if (!isNativeApp()) return;
 
+  document.documentElement.classList.add("is-native-app");
+  document.body.classList.add("is-native-app");
+
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
     await StatusBar.setStyle({ style: Style.Dark });
