@@ -170,8 +170,9 @@ const tileFloorMap = typeof document !== "undefined" ? createTileFloorTexture() 
 function Player({ camDistance, onMove, paused }) {
   const groupRef = useRef();
   const keys = useRef({});
+  const stick = useRef({ x: 0, z: 0 });
   const lastSentRef = useRef(0);
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
 
   useEffect(() => {
     const down = (e) => {
@@ -187,6 +188,53 @@ function Player({ camDistance, onMove, paused }) {
       window.removeEventListener("keyup", up);
     };
   }, []);
+
+  // Mobil: chap tomonda barmoq bilan yurish (virtual stick)
+  useEffect(() => {
+    const el = gl?.domElement;
+    if (!el) return undefined;
+    let activeId = null;
+    let origin = null;
+
+    const onStart = (e) => {
+      if (paused) return;
+      const t = e.changedTouches[0];
+      if (!t || t.clientX > window.innerWidth * 0.58) return;
+      activeId = t.identifier;
+      origin = { x: t.clientX, y: t.clientY };
+      e.preventDefault();
+    };
+    const onMoveTouch = (e) => {
+      if (activeId == null || !origin) return;
+      const t = [...e.changedTouches].find((c) => c.identifier === activeId);
+      if (!t) return;
+      const dx = t.clientX - origin.x;
+      const dy = t.clientY - origin.y;
+      const max = 56;
+      stick.current = {
+        x: Math.max(-1, Math.min(1, dx / max)),
+        z: Math.max(-1, Math.min(1, -dy / max)),
+      };
+      e.preventDefault();
+    };
+    const onEnd = (e) => {
+      if (![...e.changedTouches].some((c) => c.identifier === activeId)) return;
+      activeId = null;
+      origin = null;
+      stick.current = { x: 0, z: 0 };
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMoveTouch, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMoveTouch);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [gl, paused]);
 
   useEffect(() => {
     camera.fov = 42 + camDistance * 2.8;
@@ -210,6 +258,11 @@ function Player({ camDistance, onMove, paused }) {
     if (keys.current["ArrowRight"]) move.add(right);
     if (keys.current["KeyD"]) move.sub(right);
     if (keys.current["ArrowLeft"]) move.sub(right);
+
+    if (stick.current.x || stick.current.z) {
+      move.addScaledVector(forward, stick.current.z);
+      move.addScaledVector(right, -stick.current.x);
+    }
 
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(MOVE_SPEED * delta);

@@ -1598,6 +1598,7 @@ video {
   display: flex;
   margin-bottom: 8px;
   position: relative;
+  width: 100%;
 }
 
 .message-row.mine {
@@ -1610,6 +1611,10 @@ video {
 
 .message-bubble {
   position: relative;
+  max-width: min(78%, 520px);
+  min-width: 0;
+  flex: 0 1 auto;
+  width: fit-content;
 }
 
 .message-row.mine .message-bubble {
@@ -1662,17 +1667,34 @@ video {
   border-left-color: rgba(255, 255, 255, 0.8);
 }
 
+/* Actions layoutdan joy olmasin — aks holda bubble siqilib harflar ikki-ikkidan siniqadi */
 .message-actions {
+  position: absolute;
+  top: 2px;
+  z-index: 3;
   display: flex;
   gap: 4px;
   align-items: center;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.12s ease;
   font-size: 12px;
+  white-space: nowrap;
 }
 
-.message-row:hover .message-actions {
+.message-row.theirs .message-actions {
+  left: calc(100% + 6px);
+}
+
+.message-row.mine .message-actions {
+  right: calc(100% + 6px);
+  order: unset;
+}
+
+.message-row:hover .message-actions,
+.message-row:focus-within .message-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .message-actions button {
@@ -1682,10 +1704,6 @@ video {
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text-dim);
-}
-
-.message-row.mine .message-actions {
-  order: -1;
 }
 
 .reply-preview-bar {
@@ -2451,19 +2469,26 @@ video {
 
 .office-3d-hint {
   position: absolute;
-  bottom: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   max-width: min(92%, 720px);
   text-align: center;
   background: rgba(10, 14, 23, 0.78);
   border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 999px;
+  border-radius: 16px;
   padding: 8px 18px;
   font-size: 12.5px;
   color: #cbd5e1;
   backdrop-filter: blur(10px);
   z-index: 5;
+  line-height: 1.35;
+}
+
+.office-3d-hint.is-mobile {
+  border-radius: 14px;
+  max-width: min(94%, 420px);
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---------- 3D office controls overlay (fullscreen + zoom) ---------- */
@@ -3983,7 +4008,8 @@ video {
 .chat-bubble-text {
   margin: 0;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
   line-height: 1.4;
 }
 
@@ -9603,12 +9629,16 @@ html[data-custom-bg="1"] .galaxy-sky {
   background: #030712;
   display: flex;
   flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .office-immersive-top {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 10px;
   right: 70px;
   z-index: 30;
   display: flex;
@@ -9622,6 +9652,7 @@ html[data-custom-bg="1"] .galaxy-sky {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-width: min(70vw, 280px);
   padding: 8px 12px;
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.55);
@@ -9633,11 +9664,15 @@ html[data-custom-bg="1"] .galaxy-sky {
   font-family: "Syne", "Poppins", sans-serif;
   color: #f8fafc;
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .office-immersive-top span {
   font-size: 0.75rem;
   color: #94a3b8;
+  white-space: nowrap;
 }
 
 .office-immersive-top .office-voice-pill {
@@ -13465,4 +13500,97 @@ body.is-native-app {
     background: rgba(255, 255, 255, 0.82);
     border-color: rgba(15, 23, 42, 0.1);
   }
+}
+
+/* ========== Mobile bugfixes: chat wrap, empty scroll, office ========== */
+@media (max-width: 900px) {
+  .message-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .message-row.mine {
+    align-items: flex-end;
+  }
+
+  .message-bubble {
+    max-width: min(88%, 420px);
+    width: fit-content;
+  }
+
+  .message-actions {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+    order: 2;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: min(88%, 420px);
+  }
+
+  .message-bubble {
+    order: 1;
+  }
+
+  /* Bo‘sh scroll: majburiy balandliklarni olib tashlash */
+  .chat-workspace {
+    min-height: 0 !important;
+  }
+
+  .chat-workspace-body {
+    min-height: 0 !important;
+  }
+
+  .chat-main-pane .chat-page {
+    min-height: 0 !important;
+  }
+
+  .chat-page .messages,
+  .chat-messages {
+    height: auto;
+    max-height: min(46vh, 380px);
+    min-height: 140px;
+  }
+
+  .app-shell.has-mobile-tabs .main-content {
+    padding-bottom: 0;
+  }
+
+  .app-shell.has-mobile-tabs .galaxy-chrome-body {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .galaxy-chrome,
+  .galaxy-main {
+    min-height: 0;
+  }
+
+  .dashboard-galaxy {
+    min-height: 0;
+  }
+
+  .mhome {
+    padding-bottom: 0;
+  }
+
+  .office-page {
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .office-3d-wrap-galaxy:not(.is-immersive) {
+    height: min(52vh, 420px);
+  }
+
+  .office-status-hint {
+    font-size: 0.8rem;
+  }
+}
+
+html.is-office-immersive,
+html.is-office-immersive body {
+  overflow: hidden !important;
+  height: 100%;
+  overscroll-behavior: none;
 }

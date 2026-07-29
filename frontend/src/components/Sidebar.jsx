@@ -8,9 +8,9 @@ import RafiqAvatar from "./RafiqAvatar";
 const NAV_ITEMS = [
   { icon: "🌌", label: "Galaxy Home", hint: "Bosh sahifa", to: "/dashboard" },
   { icon: "🏢", label: "Korxona", hint: "Kompaniyalar", to: "/companies" },
-  { icon: "🏙️", label: "Virtual Office", hint: "3D Metaverse", to: "/office" },
-  { icon: "🎥", label: "Online Meeting", hint: "Meet & Connect", to: "/meetings" },
-  { icon: "💬", label: "Chat", hint: "Messages", to: "/chat" },
+  { icon: "🏙️", label: "Ofislar", hint: "Virtual ofis", to: "/office" },
+  { icon: "🎥", label: "Uchrashuvlar", hint: "Meet & Connect", to: "/meetings" },
+  { icon: "💬", label: "Xabarlar", hint: "Messages", to: "/chat" },
   { icon: "🗂️", label: "Vazifalar", hint: "Jira-style board", to: "/tasks" },
   { icon: "ziyo", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
