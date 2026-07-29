@@ -206,8 +206,8 @@ export function useActiveCompany() {
     companies,
     loading,
     error,
-    refresh: async ({ force = false } = {}) => {
-      const data = await refresh({ force });
+    refresh: async ({ force = false, activeCompanyId = null } = {}) => {
+      const data = await refresh({ force, activeCompanyId });
       return data?.companies || [];
     },
   };

@@ -3,11 +3,14 @@ two things neither group_meeting.py nor partner_meeting.py could do before:
 seeing who's ACTUALLY connected to a room right now (for the "active
 meetings" list), and a host forcibly muting someone's mic/camera (which
 only the LiveKit server, not another participant's browser, is allowed to
-do). Every function here is best-effort: on any error (LiveKit not
-configured, room doesn't exist, SDK hiccup) it degrades to an empty/false
-result instead of raising, since none of this should ever break the actual
-meeting itself.
+do).
+
+list_room_participants returns:
+  - list[dict]  — room exists (possibly empty)
+  - None        — LiveKit error / not configured (DO NOT treat as "ended")
 """
+from __future__ import annotations
+
 import logging
 
 from app.core.config import settings
@@ -19,12 +22,29 @@ def _configured() -> bool:
     return bool(settings.livekit_api_key and settings.livekit_api_secret and settings.livekit_url)
 
 
-async def list_room_participants(room_name: str) -> list[dict]:
+def _is_missing_room_error(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(
+        tip in text
+        for tip in (
+            "not_found",
+            "not found",
+            "does not exist",
+            "room does not exist",
+            "no room",
+        )
+    )
+
+
+async def list_room_participants(room_name: str) -> list[dict] | None:
     """Returns [{identity, name, tracks: [{sid, kind, muted}]}] for whoever
-    is currently connected to this LiveKit room. Empty list if the room is
-    empty, doesn't exist, or LiveKit isn't configured."""
+    is currently connected to this LiveKit room.
+
+    Empty list  → room missing or empty (safe to finalize invites).
+    None        → API/config failure (do NOT finalize — call may still be live).
+    """
     if not _configured():
-        return []
+        return None
     from livekit import api as livekit_api
 
     lkapi = livekit_api.LiveKitAPI(settings.livekit_url, settings.livekit_api_key, settings.livekit_api_secret)
@@ -38,9 +58,11 @@ async def list_room_participants(room_name: str) -> list[dict]:
             ]
             out.append({"identity": p.identity, "name": p.name or p.identity, "tracks": tracks})
         return out
-    except Exception:
-        logger.info("Could not list participants for room %s (likely empty/nonexistent)", room_name)
-        return []
+    except Exception as exc:
+        if _is_missing_room_error(exc):
+            return []
+        logger.warning("Could not list participants for room %s: %s", room_name, exc)
+        return None
     finally:
         await lkapi.aclose()
 
@@ -54,6 +76,8 @@ async def mute_participant_track(room_name: str, identity: str, kind: str, muted
     from livekit import api as livekit_api
 
     participants = await list_room_participants(room_name)
+    if not participants:
+        return False
     target = next((p for p in participants if p["identity"] == identity), None)
     if not target:
         return False
