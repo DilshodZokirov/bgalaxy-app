@@ -6037,19 +6037,43 @@ html[data-custom-bg="1"] .galaxy-sky {
 
 .chat-room-bar-copy {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chat-room-bar-titles {
+  display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.chat-room-bar-copy strong {
+.chat-room-bar-copy strong,
+.chat-room-bar-titles strong {
   font-size: 14px;
   color: #f8fafc;
 }
 
-.chat-room-bar-copy span {
+.chat-room-bar-copy span,
+.chat-room-bar-titles span {
   font-size: 12px;
   color: #94a3b8;
+}
+
+.chat-back-btn {
+  flex-shrink: 0;
+  width: 40px !important;
+  height: 40px;
+  padding: 0 !important;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .chat-room-bar-actions {
@@ -12430,9 +12454,9 @@ body.is-native-app {
     border-radius: 14px;
   }
 
-  /* Chat */
+  /* Chat — default stack (desktop-shrunk); master–detail overrides below */
   .chat-workspace-body {
-    min-height: calc(100dvh - 160px);
+    min-height: 0;
   }
 
   .chat-composer input,
@@ -13551,6 +13575,100 @@ body.is-native-app {
     height: auto;
     max-height: min(46vh, 380px);
     min-height: 140px;
+  }
+
+  /* Master–detail: list YOKI thread */
+  .chat-workspace.mobile-chat {
+    gap: 10px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 118px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 118px - env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+  }
+
+  .app-shell.has-mobile-tabs .chat-workspace.mobile-chat {
+    height: calc(100dvh - 128px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 128px - env(safe-area-inset-bottom, 0px));
+  }
+
+  .chat-workspace.mobile-chat .chat-workspace-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chat-workspace.mobile-chat.show-list .chat-main-pane,
+  .chat-workspace.mobile-chat.show-list .chat-live-dock {
+    display: none !important;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-side-list,
+  .chat-workspace.mobile-chat.show-thread .chat-live-dock,
+  .chat-workspace.mobile-chat.show-thread .chat-workspace-head {
+    display: none !important;
+  }
+
+  .chat-workspace.mobile-chat.show-list .chat-side-list {
+    width: 100%;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .chat-workspace.mobile-chat.show-list .chat-side-section {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-workspace-body {
+    flex-direction: column;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-main-pane {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-room-bar {
+    flex-shrink: 0;
+    margin-bottom: 8px;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-page.chat-stage {
+    flex: 1;
+    min-height: 0 !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-page .messages,
+  .chat-workspace.mobile-chat.show-thread .chat-messages {
+    flex: 1 1 auto;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    margin-bottom: 8px;
+  }
+
+  .chat-workspace.mobile-chat.show-thread .chat-composer-wrap {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding-bottom: 2px;
+    background: linear-gradient(180deg, transparent, rgba(11, 18, 32, 0.92) 28%);
+  }
+
+  .chat-workspace.mobile-chat .chat-side-item {
+    min-height: 52px;
+    padding: 10px 12px;
   }
 
   .app-shell.has-mobile-tabs .main-content {

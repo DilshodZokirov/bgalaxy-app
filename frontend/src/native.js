@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 
 /**
@@ -6,6 +7,24 @@ import { Capacitor } from "@capacitor/core";
  */
 export function isNativeApp() {
   return Capacitor.isNativePlatform();
+}
+
+/** Telefon / Capacitor — pastki tablar va master–detail UI uchun */
+export function useIsMobileShell(maxWidth = 900) {
+  const [mobile, setMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return isNativeApp() || window.matchMedia(`(max-width: ${maxWidth}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const sync = () => setMobile(isNativeApp() || mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [maxWidth]);
+
+  return mobile;
 }
 
 export async function initNativeShell() {
