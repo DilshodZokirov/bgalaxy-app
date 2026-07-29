@@ -81,7 +81,7 @@ export function MobileProfileSheet({ open, onClose, onOpenSettings }) {
   ];
   if (nav?.warehouse) links.push({ to: "/warehouse", label: "Ombor", icon: "📦" });
   if (nav?.accounting) links.push({ to: "/accounting", label: "Buxgalteriya", icon: "🧾" });
-  if (nav?.analytics) links.push({ to: "/statistika", label: "Analytics", icon: "📈" });
+  if (nav?.analytics) links.push({ to: "/statistika", label: "Statistika", icon: "📈" });
   if (user?.is_developer) links.push({ to: "/developer", label: "Developer", icon: "🛠️" });
 
   return (

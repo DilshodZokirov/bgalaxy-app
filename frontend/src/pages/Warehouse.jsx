@@ -15,6 +15,7 @@ import {
 import { api } from "../api/client";
 import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
+import { useIsMobileShell } from "../native";
 import Wh3DBarChart from "../components/Wh3DBarChart";
 import WarehouseFinanceStats from "../components/WarehouseFinanceStats";
 import { MarketplaceTab } from "./Marketplace";
@@ -100,27 +101,36 @@ function stockTone(p, isLow) {
   return "ok";
 }
 
-function WarehouseHeading({ companyName, subtitle }) {
+function WarehouseHeading({ companyName, subtitle, compact }) {
   return (
-    <div className="galaxy-page-heading">
-      <p className="galaxy-page-kicker">Warehouse Hub</p>
-      <h1>Ombor{companyName ? ` — ${companyName}` : ""}</h1>
-      <p>{subtitle || "Mahsulotlar, zaxira va bozor — bitta stansiyada."}</p>
+    <div className={`galaxy-page-heading ${compact ? "is-compact" : ""}`}>
+      <p className="galaxy-page-kicker">{compact ? "Ombor" : "Warehouse Hub"}</p>
+      <h1>{compact ? "Ombor" : `Ombor${companyName ? ` — ${companyName}` : ""}`}</h1>
+      {compact && companyName ? <p className="wh-mobile-sub">{companyName}</p> : null}
+      {!compact && <p>{subtitle || "Mahsulotlar, zaxira va bozor — bitta stansiyada."}</p>}
+      {compact && subtitle ? <p className="wh-mobile-sub muted">{subtitle}</p> : null}
     </div>
   );
 }
 
 function ChartBlock({ title, period, setPeriod, chartType, setChartType, children, hint }) {
+  const isMobile = useIsMobileShell();
+  const types = isMobile
+    ? [
+        ["line", "Chiziq"],
+        ["bar", "Ustun"],
+      ]
+    : [
+        ["line", "Chiziq"],
+        ["bar", "Ustun"],
+        ["3d", "3D"],
+      ];
   return (
     <section className="wh-panel">
       <div className="wh-panel-head">
         <h3>{title}</h3>
         <div className="wh-seg">
-          {[
-            ["line", "Chiziq"],
-            ["bar", "Ustun"],
-            ["3d", "3D"],
-          ].map(([t, label]) => (
+          {types.map(([t, label]) => (
             <button key={t} type="button" className={chartType === t ? "active" : ""} onClick={() => setChartType(t)}>
               {label}
             </button>
@@ -1218,6 +1228,7 @@ export default function Warehouse() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
   const [warehouses, setWarehouses] = useState([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(null); // null = all (multi only)
   const [products, setProducts] = useState([]);
@@ -1413,9 +1424,9 @@ export default function Warehouse() {
           : `Ishlab chiqarish turi: ${TYPE_LABELS[activeWarehouseType] || activeWarehouseType || "—"}`;
 
   return (
-    <AppShell>
-      <div className="wh-page">
-        <WarehouseHeading companyName={company.name} subtitle={subtitle} />
+    <AppShell hideAppBar={isMobile}>
+      <div className={`wh-page ${isMobile ? "is-mobile" : ""}`}>
+        <WarehouseHeading companyName={company.name} subtitle={subtitle} compact={isMobile} />
 
         <div className="wh-toolbar">
           <div className="wh-tabs" role="tablist">
@@ -1432,7 +1443,7 @@ export default function Warehouse() {
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="wh-toolbar-right">
             {multi && (
               <select
                 className="wh-warehouse-select"
@@ -1448,9 +1459,11 @@ export default function Warehouse() {
                 ))}
               </select>
             )}
-            <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/dashboard")}>
-              Korxonaga qaytish
-            </button>
+            {!isMobile && (
+              <button type="button" className="secondary wh-soft-btn" onClick={() => navigate("/dashboard")}>
+                Korxonaga qaytish
+              </button>
+            )}
           </div>
         </div>
 
