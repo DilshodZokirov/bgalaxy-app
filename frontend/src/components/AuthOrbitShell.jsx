@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { isNativeApp } from "../native";
 
 /**
  * Auth gate — mockupdagi markazlashgan Login/Register qobig‘i.
@@ -12,6 +13,8 @@ export default function AuthOrbitShell({
   art = "portal",
   kicker: _kicker,
 }) {
+  const brandTo = isNativeApp() ? "/login" : "/";
+
   return (
     <div className={`auth-gate art-${art}`}>
       <div className="auth-gate-sky" aria-hidden>
@@ -21,7 +24,7 @@ export default function AuthOrbitShell({
       </div>
 
       <div className="auth-gate-inner">
-        <Link to="/" className="auth-gate-brand">
+        <Link to={brandTo} className="auth-gate-brand">
           <span className="auth-gate-mark" aria-hidden>
             <span className="auth-gate-orbit o1" />
             <span className="auth-gate-orbit o2" />

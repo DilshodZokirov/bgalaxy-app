@@ -107,6 +107,8 @@ npm run android
 **Bor (web bilan bir xil):**
 - Login, korxona, ombor, buyurtmalar, chat, vazifalar, statistika…
 
+**Farq:** Android’da **Landing page yo‘q** — ochilganda to‘g‘ridan-to‘g‘ri Login (yoki sessiya bo‘lsa Dashboard).
+
 **Hali keyinga (alohida ish):**
 - Push notification (Firebase)
 - Play Store’ga chiqarish (imzo, AAB, privacy policy)
