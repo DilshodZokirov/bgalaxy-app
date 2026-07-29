@@ -220,7 +220,11 @@ export default function Dashboard() {
   const chatSeries = [5, 9, 7, 14, 18, 16, Math.max(conversationCount, 3)];
 
   function joinMeeting(m) {
-    navigate(`/group-meeting?scheduled=${encodeURIComponent(m.id)}`);
+    const q = new URLSearchParams();
+    if (m.company_id) q.set("company", m.company_id);
+    q.set("scheduled", m.id);
+    q.set("join", "1");
+    navigate(`/group-meeting?${q.toString()}`);
   }
 
   return (

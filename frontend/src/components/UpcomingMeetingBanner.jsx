@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
-import { setActiveCompanyId } from "../hooks/useCompany";
 import CountdownBadge from "./CountdownBadge";
 import { formatMeetingWhen, pickNextMeeting } from "./scheduledMeetingUtils";
 
@@ -50,8 +49,11 @@ export default function UpcomingMeetingBanner() {
   const isCreator = user?.id === next.created_by;
 
   function join() {
-    if (next.company_id) setActiveCompanyId(next.company_id);
-    navigate(`/group-meeting?scheduled=${encodeURIComponent(next.id)}`);
+    const q = new URLSearchParams();
+    if (next.company_id) q.set("company", next.company_id);
+    q.set("scheduled", next.id);
+    q.set("join", "1");
+    navigate(`/group-meeting?${q.toString()}`);
   }
 
   function openEdit() {

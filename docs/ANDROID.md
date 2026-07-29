@@ -107,6 +107,8 @@ npm run android
 **Bor (web bilan bir xil):**
 - Login, korxona, ombor, buyurtmalar, chat, vazifalar, statistika…
 
+**Uchrashuv (video/ovoz):** Android Manifest’da `CAMERA` + `RECORD_AUDIO` kerak. Birinchi ulanishda telefon ruxsat so‘raydi — rad etilsa Sozlamalardan bering.
+
 **Hali keyinga (alohida ish):**
 - Push notification (Firebase)
 - Play Store’ga chiqarish (imzo, AAB, privacy policy)

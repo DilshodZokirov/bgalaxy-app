@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { useActiveCompany, setActiveCompanyId } from "../hooks/useCompany";
+import { useActiveCompany } from "../hooks/useCompany";
 import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import CountdownBadge from "../components/CountdownBadge";
@@ -185,8 +185,11 @@ export default function MeetingsHub() {
   }
 
   function joinScheduled(meeting) {
-    if (meeting.company_id) setActiveCompanyId(meeting.company_id);
-    navigate(`/group-meeting?scheduled=${encodeURIComponent(meeting.id)}`);
+    const q = new URLSearchParams();
+    if (meeting.company_id) q.set("company", meeting.company_id);
+    q.set("scheduled", meeting.id);
+    q.set("join", "1");
+    navigate(`/group-meeting?${q.toString()}`);
   }
 
   const upcoming = useMemo(

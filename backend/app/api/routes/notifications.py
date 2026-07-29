@@ -81,7 +81,10 @@ async def list_notifications(
     still_live: list[Notification] = []
     for company_id in company_ids:
         participants = await livekit_admin.list_room_participants(f"company-{company_id}")
-        if participants:
+        if participants is None:
+            # LiveKit noaniq — taklifni "yakunlandi"ga aylantirmaymiz
+            still_live.extend(n for n in pending_started if str(n.company_id) == company_id)
+        elif participants:
             still_live.extend(n for n in pending_started if str(n.company_id) == company_id)
         else:
             # Late cleanup — do not treat "online now" as "was online during call".

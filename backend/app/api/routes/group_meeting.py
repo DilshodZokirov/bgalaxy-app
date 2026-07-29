@@ -111,6 +111,14 @@ async def get_active_group_call(
     await require_permission(db, company_id, current_user.id, "start_meeting")
     room_name = f"company-{company_id}"
     participants = await livekit_admin.list_room_participants(room_name)
+    # None = LiveKit xatosi — jonli chaqiriqni "tugadi" deb yopmaymiz
+    if participants is None:
+        return {
+            "active": True,
+            "uncertain": True,
+            "room_name": room_name,
+            "participants": [],
+        }
     if not participants:
         await finalize_group_call_notifications(db, company_id, trust_live_presence=True)
         await complete_scheduled_meetings_for_company(db, company_id)
@@ -134,9 +142,12 @@ async def leave_group_call(
     await require_permission(db, company_id, current_user.id, "start_meeting")
     room_name = f"company-{company_id}"
     participants = await livekit_admin.list_room_participants(room_name)
-    others = [p for p in participants if p["identity"] != str(current_user.id)]
     finalized = 0
     completed = 0
+    # LiveKit javob bermasa — taklifnomalarni o‘chirmaymiz
+    if participants is None:
+        return {"active": True, "uncertain": True, "finalized": 0, "completed_scheduled": 0}
+    others = [p for p in participants if p["identity"] != str(current_user.id)]
     if not others:
         finalized = await finalize_group_call_notifications(db, company_id, trust_live_presence=True)
         completed = await complete_scheduled_meetings_for_company(

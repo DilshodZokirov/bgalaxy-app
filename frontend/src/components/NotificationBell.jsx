@@ -117,9 +117,11 @@ export default function NotificationBell({ variant = "fixed" }) {
       // ignore
     }
     setOpen(false);
-    if (n.company_id) setActiveCompanyId(n.company_id);
-    const q = n.invite_token ? `?scheduled=${encodeURIComponent(n.invite_token)}` : "";
-    navigate(`/group-meeting${q}`);
+    const q = new URLSearchParams();
+    if (n.company_id) q.set("company", n.company_id);
+    if (n.invite_token) q.set("scheduled", n.invite_token);
+    q.set("join", "1");
+    navigate(`/group-meeting?${q.toString()}`);
   }
 
   async function handleOpenMeetingsHub(n) {
@@ -135,15 +137,18 @@ export default function NotificationBell({ variant = "fixed" }) {
   }
 
   async function handleJoinGroupCall(n) {
+    // Taklifni o‘chirmaymiz — muvaffaqiyatsiz kirishdan keyin qayta urinish mumkin
     try {
-      await api.dismissNotification(n.id);
-      removeLocally(n.id);
+      await api.markNotificationRead(n.id);
+      markLocally(n.id, { read: true });
     } catch {
       // ignore
     }
     setOpen(false);
-    if (n.company_id) setActiveCompanyId(n.company_id);
-    navigate("/group-meeting");
+    const q = new URLSearchParams();
+    if (n.company_id) q.set("company", n.company_id);
+    q.set("join", "1");
+    navigate(`/group-meeting?${q.toString()}`);
   }
 
   async function handleOpenWarehouseOrder(n, tabHint) {

@@ -27,6 +27,35 @@ export function useIsMobileShell(maxWidth = 900) {
   return mobile;
 }
 
+/**
+ * LiveKit / WebRTC oldidan kamera+mikrofon ruxsatini so‘raydi.
+ * Android: Manifest’da CAMERA/RECORD_AUDIO bo‘lishi shart.
+ */
+export async function ensureMeetingMediaAccess() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Bu qurilmada kamera/mikrofon qo‘llab-quvvatlanmaydi");
+  }
+
+  async function tryGet(constraints) {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    stream.getTracks().forEach((t) => t.stop());
+  }
+
+  try {
+    await tryGet({ audio: true, video: true });
+    return { audio: true, video: true };
+  } catch {
+    try {
+      await tryGet({ audio: true, video: false });
+      return { audio: true, video: false };
+    } catch {
+      throw new Error(
+        "Kamera yoki mikrofonga ruxsat berilmadi. Telefon sozlamalaridan Business Galaxy uchun ruxsat bering."
+      );
+    }
+  }
+}
+
 export async function initNativeShell() {
   if (!isNativeApp()) return;
 

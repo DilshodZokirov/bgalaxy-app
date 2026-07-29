@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import AppShell from "../components/AppShell";
 import MeetingRoom from "../components/MeetingRoom";
 import UserSearchInput from "../components/UserSearchInput";
+import { ensureMeetingMediaAccess } from "../native";
 
 function PartnerHeading({ title = "Hamkorlar uchrashuvi" }) {
   return (
@@ -29,12 +30,24 @@ export default function PartnerCall() {
   const [addedMsg, setAddedMsg] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [participants, setParticipants] = useState([]);
+  const [mediaReady, setMediaReady] = useState({ audio: true, video: true });
 
   useEffect(() => {
-    api
-      .joinPartnerMeeting(roomName)
-      .then(setConnection)
-      .catch((err) => setError(err.message));
+    let cancelled = false;
+    (async () => {
+      try {
+        const media = await ensureMeetingMediaAccess();
+        if (cancelled) return;
+        setMediaReady(media);
+        const res = await api.joinPartnerMeeting(roomName);
+        if (!cancelled) setConnection(res);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [roomName]);
 
   useEffect(() => {
@@ -129,8 +142,8 @@ export default function PartnerCall() {
         serverUrl={connection.url}
         token={connection.token}
         connect={true}
-        video={true}
-        audio={true}
+        video={mediaReady.video}
+        audio={mediaReady.audio}
         onDisconnected={() => navigate("/meetings")}
         style={{ height: "100%" }}
       >
