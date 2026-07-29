@@ -15,7 +15,8 @@ const NAV_ITEMS = [
   { icon: "ziyo", label: "AI Ziyo", hint: "Yordamchi", to: "/rafiq" },
 ];
 
-export default function Sidebar({ onOpenSettings, variant = "default", mobileOpen = false, onMobileClose }) {
+/** Desktop yon menyu. Mobil’da CSS bilan yashiriladi — o‘rniga past tablar. */
+export default function Sidebar({ onOpenSettings, variant = "default" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isGalaxy = variant === "galaxy";
@@ -65,42 +66,24 @@ export default function Sidebar({ onOpenSettings, variant = "default", mobileOpe
     finalNavItems = [...finalNavItems, { icon: "🛠️", label: "Developer", hint: "Panel", to: "/developer" }];
   }
 
-  // Mobil drawer ochiq bo‘lsa har doim to‘liq label ko‘rsatamiz
-  const showLabels = !collapsed || mobileOpen;
+  const showLabels = !collapsed;
 
   return (
-    <aside
-      className={`sidebar ${collapsed ? "collapsed" : ""} ${isGalaxy ? "sidebar-galaxy" : ""} ${
-        mobileOpen ? "mobile-open" : ""
-      }`}
-    >
+    <aside className={`sidebar desktop-sidebar ${collapsed ? "collapsed" : ""} ${isGalaxy ? "sidebar-galaxy" : ""}`}>
       <div className="sidebar-brand-row">
         <Logo compact={!showLabels} variant={isGalaxy ? "galaxy" : "default"} />
         <button
           type="button"
-          className="sidebar-collapse-btn desktop-only"
+          className="sidebar-collapse-btn"
           onClick={toggleCollapsed}
           title={collapsed ? "Kengaytirish" : "Siqish"}
         >
           {collapsed ? "»" : "«"}
         </button>
-        <button
-          type="button"
-          className="sidebar-collapse-btn mobile-only"
-          onClick={() => onMobileClose?.()}
-          title="Yopish"
-          aria-label="Menyuni yopish"
-        >
-          ✕
-        </button>
       </div>
 
       {showLabels && companies.length > 0 && (
-        <select
-          className="sidebar-company-select"
-          value={activeId || ""}
-          onChange={handleSwitch}
-        >
+        <select className="sidebar-company-select" value={activeId || ""} onChange={handleSwitch}>
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -118,14 +101,9 @@ export default function Sidebar({ onOpenSettings, variant = "default", mobileOpe
               to={item.to}
               className={`sidebar-link ${active ? "active" : ""}`}
               title={!showLabels ? item.label : undefined}
-              onClick={() => onMobileClose?.()}
             >
               <span className="sidebar-link-icon">
-                {item.icon === "ziyo" ? (
-                  <RafiqAvatar size={16} variant="svg" />
-                ) : (
-                  item.icon
-                )}
+                {item.icon === "ziyo" ? <RafiqAvatar size={16} variant="svg" /> : item.icon}
               </span>
               {showLabels && (
                 <span className="sidebar-link-copy">
@@ -139,13 +117,7 @@ export default function Sidebar({ onOpenSettings, variant = "default", mobileOpe
       </nav>
 
       <div className="sidebar-footer">
-        <div
-          className="sidebar-user"
-          onClick={() => {
-            onMobileClose?.();
-            onOpenSettings?.();
-          }}
-        >
+        <div className="sidebar-user" onClick={() => onOpenSettings?.()}>
           {user?.avatar_url ? (
             <img src={user.avatar_url} alt="Avatar" className="sidebar-avatar-img" />
           ) : (

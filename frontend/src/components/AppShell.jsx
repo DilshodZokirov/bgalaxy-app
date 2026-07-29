@@ -6,6 +6,7 @@ import SettingsPopup from "./SettingsPopup";
 import GalaxySkyBackdrop from "./GalaxySkyBackdrop";
 import GalaxyAppBar from "./GalaxyAppBar";
 import UpcomingMeetingBanner from "./UpcomingMeetingBanner";
+import MobileTabBar, { MobileProfileSheet } from "./MobileTabBar";
 import { useAuth } from "../hooks/useAuth";
 
 export default function AppShell({
@@ -16,7 +17,7 @@ export default function AppShell({
 }) {
   const { user, refreshUser } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const theme = user?.theme || "dark";
   const skyMode = theme === "light" ? "day" : "night";
   const activeBg = theme === "light" ? user?.light_background : user?.dark_background;
@@ -25,13 +26,13 @@ export default function AppShell({
   const useSystemSky = uiThemeId === "default" && !hasCustomBg;
 
   useEffect(() => {
-    if (!mobileNavOpen) return undefined;
+    if (!profileOpen) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [mobileNavOpen]);
+  }, [profileOpen]);
 
   if (immersive) {
     return (
@@ -55,42 +56,35 @@ export default function AppShell({
   const shellClass = [
     "app-shell",
     "galaxy-shell",
+    "has-mobile-tabs",
     `galaxy-shell-${skyMode}`,
     hasCustomBg || uiThemeId !== "default" ? "has-custom-ui" : "",
-    mobileNavOpen ? "nav-open" : "",
+    profileOpen ? "profile-open" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div className={shellClass}>
-      <button
-        type="button"
-        className="mobile-nav-backdrop"
-        aria-label="Menyuni yopish"
-        tabIndex={mobileNavOpen ? 0 : -1}
-        onClick={() => setMobileNavOpen(false)}
-      />
-      <Sidebar
-        onOpenSettings={() => {
-          setMobileNavOpen(false);
-          setShowSettings(true);
-        }}
-        variant="galaxy"
-        mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
-      />
+      {/* Desktop: yon sidebar. Mobil: yashiriladi — past tablar */}
+      <Sidebar onOpenSettings={() => setShowSettings(true)} variant="galaxy" />
       <main className="main-content galaxy-main">
         <div className={`galaxy-chrome sky-${skyMode}`}>
           {useSystemSky && <GalaxySkyBackdrop mode={skyMode} />}
           <EmailVerifyBanner />
-          {!hideAppBar && (
-            <GalaxyAppBar left={topLeft} onMenuClick={() => setMobileNavOpen(true)} />
-          )}
+          {!hideAppBar && <GalaxyAppBar left={topLeft} />}
           <UpcomingMeetingBanner />
           <div className="galaxy-chrome-body">{children}</div>
         </div>
       </main>
+
+      <MobileTabBar onProfile={() => setProfileOpen(true)} />
+      <MobileProfileSheet
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
       <ComplaintButton />
       {showSettings && (
         <SettingsPopup user={user} onClose={() => setShowSettings(false)} onSaved={refreshUser} />
