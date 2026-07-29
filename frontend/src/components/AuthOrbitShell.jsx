@@ -1,43 +1,50 @@
 import { Link } from "react-router-dom";
-import Logo from "./Logo";
-import RafiqWidget from "./RafiqWidget";
 
 /**
- * Fantastical split auth layout: brand outside + small AI Ziyo chat widget.
+ * Auth gate — mockupdagi markazlashgan Login/Register qobig‘i.
+ * Mobil birinchi: logo, forma, pastki atmosfera.
  */
 export default function AuthOrbitShell({
-  kicker = "Business Galaxy",
   title,
   subtitle,
   children,
   footer,
+  art = "portal",
+  kicker: _kicker,
 }) {
   return (
-    <div className="auth-orbit">
-      <div className="auth-orbit-sky" aria-hidden>
-        <span className="auth-orbit-glow g1" />
-        <span className="auth-orbit-glow g2" />
-        <span className="auth-orbit-dust" />
+    <div className={`auth-gate art-${art}`}>
+      <div className="auth-gate-sky" aria-hidden>
+        <span className="auth-gate-nebula n1" />
+        <span className="auth-gate-nebula n2" />
+        <span className="auth-gate-stars" />
       </div>
 
-      <Link to="/" className="auth-orbit-brand">
-        <Logo variant="galaxy" withTagline />
-      </Link>
+      <div className="auth-gate-inner">
+        <Link to="/" className="auth-gate-brand">
+          <span className="auth-gate-mark" aria-hidden>
+            <span className="auth-gate-orbit o1" />
+            <span className="auth-gate-orbit o2" />
+            <span className="auth-gate-planet" />
+          </span>
+          <strong className="auth-gate-wordmark">BGALAXY</strong>
+          <em className="auth-gate-tag">YOUR GATEWAY TO METAVERSE</em>
+        </Link>
 
-      <div className="auth-orbit-stage">
-        <aside className="auth-orbit-visual">
-          <p className="auth-orbit-kicker">{kicker}</p>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-          <div className="auth-orbit-widget">
-            <RafiqWidget />
-          </div>
-        </aside>
+        {(title || subtitle) && (
+          <header className="auth-gate-head">
+            {title && <h1>{title}</h1>}
+            {subtitle && <p>{subtitle}</p>}
+          </header>
+        )}
 
-        <section className="auth-orbit-panel">
-          {children}
-          {footer}
-        </section>
+        <section className="auth-gate-card">{children}</section>
+
+        {footer && <div className="auth-gate-footer">{footer}</div>}
+      </div>
+
+      <div className="auth-gate-horizon" aria-hidden>
+        <div className={`auth-gate-art ${art}`} />
       </div>
     </div>
   );

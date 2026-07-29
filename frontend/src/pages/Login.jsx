@@ -4,7 +4,8 @@ import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { getPendingInvite } from "../hooks/usePendingInvite";
 import AuthOrbitShell from "../components/AuthOrbitShell";
-import GoogleAuthButton from "../components/GoogleAuthButton";
+import { AuthField } from "../components/AuthFields";
+import AuthSocialRow from "../components/AuthSocialRow";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -52,38 +53,42 @@ export default function Login() {
 
   return (
     <AuthOrbitShell
-      kicker="Orbit Gate"
-      title="Galaktikangizga qayting"
-      subtitle="Ziyo kutmoqda — virtual ofis, jamoa va AI bitta stansiyada."
+      title="Xush kelibsiz!"
+      subtitle="Hisobingizga kiring va koinotingizni boshqaring"
+      art="portal"
       footer={
-        <p className="auth-footer">
-          Hisobingiz yo'qmi? <Link to="/register">Ro'yxatdan o'ting</Link>
+        <p className="auth-gate-switch">
+          Hisobingiz yo&apos;qmi? <Link to="/register">Ro&apos;yxatdan o&apos;tish</Link>
         </p>
       }
     >
-      <h2>Kirish</h2>
-      <p className="subtitle">Email yoki Google orqali davom eting.</p>
-      <form onSubmit={handleSubmit}>
-        <label>Email</label>
-        <input
+      <form className="auth-gate-form" onSubmit={handleSubmit}>
+        <AuthField
+          icon="user"
           type="email"
-          placeholder="sizning@email.com"
+          name="email"
+          placeholder="Email yoki telefon raqami"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           required
         />
-        <label>Parol</label>
-        <input
+        <AuthField
+          icon="lock"
           type="password"
-          placeholder="••••••••"
+          name="password"
+          placeholder="Parol"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           required
         />
-        <p className="auth-forgot">
+
+        <p className="auth-gate-forgot">
           <Link to="/forgot-password">Parolni unutdingizmi?</Link>
         </p>
-        {error && <p className="error">{error}</p>}
+
+        {error && <p className="error auth-gate-error">{error}</p>}
         {needsVerify && (
           <p className="auth-verify-row">
             {resendSent ? (
@@ -95,11 +100,13 @@ export default function Login() {
             )}
           </p>
         )}
-        <button type="submit" disabled={loading}>
+
+        <button type="submit" className="auth-gate-cta" disabled={loading}>
           {loading ? "Kirilmoqda..." : "Kirish"}
         </button>
       </form>
-      <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={setError} />
+
+      <AuthSocialRow onSuccess={handleGoogleSuccess} onError={setError} />
     </AuthOrbitShell>
   );
 }
