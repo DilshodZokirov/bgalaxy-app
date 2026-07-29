@@ -8081,6 +8081,124 @@ html[data-custom-bg="1"] .galaxy-sky {
   }
 }
 
+/* Android / phone Meetings hub */
+.meetings-page.is-mobile {
+  gap: 14px;
+  max-width: none;
+  padding-bottom: 8px;
+}
+
+.meetings-page.is-mobile .galaxy-page-heading.is-compact h1 {
+  font-size: 1.45rem;
+  margin: 2px 0 0;
+}
+
+.meetings-mobile-company {
+  margin: -4px 0 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.meetings-mobile-empty {
+  margin: 0;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.meetings-page.is-mobile .meetings-launch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meetings-page.is-mobile .meetings-launch-card {
+  padding: 14px 12px;
+  border-radius: 16px;
+  min-height: 64px;
+}
+
+.meetings-page.is-mobile .meetings-launch-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+}
+
+.meetings-page.is-mobile .meetings-launch-copy strong {
+  font-size: 0.95rem;
+}
+
+.meetings-page.is-mobile .meetings-launch-copy em {
+  font-size: 0.78rem;
+}
+
+.meetings-page.is-mobile .meetings-launch-cta {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.meetings-page.is-mobile .meetings-scheduled-card {
+  gap: 10px;
+  padding: 12px;
+}
+
+.meetings-page.is-mobile .meetings-scheduled-actions .meetings-cta,
+.meetings-page.is-mobile .meetings-live-item .meetings-cta {
+  min-height: 44px;
+  flex: 1;
+}
+
+.meetings-page.is-mobile .meetings-scheduled-actions .meetings-soft-btn {
+  min-height: 40px;
+}
+
+.meetings-page.is-mobile .meetings-live-item {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.meetings-modal-backdrop.is-sheet {
+  align-items: flex-end;
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.meetings-modal-backdrop.is-sheet .meetings-modal {
+  width: 100%;
+  max-width: none;
+  max-height: min(88dvh, 720px);
+  margin: 0;
+  border-radius: 20px 20px 0 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.meetings-modal-backdrop.is-sheet .meetings-modal input,
+.meetings-modal-backdrop.is-sheet .meetings-modal textarea {
+  font-size: 16px;
+  min-height: 44px;
+}
+
+.meetings-modal-backdrop.is-sheet .meetings-cta {
+  min-height: 48px;
+  width: 100%;
+}
+
+.meetings-modal-backdrop.is-sheet .upcoming-meeting-edit-actions {
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .app-shell.has-mobile-tabs .meetings-page.is-mobile {
+    min-height: 0;
+  }
+}
+
 /* ---------- OS Company Panel ---------- */
 .os-company-page {
   display: flex;

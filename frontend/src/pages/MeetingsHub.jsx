@@ -6,13 +6,14 @@ import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import CountdownBadge from "../components/CountdownBadge";
 import UserSearchInput from "../components/UserSearchInput";
+import { useIsMobileShell } from "../native";
 
-function MeetingsHeading() {
+function MeetingsHeading({ compact }) {
   return (
-    <div className="galaxy-page-heading">
-      <p className="galaxy-page-kicker">Online Meeting</p>
+    <div className={`galaxy-page-heading ${compact ? "is-compact" : ""}`}>
+      <p className="galaxy-page-kicker">Uchrashuvlar</p>
       <h1>Uchrashuvlar</h1>
-      <p>Hozir boshlang yoki vaqtga belgilang — mavzu va countdown bilan.</p>
+      {!compact && <p>Hozir boshlang yoki vaqtga belgilang — mavzu va countdown bilan.</p>}
     </div>
   );
 }
@@ -33,6 +34,7 @@ export default function MeetingsHub() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
   const [showPartnerSearch, setShowPartnerSearch] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -194,174 +196,213 @@ export default function MeetingsHub() {
 
   const hasActive = activeGroupCall || activePartnerMeetings.length > 0;
 
-  return (
-    <AppShell topLeft={<MeetingsHeading />}>
-      <div className="meetings-page">
-        <div className="meetings-toolbar">
-          <div>
-            <h2>Uchrashuv markazi</h2>
-            <p>
-              {company
-                ? `Faol korxona: ${company.name}`
-                : "Guruh uchrashuvi uchun avval kompaniya tanlang"}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="meetings-cta"
-            disabled={!company}
-            onClick={openCreateSchedule}
-          >
-            Vaqtga belgilash
-          </button>
-        </div>
+  const launchSection = (
+    <section className="meetings-launch" aria-label="Yangi uchrashuv">
+      <button type="button" className="meetings-launch-card" onClick={() => navigate("/group-meeting")}>
+        <span className="meetings-launch-mark" aria-hidden>
+          G
+        </span>
+        <span className="meetings-launch-copy">
+          <strong>Guruh uchrashuvi</strong>
+          <em>{isMobile ? "Kompaniya xonasiga kirish" : "Hozir kompaniya xonasiga qo‘shiling"}</em>
+        </span>
+        <span className="meetings-launch-cta">Boshlash</span>
+      </button>
 
-        {upcoming.length > 0 && (
-          <section className="meetings-scheduled" aria-label="Belgilangan uchrashuvlar">
-            <div className="meetings-section-head">
-              <h3>Belgilangan uchrashuvlar</h3>
-            </div>
-            <div className="meetings-scheduled-list">
-              {upcoming.map((m) => {
-                const when = new Date(m.starts_at);
-                const whenLabel = when.toLocaleString("uz-UZ", {
-                  weekday: "short",
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                const isCreator = user?.id === m.created_by;
-                return (
-                  <article key={m.id} className={`meetings-scheduled-card ${m.status === "notified" ? "is-due" : ""}`}>
-                    <div className="meetings-scheduled-copy">
-                      <strong>{m.title}</strong>
-                      <p className="meetings-scheduled-meta">
-                        {m.company_name} · {whenLabel}
-                        {m.creator_name ? ` · ${m.creator_name}` : ""}
-                      </p>
-                      {m.description && <p className="meetings-scheduled-desc">{m.description}</p>}
-                    </div>
-                    <CountdownBadge startsAt={m.starts_at} onDue={() => refreshScheduled()} />
-                    <div className="meetings-scheduled-actions">
-                      <button type="button" className="meetings-cta" onClick={() => joinScheduled(m)}>
-                        {m.status === "notified" || new Date(m.starts_at) <= new Date()
-                          ? "Uchrashuvga kirish"
-                          : "Erta kirish"}
-                      </button>
-                      {isCreator && (
-                        <>
-                          <button
-                            type="button"
-                            className="secondary meetings-soft-btn"
-                            onClick={() => openEditSchedule(m)}
-                          >
-                            Update
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary meetings-soft-btn upcoming-meeting-delete"
-                            onClick={() => handleCancelScheduled(m.id)}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
+      <button type="button" className="meetings-launch-card partner" onClick={() => setShowPartnerSearch(true)}>
+        <span className="meetings-launch-mark" aria-hidden>
+          H
+        </span>
+        <span className="meetings-launch-copy">
+          <strong>Hamkorlar bilan</strong>
+          <em>{isMobile ? "Istalgan foydalanuvchi" : "BG’dagi istalgan foydalanuvchi bilan"}</em>
+        </span>
+        <span className="meetings-launch-cta">Tanlash</span>
+      </button>
 
-        {hasActive && (
-          <section className="meetings-live" aria-label="Faol uchrashuvlar">
-            <div className="meetings-section-head">
-              <h3>Faol uchrashuvlar</h3>
-              <span className="meetings-live-dot" aria-hidden />
-            </div>
-            <div className="meetings-live-list">
-              {activeGroupCall && (
-                <article className="meetings-live-item">
-                  <div>
-                    <strong>Guruh uchrashuvi</strong>
-                    <p>
-                      {company?.name}
-                      {activeGroupCall.participants?.length
-                        ? ` · ${activeGroupCall.participants.map((p) => p.name).join(", ")}`
-                        : ""}
-                    </p>
-                  </div>
-                  <button type="button" className="meetings-cta" onClick={() => navigate("/group-meeting")}>
-                    Kirish
-                  </button>
-                </article>
-              )}
-              {activePartnerMeetings.map((m) => (
-                <article key={m.room_name} className="meetings-live-item">
-                  <div>
-                    <strong>Hamkorlar uchrashuvi</strong>
-                    <p>{m.participants.map((p) => p.name).join(", ")}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="meetings-cta"
-                    onClick={() => navigate(`/partner-call/${m.room_name}`)}
-                  >
-                    Kirish
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
+      <button
+        type="button"
+        className="meetings-launch-card schedule"
+        disabled={!company}
+        onClick={openCreateSchedule}
+      >
+        <span className="meetings-launch-mark" aria-hidden>
+          V
+        </span>
+        <span className="meetings-launch-copy">
+          <strong>Vaqtga belgilash</strong>
+          <em>{isMobile ? "Sana, soat va mavzu" : "Mavzu + sana/soat + soniyagacha countdown"}</em>
+        </span>
+        <span className="meetings-launch-cta">Belgilash</span>
+      </button>
+    </section>
+  );
 
-        <section className="meetings-launch" aria-label="Yangi uchrashuv">
-          <button type="button" className="meetings-launch-card" onClick={() => navigate("/group-meeting")}>
-            <span className="meetings-launch-mark" aria-hidden>
-              G
-            </span>
-            <span className="meetings-launch-copy">
+  const liveSection = hasActive ? (
+    <section className="meetings-live" aria-label="Faol uchrashuvlar">
+      <div className="meetings-section-head">
+        <h3>Faol uchrashuvlar</h3>
+        <span className="meetings-live-dot" aria-hidden />
+      </div>
+      <div className="meetings-live-list">
+        {activeGroupCall && (
+          <article className="meetings-live-item">
+            <div>
               <strong>Guruh uchrashuvi</strong>
-              <em>Hozir kompaniya xonasiga qo‘shiling</em>
-            </span>
-            <span className="meetings-launch-cta">Boshlash</span>
-          </button>
+              <p>
+                {company?.name}
+                {activeGroupCall.participants?.length
+                  ? ` · ${activeGroupCall.participants.map((p) => p.name).join(", ")}`
+                  : ""}
+              </p>
+            </div>
+            <button type="button" className="meetings-cta" onClick={() => navigate("/group-meeting")}>
+              Kirish
+            </button>
+          </article>
+        )}
+        {activePartnerMeetings.map((m) => (
+          <article key={m.room_name} className="meetings-live-item">
+            <div>
+              <strong>Hamkorlar uchrashuvi</strong>
+              <p>{m.participants.map((p) => p.name).join(", ")}</p>
+            </div>
+            <button
+              type="button"
+              className="meetings-cta"
+              onClick={() => navigate(`/partner-call/${m.room_name}`)}
+            >
+              Kirish
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  ) : null;
 
-          <button type="button" className="meetings-launch-card partner" onClick={() => setShowPartnerSearch(true)}>
-            <span className="meetings-launch-mark" aria-hidden>
-              H
-            </span>
-            <span className="meetings-launch-copy">
-              <strong>Hamkorlar bilan</strong>
-              <em>BG’dagi istalgan foydalanuvchi bilan</em>
-            </span>
-            <span className="meetings-launch-cta">Tanlash</span>
-          </button>
+  const scheduledSection =
+    upcoming.length > 0 ? (
+      <section className="meetings-scheduled" aria-label="Belgilangan uchrashuvlar">
+        <div className="meetings-section-head">
+          <h3>Belgilangan uchrashuvlar</h3>
+        </div>
+        <div className="meetings-scheduled-list">
+          {upcoming.map((m) => {
+            const when = new Date(m.starts_at);
+            const whenLabel = when.toLocaleString("uz-UZ", {
+              weekday: "short",
+              year: isMobile ? undefined : "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const isCreator = user?.id === m.created_by;
+            const canJoinNow = m.status === "notified" || new Date(m.starts_at) <= new Date();
+            return (
+              <article key={m.id} className={`meetings-scheduled-card ${m.status === "notified" ? "is-due" : ""}`}>
+                <div className="meetings-scheduled-copy">
+                  <strong>{m.title}</strong>
+                  <p className="meetings-scheduled-meta">
+                    {m.company_name} · {whenLabel}
+                    {!isMobile && m.creator_name ? ` · ${m.creator_name}` : ""}
+                  </p>
+                  {m.description && <p className="meetings-scheduled-desc">{m.description}</p>}
+                </div>
+                <CountdownBadge startsAt={m.starts_at} onDue={() => refreshScheduled()} />
+                <div className="meetings-scheduled-actions">
+                  <button type="button" className="meetings-cta" onClick={() => joinScheduled(m)}>
+                    {canJoinNow ? "Kirish" : "Erta kirish"}
+                  </button>
+                  {isCreator && (
+                    <>
+                      <button
+                        type="button"
+                        className="secondary meetings-soft-btn"
+                        onClick={() => openEditSchedule(m)}
+                      >
+                        Tahrirlash
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary meetings-soft-btn upcoming-meeting-delete"
+                        onClick={() => handleCancelScheduled(m.id)}
+                      >
+                        O‘chirish
+                      </button>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    ) : null;
 
-          <button
-            type="button"
-            className="meetings-launch-card schedule"
-            disabled={!company}
-            onClick={openCreateSchedule}
-          >
-            <span className="meetings-launch-mark" aria-hidden>
-              V
-            </span>
-            <span className="meetings-launch-copy">
-              <strong>Vaqtga belgilash</strong>
-              <em>Mavzu + sana/soat + soniyagacha countdown</em>
-            </span>
-            <span className="meetings-launch-cta">Belgilash</span>
-          </button>
-        </section>
+  return (
+    <AppShell
+      hideAppBar={isMobile}
+      topLeft={isMobile ? null : <MeetingsHeading />}
+    >
+      <div className={`meetings-page ${isMobile ? "is-mobile" : ""}`}>
+        {isMobile && <MeetingsHeading compact />}
+
+        {!isMobile && (
+          <div className="meetings-toolbar">
+            <div>
+              <h2>Uchrashuv markazi</h2>
+              <p>
+                {companyLoading
+                  ? "Yuklanmoqda..."
+                  : company
+                    ? `Faol korxona: ${company.name}`
+                    : "Guruh uchrashuvi uchun avval kompaniya tanlang"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="meetings-cta"
+              disabled={!company}
+              onClick={openCreateSchedule}
+            >
+              Vaqtga belgilash
+            </button>
+          </div>
+        )}
+
+        {isMobile && (
+          <p className="meetings-mobile-company">
+            {companyLoading
+              ? "Yuklanmoqda..."
+              : company
+                ? company.name
+                : "Kompaniya tanlanmagan"}
+          </p>
+        )}
+
+        {/* Mobil: avval harakatlar, keyin jonli, so‘ng reja */}
+        {isMobile ? (
+          <>
+            {launchSection}
+            {liveSection}
+            {scheduledSection}
+            {!hasActive && upcoming.length === 0 && (
+              <p className="meetings-mobile-empty">Hali rejalashtirilgan uchrashuv yo‘q. Yuqoridan boshlang.</p>
+            )}
+          </>
+        ) : (
+          <>
+            {scheduledSection}
+            {liveSection}
+            {launchSection}
+          </>
+        )}
       </div>
 
       {showSchedule && (
         <div
-          className="meetings-modal-backdrop"
+          className={`meetings-modal-backdrop ${isMobile ? "is-sheet" : ""}`}
           onClick={() => {
             setShowSchedule(false);
             resetScheduleForm();
@@ -369,7 +410,7 @@ export default function MeetingsHub() {
         >
           <div className="card meetings-modal meetings-schedule-modal" onClick={(e) => e.stopPropagation()}>
             <div className="meetings-modal-head">
-              <h3>{editingId ? "Uchrashuvni yangilash" : "Uchrashuvni vaqtga belgilash"}</h3>
+              <h3>{editingId ? "Uchrashuvni yangilash" : "Vaqtga belgilash"}</h3>
               <button
                 type="button"
                 className="secondary meetings-soft-btn"
@@ -383,8 +424,10 @@ export default function MeetingsHub() {
             </div>
             <p className="meetings-modal-hint">
               {editingId
-                ? "Vaqt, sarlavha yoki mavzuni o‘zgartiring. Kerak bo‘lmasa Delete bilan o‘chiring."
-                : "Masalan: bugun soat 16:00 — mavzu “Oylik muammo”. Vaqt yaqinlashganda jamoa bildirishnoma oladi, countdown esa soniyagacha sanaydi."}
+                ? "Vaqt, sarlavha yoki mavzuni o‘zgartiring."
+                : isMobile
+                  ? "Sana, soat va mavzuni kiriting — jamoa bildirishnoma oladi."
+                  : "Masalan: bugun soat 16:00 — mavzu “Oylik muammo”. Vaqt yaqinlashganda jamoa bildirishnoma oladi, countdown esa soniyagacha sanaydi."}
             </p>
             <form onSubmit={handleScheduleSubmit}>
               <label>Sarlavha</label>
@@ -394,12 +437,12 @@ export default function MeetingsHub() {
                 placeholder="Oylik muhokama"
                 required
               />
-              <label>Mavzu / description</label>
+              <label>Mavzu</label>
               <textarea
                 value={schedDescription}
                 onChange={(e) => setSchedDescription(e.target.value)}
-                placeholder="Uchrashuvda oylik muammo haqida gaplashamiz..."
-                rows={3}
+                placeholder="Uchrashuvda nima muhokama qilinadi..."
+                rows={isMobile ? 2 : 3}
               />
               <label>Sana va soat</label>
               <input
@@ -424,7 +467,7 @@ export default function MeetingsHub() {
                     className="secondary meetings-soft-btn upcoming-meeting-delete"
                     onClick={() => handleCancelScheduled(editingId)}
                   >
-                    Delete
+                    O‘chirish
                   </button>
                 )}
               </div>
@@ -434,17 +477,20 @@ export default function MeetingsHub() {
       )}
 
       {showPartnerSearch && (
-        <div className="meetings-modal-backdrop" onClick={() => setShowPartnerSearch(false)}>
+        <div
+          className={`meetings-modal-backdrop ${isMobile ? "is-sheet" : ""}`}
+          onClick={() => setShowPartnerSearch(false)}
+        >
           <div className="card meetings-modal" onClick={(e) => e.stopPropagation()}>
             <div className="meetings-modal-head">
-              <h3>Hamkorlar bilan uchrashuv</h3>
+              <h3>Hamkorlar bilan</h3>
               <button type="button" className="secondary meetings-soft-btn" onClick={() => setShowPartnerSearch(false)}>
                 Yopish
               </button>
             </div>
 
             <p className="meetings-modal-hint">
-              Email orqali qidiring — bir nechta hamkorni qo‘shishingiz mumkin.
+              Ism yoki email bo‘yicha qidiring — bir nechta hamkor qo‘shish mumkin.
             </p>
 
             {partners.length > 0 && (
@@ -476,7 +522,7 @@ export default function MeetingsHub() {
             >
               {starting
                 ? "Boshlanmoqda..."
-                : `Uchrashuvni boshlash${partners.length > 1 ? ` (${partners.length})` : ""}`}
+                : `Boshlash${partners.length > 1 ? ` (${partners.length})` : ""}`}
             </button>
           </div>
         </div>
