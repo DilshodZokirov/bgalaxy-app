@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import AppShell from "../components/AppShell";
 import UserSearchInput from "../components/UserSearchInput";
 import { formatChatTime, isChatUnread, markChatRead, seedChatRead } from "../components/chatUnread";
+import { useIsMobileShell } from "../native";
 
 const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 function isImage(fileName) {
@@ -442,6 +443,7 @@ export default function Chat() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { company, loading: companyLoading } = useActiveCompany();
+  const isMobile = useIsMobileShell();
 
   const [companyId, setCompanyId] = useState(params.companyId || null);
   const [channels, setChannels] = useState([]);
@@ -450,6 +452,10 @@ export default function Chat() {
   const [activeKind, setActiveKind] = useState(params.conversationId ? "direct" : "channel");
   const [activeChannelId, setActiveChannelId] = useState(params.channelId || null);
   const [activeConversationId, setActiveConversationId] = useState(params.conversationId || null);
+  /** Mobil: list (kanallar/suhbatlar) yoki thread (ochiq chat) */
+  const [mobilePane, setMobilePane] = useState(() =>
+    params.channelId || params.conversationId ? "thread" : "list"
+  );
 
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -506,7 +512,8 @@ export default function Chat() {
       list.forEach((c) => seedChatRead("channel", c.id, c.last_message_at));
       setChannels(list);
       bumpUnread();
-      if (!activeChannelId && !activeConversationId && list.length > 0) {
+      // Desktop: birinchi kanalni ochib qo‘yamiz. Mobil: list sahifada qolamiz.
+      if (!isMobile && !activeChannelId && !activeConversationId && list.length > 0) {
         setActiveKind("channel");
         setActiveChannelId(list[0].id);
       }
@@ -541,11 +548,15 @@ export default function Chat() {
     if (params.channelId) {
       setActiveKind("channel");
       setActiveChannelId(params.channelId);
+      setMobilePane("thread");
     } else if (params.conversationId) {
       setActiveKind("direct");
       setActiveConversationId(params.conversationId);
+      setMobilePane("thread");
+    } else if (isMobile) {
+      setMobilePane("list");
     }
-  }, [params.channelId, params.conversationId]);
+  }, [params.channelId, params.conversationId, isMobile]);
 
   useEffect(() => {
     setShowMembersPanel(false);
@@ -607,13 +618,30 @@ export default function Chat() {
   function selectChannel(id) {
     setActiveKind("channel");
     setActiveChannelId(id);
+    setMobilePane("thread");
     navigate(`/chat/${companyId}/${id}`);
   }
 
   function selectConversation(id) {
     setActiveKind("direct");
     setActiveConversationId(id);
+    setMobilePane("thread");
     navigate(`/direct-chat/${id}`);
+  }
+
+  function backToMobileList() {
+    setMobilePane("list");
+    setShowMembersPanel(false);
+    setShowDmMembersPanel(false);
+    setReplyTo(null);
+    setEditingId(null);
+    if (activeKind === "direct") {
+      setActiveConversationId(null);
+      navigate("/direct-chat");
+      return;
+    }
+    setActiveChannelId(null);
+    if (companyId) navigate(`/chat/${companyId}`);
   }
 
   function loadChannelMembers() {
@@ -646,6 +674,12 @@ export default function Chat() {
       setShowMembersPanel(false);
       const remaining = channels.filter((c) => c.id !== activeChannelId);
       setChannels(remaining);
+      if (isMobile) {
+        setActiveChannelId(null);
+        setMobilePane("list");
+        navigate(`/chat/${companyId}`);
+        return;
+      }
       setActiveChannelId(remaining[0]?.id || null);
       navigate(remaining[0] ? `/chat/${companyId}/${remaining[0].id}` : `/chat/${companyId}`);
     } catch {
@@ -667,6 +701,7 @@ export default function Chat() {
       setConversations(remaining);
       setActiveConversationId(null);
       setActiveKind("channel");
+      if (isMobile) setMobilePane("list");
       navigate("/direct-chat");
     } catch {
       // ignore
@@ -695,6 +730,7 @@ export default function Chat() {
       setActiveConversationId(null);
       setActiveKind("channel");
       setShowDmMembersPanel(false);
+      if (isMobile) setMobilePane("list");
       navigate("/direct-chat");
     } catch {
       // ignore
@@ -880,20 +916,31 @@ export default function Chat() {
   ];
 
   const unreadTotal = liveChats.filter((c) => c.unread && !c.active).length;
+  const showMobileThread = isMobile && mobilePane === "thread";
+  const showMobileList = isMobile && mobilePane === "list";
+  const workspaceClass = [
+    "chat-workspace",
+    isMobile ? "mobile-chat" : "",
+    showMobileList ? "show-list" : "",
+    showMobileThread ? "show-thread" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <AppShell>
-      <div className="chat-workspace">
+      <div className={workspaceClass}>
         <div className="chat-workspace-head">
           <div>
-            <p className="chat-kicker">Live Chat Hub</p>
-            <h1>{headerTitle}</h1>
-            <p className="chat-head-preview">{headerHint}</p>
+            <p className="chat-kicker">{isMobile ? "Xabarlar" : "Live Chat Hub"}</p>
+            <h1>{showMobileList ? "Chatlar" : headerTitle}</h1>
+            {!showMobileList && <p className="chat-head-preview">{headerHint}</p>}
+            {showMobileList && <p className="chat-head-preview">Kanallar va suhbatlar</p>}
           </div>
           <div className="chat-head-actions">
             {unreadTotal > 0 && <span className="chat-unread-pill">{unreadTotal} ta yangi</span>}
             <button type="button" className="chat-cta" onClick={() => setShowLauncher(true)}>
-              Chatlar / Yangi
+              {isMobile ? "Yangi" : "Chatlar / Yangi"}
             </button>
           </div>
         </div>
@@ -968,12 +1015,19 @@ export default function Chat() {
             {(activeChannel || activeConversation) && (
               <div className="chat-room-bar" ref={membersPanelRef}>
                 <div className="chat-room-bar-copy">
-                  <strong>{headerTitle}</strong>
-                  <span>
-                    {activeKind === "channel"
-                      ? `${activeChannel?.member_count || 0} aʼzo`
-                      : `${activeConversation?.participants?.length || 0} ishtirokchi`}
-                  </span>
+                  {isMobile && (
+                    <button type="button" className="chat-back-btn" onClick={backToMobileList} aria-label="Orqaga">
+                      ←
+                    </button>
+                  )}
+                  <div className="chat-room-bar-titles">
+                    <strong>{headerTitle}</strong>
+                    <span>
+                      {activeKind === "channel"
+                        ? `${activeChannel?.member_count || 0} aʼzo`
+                        : `${activeConversation?.participants?.length || 0} ishtirokchi`}
+                    </span>
+                  </div>
                 </div>
                 <div className="chat-room-bar-actions">
                   {activeKind === "channel" && activeChannel && (
