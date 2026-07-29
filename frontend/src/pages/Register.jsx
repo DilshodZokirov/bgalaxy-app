@@ -4,12 +4,18 @@ import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { getPendingInvite } from "../hooks/usePendingInvite";
 import AuthOrbitShell from "../components/AuthOrbitShell";
-import GoogleAuthButton from "../components/GoogleAuthButton";
+import { AuthField, AuthCheck } from "../components/AuthFields";
+import AuthSocialRow from "../components/AuthSocialRow";
 
 export default function Register() {
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [wantNews, setWantNews] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -19,9 +25,25 @@ export default function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    if (!agreeTerms) {
+      setError("Foydalanish shartlari bilan rozilik kerak");
+      return;
+    }
+    if (password !== password2) {
+      setError("Parollar mos kelmadi");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Parol kamida 6 ta belgidan iborat bo‘lsin");
+      return;
+    }
     setLoading(true);
     try {
-      await api.register({ full_name: fullName, email, password });
+      const full_name = `${firstName.trim()} ${lastName.trim()}`.trim();
+      await api.register({ full_name, email, password });
+      // phone / wantNews — UI uchun; backend hali alohida maydon kutmaydi
+      void phone;
+      void wantNews;
       setRegistered(true);
     } catch (err) {
       setError(err.message);
@@ -39,21 +61,20 @@ export default function Register() {
   if (registered) {
     return (
       <AuthOrbitShell
-        kicker="Signal sent"
         title="Emailingizni tekshiring"
         subtitle="Galaktikaga kirish uchun tasdiqlash havolasini bosing."
+        art="dome"
         footer={
-          <p className="auth-footer">
-            <Link to="/login">← Kirish sahifasiga o'tish</Link>
+          <p className="auth-gate-switch">
+            <Link to="/login">← Kirish sahifasiga o&apos;tish</Link>
           </p>
         }
       >
-        <h2>Xabar yuborildi</h2>
-        <p className="subtitle">
-          <strong>{email}</strong> manziliga tasdiqlash havolasi yubordik — havolani bosgach, tizimga kira olasiz.
+        <p className="auth-gate-success">
+          <strong>{email}</strong> manziliga tasdiqlash havolasi yuborildi.
         </p>
-        <Link to="/login">
-          <button type="button">Kirish sahifasiga o'tish</button>
+        <Link to="/login" className="auth-gate-cta-link">
+          <span className="auth-gate-cta">Kirish sahifasiga o&apos;tish</span>
         </Link>
       </AuthOrbitShell>
     );
@@ -61,48 +82,102 @@ export default function Register() {
 
   return (
     <AuthOrbitShell
-      kicker="First orbit"
-      title="O'z galaktikangizni yarating"
-      subtitle="Bir necha soniyada ro'yxatdan o'ting — Ziyo sizni kutmoqda."
+      title="Ro'yxatdan o'tish"
+      subtitle="Yangi hisob yarating va koinotga qo'shiling"
+      art="dome"
       footer={
-        <p className="auth-footer">
-          Hisobingiz bormi? <Link to="/login">Kiring</Link>
+        <p className="auth-gate-switch">
+          Hisobingiz bormi? <Link to="/login">Kirish</Link>
         </p>
       }
     >
-      <h2>Ro'yxatdan o'tish</h2>
-      <p className="subtitle">Kelajakdagi ish muhitingiz shu yerdan boshlanadi.</p>
-      <form onSubmit={handleSubmit}>
-        <label>To'liq ism</label>
-        <input
-          type="text"
-          placeholder="Dilshod Z."
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-        />
-        <label>Email</label>
-        <input
+      <form className="auth-gate-form" onSubmit={handleSubmit}>
+        <div className="auth-gate-row">
+          <AuthField
+            icon="user"
+            name="firstName"
+            placeholder="Ism"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            autoComplete="given-name"
+            required
+          />
+          <AuthField
+            icon="user"
+            name="lastName"
+            placeholder="Familiya"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
+            required
+          />
+        </div>
+
+        <AuthField
+          icon="mail"
           type="email"
-          placeholder="sizning@email.com"
+          name="email"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           required
         />
-        <label>Parol</label>
-        <input
+        <AuthField
+          icon="phone"
+          type="tel"
+          name="phone"
+          placeholder="Telefon raqami (ixtiyoriy)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          autoComplete="tel"
+        />
+        <AuthField
+          icon="lock"
           type="password"
-          placeholder="••••••••"
+          name="password"
+          placeholder="Parol"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
           required
         />
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
+        <AuthField
+          icon="lock"
+          type="password"
+          name="password2"
+          placeholder="Parolni tasdiqlang"
+          value={password2}
+          onChange={(e) => setPassword2(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+
+        <div className="auth-gate-checks">
+          <AuthCheck checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)}>
+            Men{" "}
+            <a href="/terms" target="_blank" rel="noreferrer">
+              foydalanish shartlari
+            </a>{" "}
+            va{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer">
+              maxfiylik siyosati
+            </a>{" "}
+            bilan tanishdim va roziman
+          </AuthCheck>
+          <AuthCheck checked={wantNews} onChange={(e) => setWantNews(e.target.checked)}>
+            Yangiliklar va takliflarni olishni xohlayman
+          </AuthCheck>
+        </div>
+
+        {error && <p className="error auth-gate-error">{error}</p>}
+
+        <button type="submit" className="auth-gate-cta" disabled={loading}>
           {loading ? "Yaratilmoqda..." : "Ro'yxatdan o'tish"}
         </button>
       </form>
-      <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={setError} />
+
+      <AuthSocialRow onSuccess={handleGoogleSuccess} onError={setError} />
     </AuthOrbitShell>
   );
 }

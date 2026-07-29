@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import AuthOrbitShell from "../components/AuthOrbitShell";
+import { AuthField } from "../components/AuthFields";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -26,21 +27,21 @@ export default function ForgotPassword() {
   if (sent) {
     return (
       <AuthOrbitShell
-        kicker="Signal sent"
         title="Emailingizni tekshiring"
         subtitle="Agar manzil ro'yxatdan o'tgan bo'lsa, tiklash havolasi yo'lda."
+        art="portal"
         footer={
-          <p className="auth-footer">
+          <p className="auth-gate-switch">
             <Link to="/login">← Kirishga qaytish</Link>
           </p>
         }
       >
-        <h2>Xabar yuborildi</h2>
-        <p className="subtitle">
-          Agar <strong>{email}</strong> ro'yxatdan o'tgan bo'lsa, parolni tiklash havolasi yuborildi.
+        <p className="auth-gate-success">
+          Agar <strong>{email}</strong> ro&apos;yxatdan o&apos;tgan bo&apos;lsa, parolni tiklash havolasi
+          yuborildi.
         </p>
-        <Link to="/login">
-          <button type="button">Kirish sahifasiga o'tish</button>
+        <Link to="/login" className="auth-gate-cta-link">
+          <span className="auth-gate-cta">Kirish sahifasiga o&apos;tish</span>
         </Link>
       </AuthOrbitShell>
     );
@@ -48,28 +49,28 @@ export default function ForgotPassword() {
 
   return (
     <AuthOrbitShell
-      kicker="Recovery orbit"
       title="Parolni tiklash"
       subtitle="Emailingizni kiriting — galaktikaga qaytish havolasini yuboramiz."
+      art="portal"
       footer={
-        <p className="auth-footer">
+        <p className="auth-gate-switch">
           <Link to="/login">← Kirishga qaytish</Link>
         </p>
       }
     >
-      <h2>Parolni tiklash</h2>
-      <p className="subtitle">Email manzilingizni kiriting — tiklash havolasini yuboramiz.</p>
-      <form onSubmit={handleSubmit}>
-        <label>Email</label>
-        <input
+      <form className="auth-gate-form" onSubmit={handleSubmit}>
+        <AuthField
+          icon="mail"
           type="email"
-          placeholder="sizning@email.com"
+          name="email"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           required
         />
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
+        {error && <p className="error auth-gate-error">{error}</p>}
+        <button type="submit" className="auth-gate-cta" disabled={loading}>
           {loading ? "Yuborilmoqda..." : "Havola yuborish"}
         </button>
       </form>
