@@ -7,6 +7,7 @@ import LockManager from "./components/LockManager";
 import LockScreen from "./components/LockScreen";
 import { useAuth } from "./hooks/useAuth";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { isNativeApp } from "./native";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -40,6 +41,34 @@ function LockGate() {
   return <LockScreen />;
 }
 
+/** Android/iOS ilovada landing kerak emas — login yoki dashboard */
+function RootEntry() {
+  const { user, loading } = useAuth();
+
+  if (!isNativeApp()) {
+    return <Landing />;
+  }
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-dim)",
+          fontSize: 14,
+        }}
+      >
+        Yuklanmoqda...
+      </div>
+    );
+  }
+
+  return <Navigate to={user ? "/dashboard" : "/login"} replace />;
+}
+
 export default function App() {
   const body = (
     <AuthProvider>
@@ -48,7 +77,7 @@ export default function App() {
       <LockManager />
       <LockGate />
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<RootEntry />} />
         <Route path="/galaxy-demo" element={<GalaxyDemo />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
