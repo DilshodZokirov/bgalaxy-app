@@ -6,9 +6,26 @@ import { useActiveCompany } from "../hooks/useCompany";
 import AppShell from "../components/AppShell";
 import OfficeScene3D from "../components/OfficeScene3D";
 import OfficeCommsPanel from "../components/OfficeCommsPanel";
+import { isNativeApp } from "../native";
+
+function useMobileOfficeUi() {
+  const [mobile, setMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return isNativeApp() || window.matchMedia("(max-width: 900px)").matches || navigator.maxTouchPoints > 1;
+  });
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const sync = () => setMobile(isNativeApp() || mq.matches || navigator.maxTouchPoints > 1);
+    sync();
+    mq.addEventListener?.("change", sync);
+    return () => mq.removeEventListener?.("change", sync);
+  }, []);
+  return mobile;
+}
 
 export default function VirtualOffice() {
   const navigate = useNavigate();
+  const mobileUi = useMobileOfficeUi();
   const { company, loading: companyLoading } = useActiveCompany();
   const [zoom, setZoom] = useState(5);
   const [voiceStatus, setVoiceStatus] = useState("connecting"); // connecting | connected | off | error
@@ -42,6 +59,15 @@ export default function VirtualOffice() {
   const roomRef = useRef(null);
   const audioContainerRef = useRef(null);
   const ringtoneRef = useRef(null);
+
+  useEffect(() => {
+    if (!immersive) {
+      document.documentElement.classList.remove("is-office-immersive");
+      return undefined;
+    }
+    document.documentElement.classList.add("is-office-immersive");
+    return () => document.documentElement.classList.remove("is-office-immersive");
+  }, [immersive]);
 
   // company comes from useActiveCompany — no separate fetch
 
@@ -289,13 +315,15 @@ export default function VirtualOffice() {
 
   const officeHeading = (
     <div className="galaxy-page-heading">
-      <p className="galaxy-page-kicker">3D Metaverse</p>
+      <p className="galaxy-page-kicker">Ofislar</p>
       <h1>Virtual Ofis{company ? ` — ${company.name}` : ""}</h1>
       <p>
         {companyLoading
           ? "Yuklanmoqda..."
           : company
-            ? "3D xonada yuring — jamoa a’zolari real vaqtda ko‘rinadi va eshitiladi."
+            ? mobileUi
+              ? "3D xonada barmoq bilan yuring — jamoa real vaqtda ko‘rinadi."
+              : "3D xonada yuring — jamoa a’zolari real vaqtda ko‘rinadi va eshitiladi."
             : "Avval kompaniya yarating — keyin virtual ofisingiz ochiladi."}
       </p>
     </div>
@@ -367,11 +395,21 @@ export default function VirtualOffice() {
       </div>
 
       {hintVisible && immersive && (
-        <div className="office-3d-hint">
-          🖱️ Sichqoncha · WASD — yurish · M — mikrofon · Esc — kichraytirish ·{" "}
-          {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
-          {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
-          {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
+        <div className={`office-3d-hint ${mobileUi ? "is-mobile" : ""}`}>
+          {mobileUi ? (
+            <>
+              👆 Barmoq bilan yuring · 🎤 mikrofon · ⛶ kichraytirish · ⏸ pauza · 📱 telefon
+              {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
+              {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
+            </>
+          ) : (
+            <>
+              🖱️ Sichqoncha · WASD — yurish · M — mikrofon · Esc — kichraytirish ·{" "}
+              {keybinds.pause.toUpperCase()} — pauza · {keybinds.phone.toUpperCase()} — telefon
+              {voiceStatus === "connecting" && " · 🎙️ Ulanmoqda..."}
+              {voiceStatus === "error" && " · ⚠️ Ovoz sozlanmagan"}
+            </>
+          )}
         </div>
       )}
 
@@ -418,7 +456,7 @@ export default function VirtualOffice() {
         <div className="office-immersive-top">
           <div>
             <strong>{company.name}</strong>
-            <span>Virtual Ofis · Esc — chiqish</span>
+            <span>{mobileUi ? "Virtual Ofis · Chiqish ⛶" : "Virtual Ofis · Esc — chiqish"}</span>
           </div>
           <span className={`office-voice-pill is-${voiceStatus}`}>
             {voiceStatus === "connected" && "🎙️ Ulangan"}
@@ -442,7 +480,11 @@ export default function VirtualOffice() {
             {voiceStatus === "error" && "⚠️ Ovozli chat sozlanmagan"}
             {voiceStatus === "off" && "🔇 Ovoz o‘chiq"}
           </span>
-          <span className="office-status-hint">Ofis kichraytirilgan — Enter yoki tugma bilan to‘liq ekranga qayting</span>
+          <span className="office-status-hint">
+            {mobileUi
+              ? "Ofis kichraytirilgan — to‘liq ekran tugmasini bosing"
+              : "Ofis kichraytirilgan — Enter yoki tugma bilan to‘liq ekranga qayting"}
+          </span>
         </div>
 
         <div ref={audioContainerRef} className="office-audio-sink" />
