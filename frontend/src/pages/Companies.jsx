@@ -101,6 +101,14 @@ function CompaniesHeading() {
 }
 
 function ActivityChart({ data }) {
+  if (!data?.length) {
+    return (
+      <div className="os-chart-empty">
+        <p>Hali faoliyat yo‘q</p>
+        <span>Vazifalar bajarilgach bu yerda haqiqiy trend chiqadi.</span>
+      </div>
+    );
+  }
   return (
     <div className="os-chart-wrap">
       <ResponsiveContainer width="100%" height={240}>
@@ -290,19 +298,14 @@ export default function Companies() {
   }, [activeCompany?.id]);
 
   useEffect(() => {
-    if (!activeCompany) return;
+    if (!activeCompany) {
+      setActivitySeries([]);
+      return undefined;
+    }
     let cancelled = false;
 
-    const fallback = [
-      { label: "1-haft", value: 28 },
-      { label: "2-haft", value: 42 },
-      { label: "3-haft", value: 55 },
-      { label: "1-oy", value: 68 },
-      { label: "4-oy", value: Math.min(95, 40 + members.length * 4) },
-    ];
-
     if (!canViewAnalytics) {
-      setActivitySeries(fallback);
+      setActivitySeries([]);
       return undefined;
     }
 
@@ -310,43 +313,35 @@ export default function Companies() {
       .getCompanyAnalytics(activeCompany.id, { task_period: "month", perf_period: "month", fin_period: "month" })
       .then((data) => {
         if (cancelled) return;
-        const labels = ["1-haft", "2-haft", "3-haft", "1-oy", "4-oy"];
         const trend = data?.task_trend || [];
         if (!trend.length) {
-          setActivitySeries(fallback);
+          setActivitySeries([]);
           return;
         }
-        const recent = trend.slice(-5);
-        const mapped = labels.map((label, i) => {
-          const row = recent[i] || recent[recent.length - 1] || {};
+        // Real task completion trend only — no demo weeks/months
+        const mapped = trend.slice(-6).map((row, i) => {
           const value =
             row.completion_rate != null
               ? row.completion_rate
-              : Math.min(100, 18 + i * 12 + (row.accepted || 0) * 8);
-          return { label, value };
+              : Math.min(100, (row.accepted || 0) * 8);
+          return {
+            label: row.month || row.label || `${i + 1}`,
+            value: Number(value) || 0,
+          };
         });
-        setActivitySeries(mapped);
+        const hasSignal = mapped.some((p) => p.value > 0);
+        setActivitySeries(hasSignal ? mapped : []);
       })
       .catch(() => {
-        if (!cancelled) setActivitySeries(fallback);
+        if (!cancelled) setActivitySeries([]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeCompany?.id, canViewAnalytics, members.length]);
+  }, [activeCompany?.id, canViewAnalytics]);
 
-  const chartData = useMemo(
-    () =>
-      activitySeries || [
-        { label: "1-haft", value: 20 },
-        { label: "2-haft", value: 35 },
-        { label: "3-haft", value: 48 },
-        { label: "1-oy", value: 62 },
-        { label: "4-oy", value: 78 },
-      ],
-    [activitySeries]
-  );
+  const chartData = useMemo(() => activitySeries || [], [activitySeries]);
 
   async function handleLogoFile(e) {
     const file = e.target.files?.[0];
@@ -859,6 +854,7 @@ export default function Companies() {
 
                   <div className="os-card os-card-chart">
                     <h4>Faoliyat statistikasi</h4>
+                    <p className="os-chart-caption">Vazifa bajarilish foizi — haqiqiy analitika</p>
                     <ActivityChart data={chartData} />
                   </div>
                 </div>

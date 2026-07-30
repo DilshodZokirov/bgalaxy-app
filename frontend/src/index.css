@@ -8994,9 +8994,54 @@ html[data-custom-bg="1"] .galaxy-sky {
   min-height: 280px;
 }
 
+.os-chart-caption {
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
 .os-chart-wrap {
   width: 100%;
   min-height: 240px;
+}
+
+.os-chart-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 220px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.35);
+  text-align: center;
+}
+
+.os-chart-empty p {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.os-chart-empty span {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.galaxy-shell-day .os-chart-empty {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.galaxy-shell-day .os-chart-empty p {
+  color: #0f172a;
+}
+
+.galaxy-shell-day .os-chart-caption {
+  color: #64748b;
 }
 
 .os-quick h4 {
