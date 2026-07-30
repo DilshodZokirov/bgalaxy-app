@@ -1,5 +1,6 @@
 FROM python:3.11-slim
 
+# Cache-bust: task comments + board websocket (2026-07-26)
 WORKDIR /app
 
 # System deps needed by asyncpg/bcrypt build chains
