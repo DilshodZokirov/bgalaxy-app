@@ -309,6 +309,7 @@ function ReportPreviewModal({ data, onClose }) {
           <tbody>
             {data.invoices.map((inv, i) => (
               <tr key={i}>
+                <td style={{ fontFamily: "monospace", fontSize: 12 }}>{inv.invoice_number || "—"}</td>
                 <td>{inv.client_name}</td>
                 <td>{money(inv.total_amount)}</td>
                 <td><span className={`acc-badge ${inv.status}`}>{inv.status}</span></td>
@@ -628,6 +629,7 @@ function DetailModal({ title, companyId, entity, onClose, onDenied }) {
             {entity === "invoices" && (
               <>
                 <option value="issue_date">Sana bo'yicha</option>
+                <option value="invoice_number">Raqam bo'yicha</option>
                 <option value="total_amount">Summasi bo'yicha</option>
                 <option value="client_name">Mijoz bo'yicha</option>
               </>
@@ -657,7 +659,7 @@ function DetailModal({ title, companyId, entity, onClose, onDenied }) {
               <tr><th>Sana</th><th>Turi</th><th>Kategoriya</th><th>Summasi</th><th>Kim kiritdi</th></tr>
             )}
             {entity === "invoices" && (
-              <tr><th>Mijoz</th><th>Summasi</th><th>Sana</th><th>Holati</th><th>Kim yaratdi</th></tr>
+              <tr><th>Raqam</th><th>Mijoz</th><th>QQS</th><th>Jami</th><th>Sana</th><th>Holati</th></tr>
             )}
             {entity === "payroll" && (
               <tr><th>Xodim</th><th>Davr</th><th>Summasi</th><th>Holati</th></tr>
@@ -675,11 +677,12 @@ function DetailModal({ title, companyId, entity, onClose, onDenied }) {
             ))}
             {entity === "invoices" && items.map((inv) => (
               <tr key={inv.id}>
+                <td style={{ fontFamily: "monospace", fontSize: 12 }}>{inv.invoice_number}</td>
                 <td>{inv.client_name}</td>
+                <td>{money(inv.vat_amount)} ({inv.vat_rate}%)</td>
                 <td>{money(inv.total_amount)}</td>
                 <td>{inv.issue_date}</td>
                 <td><span className={`acc-badge ${inv.status}`}>{inv.status}</span></td>
-                <td style={{ color: "var(--text-dim)" }}>{inv.created_by_name}</td>
               </tr>
             ))}
             {entity === "payroll" && items.map((p) => (
@@ -774,6 +777,10 @@ function SummaryTab({ companyId, onDenied }) {
             <div className="stat-label">Balans</div>
             <div className="stat-value" style={{ fontSize: 20 }}>{money(summary.balance)}</div>
           </div>
+          <div className="card stat-card">
+            <div className="stat-label">Debitor qarz</div>
+            <div className="stat-value" style={{ fontSize: 20 }}>{money(summary.total_receivable)}</div>
+          </div>
         </div>
       )}
 
@@ -797,6 +804,7 @@ function SummaryTab({ companyId, onDenied }) {
 function TransactionsTab({ companyId, onDenied }) {
   const [items, setItems] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [type, setType] = useState("income");
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
@@ -811,20 +819,41 @@ function TransactionsTab({ companyId, onDenied }) {
 
   useEffect(refresh, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleAdd(e) {
+  function startEdit(t) {
+    setEditing(t);
+    setType(t.type);
+    setCategory(t.category || "");
+    setAmount(String(t.amount));
+    setDescription(t.description || "");
+    setOccurredOn(t.occurred_on);
+  }
+
+  function resetForm() {
+    setEditing(null);
+    setType("income");
+    setCategory("");
+    setAmount("");
+    setDescription("");
+    setOccurredOn(isoDate(new Date()));
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    const payload = {
+      type,
+      category,
+      amount: parseFloat(amount),
+      description: description || null,
+      occurred_on: occurredOn,
+    };
     try {
-      await api.createTransaction(companyId, {
-        type,
-        category,
-        amount: parseFloat(amount),
-        description: description || null,
-        occurred_on: occurredOn,
-      });
-      setCategory("");
-      setAmount("");
-      setDescription("");
+      if (editing) {
+        await api.updateTransaction(companyId, editing.id, payload);
+      } else {
+        await api.createTransaction(companyId, payload);
+      }
+      resetForm();
       refresh();
     } catch (err) {
       setError(err.message);
@@ -834,6 +863,7 @@ function TransactionsTab({ companyId, onDenied }) {
   async function handleDelete(id) {
     try {
       await api.deleteTransaction(companyId, id);
+      if (editing?.id === id) resetForm();
       refresh();
     } catch (err) {
       setError(err.message);
@@ -843,7 +873,7 @@ function TransactionsTab({ companyId, onDenied }) {
   return (
     <div>
       <div className="card" style={{ marginBottom: 20 }}>
-        <form onSubmit={handleAdd} className="acc-form-row">
+        <form onSubmit={handleSubmit} className="acc-form-row">
           <div>
             <label>Turi</label>
             <select value={type} onChange={(e) => setType(e.target.value)} style={{ background: "var(--panel-2)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-sm)", padding: "10px" }}>
@@ -867,7 +897,14 @@ function TransactionsTab({ companyId, onDenied }) {
             <label>Izoh</label>
             <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ixtiyoriy" />
           </div>
-          <button type="submit" style={{ width: "auto", padding: "10px 18px" }}>+ Qo'shish</button>
+          <button type="submit" style={{ width: "auto", padding: "10px 18px" }}>
+            {editing ? "Saqlash" : "+ Qo'shish"}
+          </button>
+          {editing && (
+            <button type="button" className="secondary" style={{ width: "auto", padding: "10px 14px" }} onClick={resetForm}>
+              Bekor
+            </button>
+          )}
         </form>
         {error && <p className="error">{error}</p>}
       </div>
@@ -890,7 +927,10 @@ function TransactionsTab({ companyId, onDenied }) {
                 <td>{money(t.amount)}</td>
                 <td style={{ color: "var(--text-dim)" }}>{t.description || "—"}</td>
                 <td style={{ color: "var(--text-dim)" }}>{t.created_by_name}</td>
-                <td>
+                <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => startEdit(t)}>
+                    Tahrir
+                  </button>
                   <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handleDelete(t.id)}>
                     O'chirish
                   </button>
@@ -913,15 +953,28 @@ function TransactionsTab({ companyId, onDenied }) {
 
 /* ---------- Invoices ---------- */
 
+function invoicePreviewTotals(lineItems, vatRate) {
+  const subtotal = lineItems.reduce(
+    (s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.price) || 0),
+    0
+  );
+  const rate = parseFloat(vatRate) || 0;
+  const vat = Math.round(subtotal * rate) / 100;
+  return { subtotal, vat, total: subtotal + vat };
+}
+
 function InvoicesTab({ companyId, onDenied }) {
   const [items, setItems] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [clientName, setClientName] = useState("");
   const [issueDate, setIssueDate] = useState(isoDate(new Date()));
   const [dueDate, setDueDate] = useState("");
+  const [vatRate, setVatRate] = useState("12");
   const [lineItems, setLineItems] = useState([{ name: "", quantity: 1, price: 0 }]);
   const [error, setError] = useState(null);
   const catchDenied = useDeniedCatch(onDenied);
+  const preview = invoicePreviewTotals(lineItems, vatRate);
 
   function refresh() {
     api.getInvoices(companyId, { page: 1, page_size: 5 }).then((res) => setItems(res.items)).catch(catchDenied);
@@ -933,18 +986,53 @@ function InvoicesTab({ companyId, onDenied }) {
     setLineItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, [field]: value } : it)));
   }
 
-  async function handleCreate(e) {
+  function resetForm() {
+    setEditing(null);
+    setClientName("");
+    setIssueDate(isoDate(new Date()));
+    setDueDate("");
+    setVatRate("12");
+    setLineItems([{ name: "", quantity: 1, price: 0 }]);
+  }
+
+  function startEdit(inv) {
+    setEditing(inv);
+    setClientName(inv.client_name || "");
+    setIssueDate(inv.issue_date);
+    setDueDate(inv.due_date || "");
+    setVatRate(String(inv.vat_rate ?? 12));
+    setLineItems(
+      (inv.items || []).length
+        ? inv.items.map((it) => ({
+            name: it.name || "",
+            quantity: it.quantity ?? 1,
+            price: it.price ?? 0,
+          }))
+        : [{ name: "", quantity: 1, price: 0 }]
+    );
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    const payload = {
+      client_name: clientName,
+      items: lineItems.map((it) => ({
+        name: it.name,
+        quantity: parseFloat(it.quantity),
+        price: parseFloat(it.price),
+      })),
+      issue_date: issueDate,
+      due_date: dueDate || null,
+      vat_rate: parseFloat(vatRate) || 0,
+    };
     try {
-      await api.createInvoice(companyId, {
-        client_name: clientName,
-        items: lineItems.map((it) => ({ ...it, quantity: parseFloat(it.quantity), price: parseFloat(it.price) })),
-        issue_date: issueDate,
-        due_date: dueDate || null,
-      });
-      setClientName("");
-      setLineItems([{ name: "", quantity: 1, price: 0 }]);
+      if (editing) {
+        await api.updateInvoice(companyId, editing.id, payload);
+      } else {
+        await api.createInvoice(companyId, payload);
+      }
+      resetForm();
       refresh();
     } catch (err) {
       setError(err.message);
@@ -963,7 +1051,16 @@ function InvoicesTab({ companyId, onDenied }) {
   async function handleDelete(id) {
     try {
       await api.deleteInvoice(companyId, id);
+      if (editing?.id === id) resetForm();
       refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handlePdf(inv) {
+    try {
+      await api.downloadInvoicePdf(companyId, inv.id, `${inv.invoice_number || "faktura"}.pdf`);
     } catch (err) {
       setError(err.message);
     }
@@ -972,7 +1069,12 @@ function InvoicesTab({ companyId, onDenied }) {
   return (
     <div>
       <div className="card" style={{ marginBottom: 20 }}>
-        <form onSubmit={handleCreate}>
+        <form onSubmit={handleSubmit}>
+          {editing && (
+            <p style={{ fontSize: 13, margin: "0 0 10px", color: "var(--accent, #38bdf8)" }}>
+              Tahrirlash: <strong>{editing.invoice_number}</strong>
+            </p>
+          )}
           <div className="acc-form-row">
             <div style={{ flex: 1, minWidth: 160 }}>
               <label>Mijoz nomi</label>
@@ -985,6 +1087,18 @@ function InvoicesTab({ companyId, onDenied }) {
             <div>
               <label>Muddat (ixtiyoriy)</label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+            <div>
+              <label>QQS %</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={vatRate}
+                onChange={(e) => setVatRate(e.target.value)}
+                style={{ maxWidth: 100 }}
+              />
             </div>
           </div>
 
@@ -1004,9 +1118,22 @@ function InvoicesTab({ companyId, onDenied }) {
           >
             + Yana buyum
           </button>
-          <br />
+          <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 12, display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <span>Oraliq: {money(preview.subtotal)}</span>
+            <span>QQS: {money(preview.vat)}</span>
+            <strong style={{ color: "var(--text)" }}>Jami: {money(preview.total)}</strong>
+          </div>
           {error && <p className="error">{error}</p>}
-          <button type="submit" style={{ width: "auto", padding: "10px 18px" }}>Hisob-faktura yaratish</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="submit" style={{ width: "auto", padding: "10px 18px" }}>
+              {editing ? "O'zgarishlarni saqlash" : "Hisob-faktura yaratish"}
+            </button>
+            {editing && (
+              <button type="button" className="secondary" style={{ width: "auto", padding: "10px 14px" }} onClick={resetForm}>
+                Bekor qilish
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -1017,12 +1144,24 @@ function InvoicesTab({ companyId, onDenied }) {
         </div>
         <table className="acc-table">
           <thead>
-            <tr><th>Mijoz</th><th>Summasi</th><th>Sana</th><th>Holati</th><th>Kim yaratdi</th><th></th></tr>
+            <tr>
+              <th>Raqam</th>
+              <th>Mijoz</th>
+              <th>Oraliq</th>
+              <th>QQS</th>
+              <th>Jami</th>
+              <th>Sana</th>
+              <th>Holati</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {items.map((inv) => (
               <tr key={inv.id}>
+                <td style={{ fontFamily: "monospace", fontSize: 12 }}>{inv.invoice_number}</td>
                 <td>{inv.client_name}</td>
+                <td>{money(inv.subtotal_amount)}</td>
+                <td>{money(inv.vat_amount)} <span style={{ color: "var(--text-dim)", fontSize: 11 }}>({inv.vat_rate}%)</span></td>
                 <td>{money(inv.total_amount)}</td>
                 <td>{inv.issue_date}</td>
                 <td>
@@ -1037,8 +1176,13 @@ function InvoicesTab({ companyId, onDenied }) {
                     <option value="overdue">Muddati o'tgan</option>
                   </select>
                 </td>
-                <td style={{ color: "var(--text-dim)" }}>{inv.created_by_name}</td>
-                <td>
+                <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => startEdit(inv)}>
+                    Tahrir
+                  </button>
+                  <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handlePdf(inv)}>
+                    PDF
+                  </button>
                   <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handleDelete(inv.id)}>
                     O'chirish
                   </button>
@@ -1046,7 +1190,7 @@ function InvoicesTab({ companyId, onDenied }) {
               </tr>
             ))}
             {items.length === 0 && (
-              <tr><td colSpan={6} style={{ color: "var(--text-dim)", textAlign: "center" }}>Hali hisob-faktura yo'q</td></tr>
+              <tr><td colSpan={8} style={{ color: "var(--text-dim)", textAlign: "center" }}>Hali hisob-faktura yo'q</td></tr>
             )}
           </tbody>
         </table>
@@ -1103,6 +1247,15 @@ function PayrollTab({ companyId, onDenied }) {
     }
   }
 
+  async function handleDelete(id) {
+    try {
+      await api.deletePayroll(companyId, id);
+      refresh();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <div className="card" style={{ marginBottom: 20 }}>
@@ -1150,12 +1303,15 @@ function PayrollTab({ companyId, onDenied }) {
                 <td>{money(p.amount)}</td>
                 <td><span className={`acc-badge ${p.status}`}>{p.status === "paid" ? "To'langan" : "Kutilmoqda"}</span></td>
                 <td style={{ color: "var(--text-dim)" }}>{p.created_by_name}</td>
-                <td>
+                <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {p.status !== "paid" && (
                     <button style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handleMarkPaid(p.id)}>
                       To'landi deb belgilash
                     </button>
                   )}
+                  <button className="secondary" style={{ width: "auto", padding: "4px 10px", fontSize: 11 }} onClick={() => handleDelete(p.id)}>
+                    O'chirish
+                  </button>
                 </td>
               </tr>
             ))}

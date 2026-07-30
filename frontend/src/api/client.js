@@ -283,6 +283,8 @@ export const api = {
     request(`/companies/${companyId}/accounting/transactions?${new URLSearchParams(params)}`),
   createTransaction: (companyId, data) =>
     request(`/companies/${companyId}/accounting/transactions`, { method: "POST", body: data }),
+  updateTransaction: (companyId, id, data) =>
+    request(`/companies/${companyId}/accounting/transactions/${id}`, { method: "PATCH", body: data }),
   deleteTransaction: (companyId, id) =>
     request(`/companies/${companyId}/accounting/transactions/${id}`, { method: "DELETE" }),
   getInvoices: (companyId, params = {}) =>
@@ -293,12 +295,28 @@ export const api = {
     request(`/companies/${companyId}/accounting/invoices/${id}`, { method: "PATCH", body: data }),
   deleteInvoice: (companyId, id) =>
     request(`/companies/${companyId}/accounting/invoices/${id}`, { method: "DELETE" }),
+  downloadInvoicePdf: async (companyId, id, filename) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/companies/${companyId}/accounting/invoices/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("PDF yuklab bo'lmadi");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || `faktura-${id}.pdf`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  },
   getPayroll: (companyId, params = {}) =>
     request(`/companies/${companyId}/accounting/payroll?${new URLSearchParams(params)}`),
   createPayroll: (companyId, data) =>
     request(`/companies/${companyId}/accounting/payroll`, { method: "POST", body: data }),
   markPayrollPaid: (companyId, id) =>
     request(`/companies/${companyId}/accounting/payroll/${id}/pay`, { method: "PATCH" }),
+  deletePayroll: (companyId, id) =>
+    request(`/companies/${companyId}/accounting/payroll/${id}`, { method: "DELETE" }),
   getAccountingSummary: (companyId, month) =>
     request(`/companies/${companyId}/accounting/summary?month=${month}`),
   getAccountingStats: (companyId, period) =>
