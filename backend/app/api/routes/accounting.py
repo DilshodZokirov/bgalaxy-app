@@ -28,6 +28,16 @@ from app.schemas.accounting import (
     PeriodTotals,
     TransactionCreate,
     TransactionOut,
+    TransactionUpdate,
+)
+from app.services.invoice_docs import (
+    build_invoice_pdf,
+    calc_invoice_totals,
+    ensure_invoice_income_tx,
+    ensure_payroll_expense_tx,
+    next_invoice_number,
+    remove_invoice_income_tx,
+    remove_payroll_expense_tx,
 )
 from app.services.permissions import require_permission
 
@@ -45,6 +55,16 @@ def _month_bounds(month: str) -> tuple[date, date]:
     return start, end
 
 
+def _refresh_overdue(inv: Invoice, today: date | None = None) -> bool:
+    today = today or date.today()
+    if inv.status in ("paid", "cancelled", "overdue"):
+        return False
+    if inv.due_date and inv.due_date < today and inv.status in ("draft", "sent"):
+        inv.status = "overdue"
+        return True
+    return False
+
+
 def _tx_out(tx: Transaction, creator_name: str | None) -> TransactionOut:
     return TransactionOut(
         id=tx.id,
@@ -55,14 +75,20 @@ def _tx_out(tx: Transaction, creator_name: str | None) -> TransactionOut:
         occurred_on=tx.occurred_on,
         created_at=tx.created_at,
         created_by_name=creator_name,
+        source_invoice_id=tx.source_invoice_id,
+        source_payroll_id=tx.source_payroll_id,
     )
 
 
 def _invoice_out(inv: Invoice, creator_name: str | None) -> InvoiceOut:
     return InvoiceOut(
         id=inv.id,
+        invoice_number=inv.invoice_number or f"INV-{str(inv.id)[:8].upper()}",
         client_name=inv.client_name,
-        items=inv.items,
+        items=inv.items or [],
+        vat_rate=float(inv.vat_rate or 0),
+        subtotal_amount=float(inv.subtotal_amount or 0),
+        vat_amount=float(inv.vat_amount or 0),
         total_amount=float(inv.total_amount),
         status=inv.status,
         issue_date=inv.issue_date,
@@ -159,6 +185,34 @@ async def create_transaction(
     return _tx_out(tx, current_user.full_name)
 
 
+@router.patch("/transactions/{transaction_id}", response_model=TransactionOut)
+async def update_transaction(
+    company_id: str,
+    transaction_id: str,
+    payload: TransactionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _check(db, company_id, current_user.id)
+    result = await db.execute(
+        select(Transaction, User)
+        .join(User, User.id == Transaction.created_by)
+        .where(Transaction.id == transaction_id, Transaction.company_id == company_id)
+    )
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    tx, creator = row
+    data = payload.model_dump(exclude_unset=True)
+    if "type" in data and data["type"] is not None and data["type"] not in ("income", "expense"):
+        raise HTTPException(status_code=400, detail="type 'income' yoki 'expense' bo'lishi kerak")
+    for key, value in data.items():
+        setattr(tx, key, value)
+    await db.commit()
+    await db.refresh(tx)
+    return _tx_out(tx, creator.full_name)
+
+
 @router.delete("/transactions/{transaction_id}", status_code=204)
 async def delete_transaction(
     company_id: str,
@@ -203,9 +257,15 @@ async def list_invoices(
     if date_to:
         query = query.where(Invoice.issue_date <= date_to)
     if search:
-        query = query.where(Invoice.client_name.ilike(f"%{search}%"))
+        like = f"%{search}%"
+        query = query.where(or_(Invoice.client_name.ilike(like), Invoice.invoice_number.ilike(like)))
 
-    sort_map = {"issue_date": Invoice.issue_date, "total_amount": Invoice.total_amount, "client_name": Invoice.client_name}
+    sort_map = {
+        "issue_date": Invoice.issue_date,
+        "total_amount": Invoice.total_amount,
+        "client_name": Invoice.client_name,
+        "invoice_number": Invoice.invoice_number,
+    }
     sort_col = sort_map.get(sort_by, Invoice.issue_date)
     query = query.order_by(sort_col.desc() if sort_dir == "desc" else sort_col.asc())
 
@@ -216,7 +276,15 @@ async def list_invoices(
     page_size = max(1, min(page_size, 100))
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    items = [_invoice_out(inv, user.full_name) for inv, user in result.all()]
+    rows = result.all()
+    changed = False
+    today = date.today()
+    for inv, _ in rows:
+        if _refresh_overdue(inv, today):
+            changed = True
+    if changed:
+        await db.commit()
+    items = [_invoice_out(inv, user.full_name) for inv, user in rows]
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -230,20 +298,62 @@ async def create_invoice(
 ):
     await _check(db, company_id, current_user.id)
     items = [item.model_dump() for item in payload.items]
-    total = sum(item["quantity"] * item["price"] for item in items)
+    if not items:
+        raise HTTPException(status_code=400, detail="Kamida bitta buyum kerak")
+    subtotal, vat_amount, total = calc_invoice_totals(items, payload.vat_rate)
+    number = await next_invoice_number(db, company_id, payload.issue_date)
     invoice = Invoice(
         company_id=company_id,
-        client_name=payload.client_name,
+        invoice_number=number,
+        client_name=payload.client_name.strip(),
         items=items,
+        vat_rate=payload.vat_rate,
+        subtotal_amount=subtotal,
+        vat_amount=vat_amount,
         total_amount=total,
         issue_date=payload.issue_date,
         due_date=payload.due_date,
         created_by=current_user.id,
     )
+    _refresh_overdue(invoice)
     db.add(invoice)
+    await db.flush()
+    if invoice.status == "paid":
+        await ensure_invoice_income_tx(
+            db, company_id=company_id, invoice=invoice, user_id=current_user.id
+        )
     await db.commit()
     await db.refresh(invoice)
     return _invoice_out(invoice, current_user.full_name)
+
+
+@router.get("/invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    company_id: str,
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _check(db, company_id, current_user.id)
+    result = await db.execute(
+        select(Invoice, User)
+        .join(User, User.id == Invoice.created_by)
+        .where(Invoice.id == invoice_id, Invoice.company_id == company_id)
+    )
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    invoice, creator = row
+    company = (await db.execute(select(Company).where(Company.id == company_id))).scalar_one_or_none()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Kompaniya topilmadi")
+    pdf = build_invoice_pdf(company=company, invoice=invoice, creator_name=creator.full_name)
+    filename = f"{(invoice.invoice_number or 'invoice').replace('/', '-')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.patch("/invoices/{invoice_id}", response_model=InvoiceOut)
@@ -264,9 +374,41 @@ async def update_invoice(
     if row is None:
         raise HTTPException(status_code=404, detail="Topilmadi")
     invoice, creator = row
-    if payload.status not in ("draft", "sent", "paid", "overdue"):
-        raise HTTPException(status_code=400, detail="Noto'g'ri status")
-    invoice.status = payload.status
+    prev_status = invoice.status
+    data = payload.model_dump(exclude_unset=True)
+
+    if "status" in data and data["status"] is not None:
+        if data["status"] not in ("draft", "sent", "paid", "overdue"):
+            raise HTTPException(status_code=400, detail="Noto'g'ri status")
+        invoice.status = data["status"]
+    if "client_name" in data and data["client_name"] is not None:
+        invoice.client_name = data["client_name"].strip()
+    if "issue_date" in data and data["issue_date"] is not None:
+        invoice.issue_date = data["issue_date"]
+    if "due_date" in data:
+        invoice.due_date = data["due_date"]
+    if "vat_rate" in data and data["vat_rate"] is not None:
+        invoice.vat_rate = data["vat_rate"]
+    if "items" in data and data["items"] is not None:
+        items = [item if isinstance(item, dict) else item.model_dump() for item in payload.items or []]
+        if not items:
+            raise HTTPException(status_code=400, detail="Kamida bitta buyum kerak")
+        invoice.items = items
+
+    items = invoice.items or []
+    subtotal, vat_amount, total = calc_invoice_totals(items, float(invoice.vat_rate or 0))
+    invoice.subtotal_amount = subtotal
+    invoice.vat_amount = vat_amount
+    invoice.total_amount = total
+    _refresh_overdue(invoice)
+
+    if invoice.status == "paid":
+        await ensure_invoice_income_tx(
+            db, company_id=company_id, invoice=invoice, user_id=current_user.id
+        )
+    elif prev_status == "paid" and invoice.status != "paid":
+        await remove_invoice_income_tx(db, company_id=company_id, invoice_id=invoice.id)
+
     await db.commit()
     await db.refresh(invoice)
     return _invoice_out(invoice, creator.full_name)
@@ -286,6 +428,7 @@ async def delete_invoice(
     invoice = result.scalar_one_or_none()
     if invoice is None:
         raise HTTPException(status_code=404, detail="Topilmadi")
+    await remove_invoice_income_tx(db, company_id=company_id, invoice_id=invoice.id)
     await db.delete(invoice)
     await db.commit()
 
@@ -387,6 +530,16 @@ async def mark_payroll_paid(
 
     entry.status = "paid"
     entry.paid_at = datetime.utcnow()
+    employee = (
+        await db.execute(select(User).where(User.id == str(entry.employee_id)))
+    ).scalar_one_or_none()
+    await ensure_payroll_expense_tx(
+        db,
+        company_id=company_id,
+        entry=entry,
+        employee_name=employee.full_name if employee else "Xodim",
+        user_id=current_user.id,
+    )
     await db.commit()
 
     user_ids = {str(entry.employee_id), str(entry.created_by)}
@@ -397,6 +550,25 @@ async def mark_payroll_paid(
         users_by_id.get(str(entry.employee_id)) and users_by_id[str(entry.employee_id)].full_name,
         users_by_id.get(str(entry.created_by)) and users_by_id[str(entry.created_by)].full_name,
     )
+
+
+@router.delete("/payroll/{entry_id}", status_code=204)
+async def delete_payroll(
+    company_id: str,
+    entry_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await _check(db, company_id, current_user.id)
+    result = await db.execute(
+        select(PayrollEntry).where(PayrollEntry.id == entry_id, PayrollEntry.company_id == company_id)
+    )
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    await remove_payroll_expense_tx(db, company_id=company_id, payroll_id=entry.id)
+    await db.delete(entry)
+    await db.commit()
 
 
 # ---------- Umumiy — month-scoped summary (stat cards) ----------
@@ -412,6 +584,7 @@ async def get_summary(
     await _check(db, company_id, current_user.id)
     month_start, month_end = _month_bounds(month)
 
+    # Balans faqat kassa tranzaksiyalaridan (to'langan faktura/oylik linked tx orqali kiradi)
     tx_result = await db.execute(
         select(Transaction).where(
             Transaction.company_id == company_id,
@@ -423,31 +596,37 @@ async def get_summary(
     total_income = sum(float(t.amount) for t in transactions if t.type == "income")
     total_expense = sum(float(t.amount) for t in transactions if t.type == "expense")
 
-    # Invoices contribute based on status: paid -> income, overdue -> expense.
-    inv_result = await db.execute(
-        select(Invoice).where(
-            Invoice.company_id == company_id,
-            Invoice.issue_date >= month_start,
-            Invoice.issue_date < month_end,
-        )
-    )
-    for inv in inv_result.scalars().all():
-        if inv.status == "paid":
-            total_income += float(inv.total_amount)
-        elif inv.status == "overdue":
-            total_expense += float(inv.total_amount)
-
     payroll_result = await db.execute(
         select(PayrollEntry).where(PayrollEntry.company_id == company_id, PayrollEntry.period == month)
     )
     total_payroll = sum(float(p.amount) for p in payroll_result.scalars().all())
+
+    # Debitor qarz: yuborilgan / muddati o'tgan (kassaga tushmagan)
+    inv_result = await db.execute(
+        select(Invoice).where(
+            Invoice.company_id == company_id,
+            Invoice.status.in_(("draft", "sent", "overdue")),
+        )
+    )
+    invoices = inv_result.scalars().all()
+    changed = False
+    today = date.today()
+    for inv in invoices:
+        if _refresh_overdue(inv, today):
+            changed = True
+    if changed:
+        await db.commit()
+    total_receivable = sum(
+        float(inv.total_amount) for inv in invoices if inv.status in ("sent", "overdue", "draft")
+    )
 
     return AccountingSummary(
         month=month,
         total_income=total_income,
         total_expense=total_expense,
         total_payroll=total_payroll,
-        balance=total_income - total_expense - total_payroll,
+        balance=total_income - total_expense,
+        total_receivable=total_receivable,
     )
 
 
@@ -504,15 +683,6 @@ async def get_stats(
     )
     all_tx = tx_result.scalars().all()
 
-    inv_result = await db.execute(
-        select(Invoice).where(
-            Invoice.company_id == company_id,
-            Invoice.issue_date >= start,
-            Invoice.issue_date <= end,
-        )
-    )
-    all_inv = inv_result.scalars().all()
-
     payroll_result = await db.execute(select(PayrollEntry).where(PayrollEntry.company_id == company_id))
     all_payroll = payroll_result.scalars().all()
 
@@ -544,20 +714,11 @@ async def get_stats(
             else:
                 data[k]["expense"] += float(t.amount)
 
-    for inv in all_inv:
-        k = bucket_key(inv.issue_date)
-        if k in data:
-            if inv.status == "paid":
-                data[k]["income"] += float(inv.total_amount)
-            elif inv.status == "overdue":
-                data[k]["expense"] += float(inv.total_amount)
-
+    # Oylik — faqat grafik uchun (balansga qayta ayirilmaydi; to'langan oylik expense tx da)
     if bucket == "month":
         for p in all_payroll:
             if p.period in data:
                 data[p.period]["payroll"] += float(p.amount)
-    # Payroll is inherently monthly — for day-level buckets (1m/1w) it isn't
-    # distributed per-day, so "Oylik" will read 0 at that granularity.
 
     buckets = [
         PeriodBucket(
@@ -565,7 +726,7 @@ async def get_stats(
             income=v["income"],
             expense=v["expense"],
             payroll=v["payroll"],
-            balance=v["income"] - v["expense"] - v["payroll"],
+            balance=v["income"] - v["expense"],
         )
         for k, v in data.items()
     ]
@@ -589,9 +750,8 @@ async def get_yearly_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Last 10 calendar years of income/expense/balance (transactions +
-    invoice status same as elsewhere: paid=income, overdue=expense, minus
-    payroll), each with a delta vs. the previous year — powers the Dashboard
+    """Last 10 calendar years of income/expense/balance from cash transactions
+    only (paid invoices/payroll appear via linked txs). Powers the Dashboard
     yearly comparison widget."""
     await _check(db, company_id, current_user.id)
 
@@ -606,33 +766,15 @@ async def get_yearly_summary(
     )
     all_tx = tx_result.scalars().all()
 
-    inv_result = await db.execute(
-        select(Invoice).where(
-            Invoice.company_id == company_id,
-            Invoice.issue_date >= date(start_year, 1, 1),
-        )
-    )
-    all_inv = inv_result.scalars().all()
-
-    payroll_result = await db.execute(select(PayrollEntry).where(PayrollEntry.company_id == company_id))
-    all_payroll = payroll_result.scalars().all()
-
     years_data = {}
     for year in range(start_year, current_year + 1):
         income = sum(float(t.amount) for t in all_tx if t.type == "income" and t.occurred_on.year == year)
         expense = sum(float(t.amount) for t in all_tx if t.type == "expense" and t.occurred_on.year == year)
-        for inv in all_inv:
-            if inv.issue_date.year == year:
-                if inv.status == "paid":
-                    income += float(inv.total_amount)
-                elif inv.status == "overdue":
-                    expense += float(inv.total_amount)
-        payroll = sum(float(p.amount) for p in all_payroll if p.period.startswith(str(year)))
         years_data[year] = {
             "year": year,
             "income": income,
             "expense": expense,
-            "balance": income - expense - payroll,
+            "balance": income - expense,
         }
 
     years = [years_data[y] for y in range(start_year, current_year + 1)]
@@ -696,7 +838,11 @@ async def preview_report(
         ],
         "invoices": [
             {
+                "invoice_number": inv.invoice_number,
                 "client_name": inv.client_name,
+                "subtotal_amount": float(inv.subtotal_amount or 0),
+                "vat_rate": float(inv.vat_rate or 0),
+                "vat_amount": float(inv.vat_amount or 0),
                 "total_amount": float(inv.total_amount),
                 "issue_date": str(inv.issue_date),
                 "status": inv.status,
@@ -763,9 +909,21 @@ async def download_report(
 
     writer.writerow([])
     writer.writerow(["HISOB-FAKTURALAR"])
-    writer.writerow(["Mijoz", "Summasi", "Sana", "Holati", "Kim yaratdi"])
+    writer.writerow(["Raqam", "Mijoz", "Oraliq", "QQS %", "QQS", "Jami", "Sana", "Holati", "Kim yaratdi"])
     for inv, user in invoice_result.all():
-        writer.writerow([inv.client_name, float(inv.total_amount), inv.issue_date, inv.status, user.full_name])
+        writer.writerow(
+            [
+                inv.invoice_number,
+                inv.client_name,
+                float(inv.subtotal_amount or 0),
+                float(inv.vat_rate or 0),
+                float(inv.vat_amount or 0),
+                float(inv.total_amount),
+                inv.issue_date,
+                inv.status,
+                user.full_name,
+            ]
+        )
 
     writer.writerow([])
     writer.writerow(["ISH HAQI"])
@@ -982,7 +1140,11 @@ async def download_report_excel(
     ]
     inv_rows = [
         [
+            inv.invoice_number,
             inv.client_name,
+            float(inv.subtotal_amount or 0),
+            float(inv.vat_rate or 0),
+            float(inv.vat_amount or 0),
             float(inv.total_amount),
             str(inv.issue_date),
             INV_STATUS_UZ.get(inv.status, inv.status),
@@ -1025,7 +1187,7 @@ async def download_report_excel(
 
     section_stats = [
         ("Tranzaksiyalar", len(tx_rows), sum(r[3] for r in tx_rows)),
-        ("Hisob-fakturalar", len(inv_rows), sum(r[1] for r in inv_rows)),
+        ("Hisob-fakturalar", len(inv_rows), sum(r[5] for r in inv_rows)),
         ("Ish haqi", len(payroll_rows), sum(r[2] for r in payroll_rows)),
     ]
     for i, (name, count, total) in enumerate(section_stats, start=7):
@@ -1071,9 +1233,9 @@ async def download_report_excel(
         ws_inv,
         "Hisob-fakturalar",
         period_label,
-        ["Mijoz", "Summasi", "Sana", "Holati", "Kim yaratdi"],
+        ["Raqam", "Mijoz", "Oraliq", "QQS %", "QQS", "Jami", "Sana", "Holati", "Kim yaratdi"],
         inv_rows,
-        1,
+        5,
         formula_keys,
     )
 

@@ -20,6 +20,13 @@ class Transaction(Base):
     occurred_on: Mapped[date] = mapped_column(Date)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Paid faktura / ish haqi bilan bog‘langan tranzaksiya (double-count oldini olish)
+    source_invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=True
+    )
+    source_payroll_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payroll_entries.id"), nullable=True
+    )
 
 
 class Invoice(Base):
@@ -27,9 +34,13 @@ class Invoice(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id"))
+    invoice_number: Mapped[str] = mapped_column(String(40))
     client_name: Mapped[str] = mapped_column(String(255))
     items: Mapped[list] = mapped_column(JSON, default=list)  # [{"name","quantity","price"}]
-    total_amount: Mapped[float] = mapped_column(Numeric(14, 2))
+    vat_rate: Mapped[float] = mapped_column(Numeric(5, 2), default=12)  # %
+    subtotal_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0)  # QQS siz
+    vat_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    total_amount: Mapped[float] = mapped_column(Numeric(14, 2))  # QQS bilan jami
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft|sent|paid|overdue
     issue_date: Mapped[date] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
