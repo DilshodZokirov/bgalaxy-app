@@ -31,16 +31,16 @@ def _check() -> None:
     ]
     assert active_emails(users) == ["a@b.com", "e@f.com"]
     assert count_by_role(users) == {"admin": 2, "member": 1}
-    assert unique_sorted_tags(["ombor", "chat", "ombor", "auth"]) == [
-        "auth",
-        "chat",
-        "ombor",
+    assert unique_sorted_tags(["kitob", "film", "kitob", "musiqa"]) == [
+        "film",
+        "kitob",
+        "musiqa",
     ]
     assert invert_map({"uz": "O'zbek", "en": "English"}) == {
         "O'zbek": "uz",
         "English": "en",
     }
-    print("ex02_collections (solution): OK ✓")
+    print("ex02_toplamlar (yechim): OK")
 
 
 if __name__ == "__main__":

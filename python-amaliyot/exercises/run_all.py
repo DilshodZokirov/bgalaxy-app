@@ -1,4 +1,4 @@
-"""Barcha mashqlarni ketma-ket ishga tushiradi."""
+"""Barcha mashqlarni ketma-ket tekshiradi."""
 
 from __future__ import annotations
 
@@ -18,26 +18,19 @@ def _load(path: Path):
 def main() -> int:
     root = Path(__file__).resolve().parent
     files = [
-        root / "ex01_basics.py",
-        root / "ex02_collections.py",
-        root / "ex03_oop.py",
-        root / "ex04_async_mini.py",
+        root / "ex01_funksiya.py",
+        root / "ex02_toplamlar.py",
+        root / "ex03_class.py",
+        root / "ex04_json.py",
     ]
     failed = 0
     for f in files:
         print(f"--- {f.name} ---")
         try:
             mod = _load(f)
-            if hasattr(mod, "_check"):
-                result = mod._check()
-                # async check
-                import asyncio
-                import inspect
-
-                if inspect.iscoroutine(result):
-                    asyncio.run(result)
+            mod._check()
         except NotImplementedError:
-            print(f"HALI TODO: {f.name} (yechimlar: ../solutions/)")
+            print(f"HALI TODO: {f.name}  (yechim: ../solutions/)")
             failed += 1
         except Exception as e:
             print(f"XATO: {f.name}: {e}")
@@ -45,7 +38,7 @@ def main() -> int:
     if failed:
         print(f"\n{failed} ta mashq hali tayyor emas.")
         return 1
-    print("\nHammasi o'tdi ✓")
+    print("\nHammasi o'tdi")
     return 0
 
 

@@ -1,37 +1,31 @@
 """
-02 — list / dict / comprehension
-python3 exercises/ex02_collections.py
+Bosqich 4 — list / dict / set
+python3 exercises/ex02_toplamlar.py
 """
 
 from __future__ import annotations
 
 
 def active_emails(users: list[dict]) -> list[str]:
-    """
-    users: [{"email": "...", "active": True/False}, ...]
-    Faqat active=True bo'lgan email'larni qaytaring (tartib saqlansin).
-    """
-    # TODO: list comprehension yoki for
+    """Faqat active=True email'lar (tartib saqlansin)."""
+    # TODO
     raise NotImplementedError
 
 
 def count_by_role(users: list[dict]) -> dict[str, int]:
-    """
-    [{"role": "admin"}, {"role": "member"}, {"role": "admin"}]
-    -> {"admin": 2, "member": 1}
-    """
+    """Rol bo'yicha nechta ekanini sanash."""
     # TODO
     raise NotImplementedError
 
 
 def unique_sorted_tags(tags: list[str]) -> list[str]:
-    """Takrorlarni olib tashlang va alifbo tartibida qaytaring."""
-    # TODO: set + sorted
+    """Takrorlarsiz, alifbo tartibida."""
+    # TODO
     raise NotImplementedError
 
 
 def invert_map(d: dict[str, str]) -> dict[str, str]:
-    """{"a": "1", "b": "2"} -> {"1": "a", "2": "b"}"""
+    """Kalit va qiymatni almashtirish."""
     # TODO
     raise NotImplementedError
 
@@ -44,16 +38,16 @@ def _check() -> None:
     ]
     assert active_emails(users) == ["a@b.com", "e@f.com"]
     assert count_by_role(users) == {"admin": 2, "member": 1}
-    assert unique_sorted_tags(["ombor", "chat", "ombor", "auth"]) == [
-        "auth",
-        "chat",
-        "ombor",
+    assert unique_sorted_tags(["kitob", "film", "kitob", "musiqa"]) == [
+        "film",
+        "kitob",
+        "musiqa",
     ]
     assert invert_map({"uz": "O'zbek", "en": "English"}) == {
         "O'zbek": "uz",
         "English": "en",
     }
-    print("ex02_collections: OK ✓")
+    print("ex02_toplamlar: OK")
 
 
 if __name__ == "__main__":

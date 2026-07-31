@@ -30,7 +30,7 @@ def safe_int(value: str, default: int = 0) -> int:
 
 
 def _check() -> None:
-    assert normalize_email("  Ali@BG.com ") == "ali@bg.com"
+    assert normalize_email("  Ali@Mail.COM ") == "ali@mail.com"
     assert grade_for_score(95) == "A"
     assert grade_for_score(70) == "B"
     assert grade_for_score(50) == "C"
@@ -40,7 +40,7 @@ def _check() -> None:
     assert safe_int("42") == 42
     assert safe_int("x") == 0
     assert safe_int("x", default=-1) == -1
-    print("ex01_basics (solution): OK ✓")
+    print("ex01_funksiya (yechim): OK")
 
 
 if __name__ == "__main__":
