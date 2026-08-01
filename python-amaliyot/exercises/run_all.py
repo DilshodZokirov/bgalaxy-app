@@ -18,6 +18,7 @@ def _load(path: Path):
 def main() -> int:
     root = Path(__file__).resolve().parent
     files = [
+        root / "ex00_xotira.py",
         root / "ex01_funksiya.py",
         root / "ex02_toplamlar.py",
         root / "ex03_class.py",

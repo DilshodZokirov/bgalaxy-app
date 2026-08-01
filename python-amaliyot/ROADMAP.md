@@ -1,260 +1,216 @@
-# Python — 0-dan amaliyot
+# Python — 0-dan (runtime + amaliyot)
 
-Boshqa loyihalardan mustaqil. Faqat Python. Har bosqichda **o‘zingiz kod yozasiz**.
+Avval **til qanday ishlaydi** (compiler / interpreter / xotira), keyin **kod yozish**.  
+Boshqa loyihalarga bog‘liq emas.
 
 ```text
-  0  Muhit o'rnatish
+  0  Muhit
   │
-  1  Asoslar — son, matn, o'zgaruvchi
+  1  Compiler vs Interpreter
   │
-  2  Shart (if) va sikl (for/while)
+  2  Python qanday ishlaydi (bytecode, PVM)
   │
-  3  Funksiya
+  3  Memory management (havola, refcount, GC)
   │
-  4  List, dict, set
+  4  Asoslar — son, matn, o'zgaruvchi
   │
-  5  Xatolik (try/except) va fayl
+  5  Shart va sikl
   │
-  6  Modul, venv, pip
+  6  Funksiya
   │
-  7  Class
+  7  List, dict, set  (+ xotira oqibatlari)
   │
-  8  JSON va pathlib
+  8  Xatolik va fayl
   │
-  9  Loyiha A — Son topish o'yini
+  9  Modul, venv, pip
   │
- 10  Loyiha B — Todo ro'yxat (faylga saqlanadi)
+ 10  Class
   │
- 11  Loyiha C — Xarajatlar daftari
+ 11  JSON va pathlib
+  │
+ 12  Loyiha A — Son topish
+  │
+ 13  Loyiha B — Todo
+  │
+ 14  Loyiha C — Xarajatlar
   ▼
-     Keyin o'zingiz yangi loyiha tanlaysiz
 ```
 
 ---
 
 ## Bosqich 0 — Muhit
 
-**Qilish**
-1. Python 3.11+ o‘rnating: https://www.python.org/downloads/
-2. Terminalda tekshiring: `python3 --version`
-3. Fayl yarating: `hello.py`
+Dars: [darslar/00-muhit.md](darslar/00-muhit.md)
 
-```python
-print("Salom, Python!")
-```
-
-4. Ishga tushiring: `python3 hello.py`
-
-**O‘tdim**
-- [ ] Versiya chiqadi
-- [ ] `hello.py` ishlaydi
+**O‘tdim:** `hello.py` ishlaydi.
 
 ---
 
-## Bosqich 1 — Asoslar
+## Bosqich 1 — Compiler va Interpreter
 
-**O‘rganish**
-- Tiplar: `int`, `float`, `str`, `bool`, `None`
-- O‘zgaruvchi, `input()`, `print()`
-- f-string: `f"Salom, {ism}"`
-- Hisob: `+ - * / // % **`
+Dars: [darslar/01-compiler-interpreter.md](darslar/01-compiler-interpreter.md)
 
-**Amaliyot (o‘zingiz yozing)**
-1. Ism so‘rang → `Salom, {ism}!` chiqaring  
-2. Ikki son so‘rab, yig‘indi/ayirma/ko‘paytma/bo‘linma chiqaring  
-3. Harorat C → F: `F = C * 9/5 + 32`
+**Amaliyot**
+```bash
+python3 -c "import dis; dis.dis('x = 1 + 2')"
+```
 
 **O‘tdim**
-- [ ] `input` natijasi string ekanini bilasiz (`int(...)` kerak)
+- [ ] Compiler / interpreter farqini tushuntira olasiz
+- [ ] Python = compile → bytecode → interpret ekanini bilasiz
+
+---
+
+## Bosqich 2 — Python qanday ishlaydi
+
+Dars: [darslar/02-python-qanday-ishlaydi.md](darslar/02-python-qanday-ishlaydi.md)
+
+**Amaliyot**
+```python
+a = [1]
+b = a
+c = [1]
+print(a is b, a is c, a == c)
+```
+
+**O‘tdim**
+- [ ] Ism → obyekt modelini bilasiz
+- [ ] `==` va `is` farqi aniq
+
+---
+
+## Bosqich 3 — Memory management
+
+Dars: [darslar/03-memory-management.md](darslar/03-memory-management.md)
+
+**Amaliyot**
+```bash
+cd python-amaliyot
+python3 exercises/ex00_xotira.py
+```
+
+**O‘tdim**
+- [ ] Mashq `OK`
+- [ ] Refcount + GC nima uchun kerakligini aytolasiz
+- [ ] `y = x` list da nusxa emasligini bilasiz
+
+> Keyingi amaliyot shu asos ustiga quriladi.
+
+---
+
+## Bosqich 4 — Asoslar
+
+**O‘rganish:** `int`, `float`, `str`, `bool`, `None`, `input`, f-string, arifmetika
+
+**Amaliyot**
+1. Ism so‘rab salomlashuv  
+2. Mini kalkulyator  
+3. C → F: `F = C * 9/5 + 32`
+
+**O‘tdim**
+- [ ] `input` string qaytarishini bilasiz
 - [ ] f-string ishlatasiz
 
 ---
 
-## Bosqich 2 — Shart va sikl
+## Bosqich 5 — Shart va sikl
 
-**O‘rganish**
-- `if / elif / else`
-- `for i in range(n)`, `while`
-- `break`, `continue`
+**O‘rganish:** `if/elif/else`, `for`, `while`, `range`, `break/continue`
 
-**Amaliyot**
-1. Ball kiriting → `A/B/C/F` chiqaring  
-2. 1 dan N gacha yig‘indi  
-3. Juft sonlarni 1..20 oralig‘ida chiqaring  
+**Amaliyot:** baho (`A/B/C/F`), 1..N yig‘indi, juft sonlar
 
 **O‘tdim**
-- [ ] `elif` zanjirini yozasiz
-- [ ] `for` bilan ro‘yxat aylanasiiz
+- [ ] `elif` zanjiri
+- [ ] `for` bilan aylanma
 
 ---
 
-## Bosqich 3 — Funksiya
-
-**O‘rganish**
-- `def`, parametr, `return`
-- Default qiymat: `def greet(name, excited=False)`
-
-**Amaliyot**
-- Mashq fayli: `exercises/ex01_funksiya.py` (TODO larni to‘ldiring)
+## Bosqich 6 — Funksiya
 
 ```bash
-cd python-amaliyot
 python3 exercises/ex01_funksiya.py
 ```
 
-**O‘tdim**
-- [ ] Mashq `OK` chiqardi
-- [ ] `return` va `print` farqini bilasiz
+**O‘tdim:** mashq `OK`; `return` vs `print` aniq.
 
 ---
 
-## Bosqich 4 — List, dict, set
+## Bosqich 7 — To‘plamlar (+ xotira)
 
-**O‘rganish**
-- `list` — tartibli ro‘yxat
-- `dict` — kalit → qiymat
-- `set` — takrorlanmas
-- Comprehension: `[x for x in items if ...]`
-
-**Amaliyot**
 ```bash
 python3 exercises/ex02_toplamlar.py
 ```
 
-**O‘tdim**
-- [ ] Mashq `OK`
-- [ ] Dict dan qiymat olish / qo‘shish oson
+Qo‘shimcha: list ni funksiyaga berib, ichida `append` qiling — tashqarida ham o‘zgarishini ko‘ring (bosqich 3 eslatmasi).
+
+**O‘tdim:** mashq `OK`.
 
 ---
 
-## Bosqich 5 — Xatolik va fayl
+## Bosqich 8 — Xatolik va fayl
 
-**O‘rganish**
-- `try / except`
-- `with open(...) as f`
-- Matn o‘qish / yozish
+**O‘rganish:** `try/except`, `with open(...)`
 
-**Amaliyot**
-1. Foydalanuvchidan son oling; noto‘g‘ri bo‘lsa qayta so‘rang  
-2. `eslatma.txt` ga 3 qator yozing, keyin o‘qing  
-
-**O‘tdim**
-- [ ] Dastur `int("abc")` da yiqilmaydi
-- [ ] Faylni `with` bilan ochasiz
+**Amaliyot:** noto‘g‘ri sondan himoya; `eslatma.txt` yozish/o‘qish
 
 ---
 
-## Bosqich 6 — Modul va venv
+## Bosqich 9 — Modul va venv
 
-**O‘rganish**
-- `import math`, `from random import randint`
-- O‘z faylingizni import qilish
-- `python3 -m venv .venv` → activate → `pip install`
+**O‘rganish:** `import`, o‘z moduli, `python3 -m venv .venv`, `pip`
 
-**Amaliyot**
-1. `utils.py` da `add(a, b)` yozing, boshqa fayldan chaqiring  
-2. Yangi papkada venv yarating  
-
-**O‘tdim**
-- [ ] Kodni 2 faylga bo‘la olasiz
-- [ ] venv yoqib ishlaysiz
+**Amaliyot:** `utils.py` + chaqiruv; venv yaratish
 
 ---
 
-## Bosqich 7 — Class
+## Bosqich 10 — Class
 
-**O‘rganish**
-- `class`, `__init__`, `self`
-- Metodlar, `@property`
-
-**Amaliyot**
 ```bash
 python3 exercises/ex03_class.py
 ```
 
-**O‘tdim**
-- [ ] Mashq `OK`
-- [ ] Obyekt yarata olasiz
+**O‘tdim:** mashq `OK`.
 
 ---
 
-## Bosqich 8 — JSON va pathlib
+## Bosqich 11 — JSON
 
-**O‘rganish**
-- `json.loads` / `json.dumps`
-- `json.load` / `json.dump` (fayl)
-- `pathlib.Path`
-
-**Amaliyot**
 ```bash
 python3 exercises/ex04_json.py
 ```
 
-**O‘tdim**
-- [ ] Mashq `OK`
-- [ ] Dict ↔ JSON fayl aylantira olasiz
+**O‘tdim:** mashq `OK`.
 
 ---
 
-## Bosqich 9 — Loyiha A: Son topish
+## Bosqich 12 — Loyiha A: Son topish
 
-**Papka:** `loyihalar/01_son_topish/`
-
-**Talab**
-- Kompyuter 1..100 oralig‘ida sirli son tanlaydi (`random`)
-- Foydalanuvchi taxmin qiladi
-- "Katta", "Kichik", "Topdingiz!"
-- Necha urinishda topganini ko‘rsatadi
-- Xato input (harf) da yiqilmasin
-
-**O‘tdim**
-- [ ] O‘yin to‘liq ishlaydi
-- [ ] Qayta o‘ynash so‘raydi (ha/yo‘q)
+`loyihalar/01_son_topish/` — talablar README da.
 
 ---
 
-## Bosqich 10 — Loyiha B: Todo
+## Bosqich 13 — Loyiha B: Todo
 
-**Papka:** `loyihalar/02_todo/`
-
-**Talab**
-- Menyu: qo‘shish / ko‘rish / bajarildi / o‘chirish / chiqish
-- Ma’lumot `todos.json` da saqlansin
-- Dastur qayta ochilganda ro‘yxat qolsin
-
-**O‘tdim**
-- [ ] CRUD ishlaydi
-- [ ] JSON orqali persist bor
+`loyihalar/02_todo/` — JSON ga saqlansin.
 
 ---
 
-## Bosqich 11 — Loyiha C: Xarajatlar
+## Bosqich 14 — Loyiha C: Xarajatlar
 
-**Papka:** `loyihalar/03_xarajatlar/`
-
-**Talab**
-- Xarajat qo‘shish: summa, kategoriya, izoh, sana
-- Ro‘yxat chiqarish
-- Kategoriya bo‘yicha yig‘indi
-- `expenses.json` ga saqlash
-- Class ishlating (masalan `Expense`, `Ledger`)
-
-**O‘tdim**
-- [ ] Hisobot chiqadi
-- [ ] Class + JSON ishlatilgan
+`loyihalar/03_xarajatlar/` — class + JSON.
 
 ---
 
 ## Kundalik qoida
 
-1. Bir sessiyada **bitta** bosqich.  
-2. Avval o‘zingiz yozing, keyin `solutions/` ga qarang.  
-3. Nusxa ko‘chirmang — yechimni yopib qayta yozing.  
-4. Bosqichni tashlab o‘tmang.
+1. 0→3 ni shoshilmay o‘qing — keyingisi osonlashadi.  
+2. Avval o‘zingiz yozing, keyin `solutions/`.  
+3. Bosqichni tashlamang.
 
 ## Tekshirish
 
 ```bash
 cd python-amaliyot
+python3 exercises/ex00_xotira.py
 python3 exercises/run_all.py
 ```
