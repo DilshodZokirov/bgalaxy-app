@@ -215,14 +215,10 @@ def new_slide(prs, tone="teal"):
 
 
 def image_panel_slide(prs, image_name, tone="teal"):
-    """Chap matn, o‘ngda rasm paneli."""
+    """Chap matn, o‘ngda rasm paneli (PNG alpha yo‘q — faqat JPG)."""
     slide = new_slide(prs, tone)
-    # o‘ng panel fon
     shape(slide, Inches(8.35), 0, Inches(5.0), H, NAVY)
     add_pic(slide, ASSETS / image_name, Inches(8.35), 0, Inches(5.0), H)
-    overlay = ASSETS / "overlay-soft.png"
-    if overlay.exists():
-        add_pic(slide, overlay, Inches(8.35), 0, Inches(5.0), H)
     return slide
 
 
@@ -234,23 +230,25 @@ def build(out: Path) -> None:
     # ---- 1. Hero ----
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg(s, NAVY)
-    add_pic(s, ASSETS / "hero-youth-coding.jpg", 0, 0, W, H)
-    add_pic(s, ASSETS / "overlay-dark.png", 0, 0, W, H)
+    # Pishirilgan JPG (PNG alpha yo‘q) — mobil/PowerPoint da aniq ko‘rinadi
+    add_pic(s, ASSETS / "hero-baked.jpg", 0, 0, W, H)
     shape(s, 0, 0, Inches(0.18), H, CORAL)
-    pill(s, Inches(0.7), Inches(1.35), Inches(4.6), Inches(0.4), "MUAMMOGA ASOSLANGAN O‘QITISH (PBL)")
-    textbox(s, Inches(0.7), Inches(2.0), Inches(9.5), Inches(4.2), [
-        ("Python → Django → Django REST", {"size": 34, "bold": True, "color": WHITE, "space_after": 14}),
+    # Matn uchun qattiq panel
+    shape(s, Inches(0.45), Inches(1.1), Inches(9.2), Inches(5.3), RGBColor(0x0B, 0x12, 0x20), rounded=True)
+    pill(s, Inches(0.75), Inches(1.4), Inches(4.8), Inches(0.4), "MUAMMOGA ASOSLANGAN O‘QITISH (PBL)")
+    textbox(s, Inches(0.75), Inches(2.05), Inches(8.6), Inches(3.8), [
+        ("Python → Django → Django REST", {"size": 32, "bold": True, "color": WHITE, "space_after": 14}),
         ("1) Python nima? Xususiyatlari va boshqa tillarga nisbatan yutuqlari\n2) Muammo: veb kerak → Django\n3) Muammo: telefon + ish stoli + sayt parallel → DRF", {
-            "size": 17, "color": RGBColor(0xE2, 0xE8, 0xF0), "space_after": 16,
+            "size": 16, "color": RGBColor(0xE2, 0xE8, 0xF0), "space_after": 14,
         }),
-        ("Qoida: avval MUAMMO, keyin YECHIM.", {"size": 18, "bold": True, "color": RGBColor(0xFD, 0xBA, 0x74)}),
+        ("Qoida: avval MUAMMO, keyin YECHIM.", {"size": 17, "bold": True, "color": RGBColor(0xFD, 0xBA, 0x74)}),
     ])
-    textbox(s, Inches(0.7), Inches(6.7), Inches(10), Inches(0.4), [
-        ("v7 · rasmlar + o‘zbekcha atamalar (inglizchasi qavsda)", {"size": 12, "color": RGBColor(0xCB, 0xD5, 0xE1)}),
+    textbox(s, Inches(0.75), Inches(5.85), Inches(8.6), Inches(0.35), [
+        ("v8 · rasmlar aniq ko‘rinadi · o‘zbekcha atamalar (inglizchasi qavsda)", {"size": 12, "color": RGBColor(0x94, 0xA3, 0xB8)}),
     ])
 
     # ---- 2. Python nima? + image ----
-    s = image_panel_slide(prs, "python-concept.jpg", "teal")
+    s = image_panel_slide(prs, "panel-python.jpg", "teal")
     heading(s, "PYTHON · SAVOL", "Python nima?")
     shape(s, Inches(0.5), Inches(1.35), Inches(7.5), Inches(1.7), CARD, line=CYAN, rounded=True)
     textbox(s, Inches(0.75), Inches(1.55), Inches(7.1), Inches(1.4), [
@@ -460,7 +458,7 @@ def build(out: Path) -> None:
         )
 
     # ---- 9. PROBLEM 1 + web image ----
-    s = image_panel_slide(prs, "web-django.jpg", "coral")
+    s = image_panel_slide(prs, "panel-web.jpg", "coral")
     heading(s, "MUAMMO 1", "Python o‘zi — lekin veb kerak")
     shape(s, Inches(0.5), Inches(1.4), Inches(7.5), Inches(5.4), PROBLEM_BG, line=CORAL, rounded=True)
     textbox(s, Inches(0.8), Inches(1.7), Inches(7.0), Inches(4.9), [
@@ -533,7 +531,7 @@ def build(out: Path) -> None:
          GREEN)
 
     # ---- 13. PROBLEM 2 + multi image ----
-    s = image_panel_slide(prs, "multi-platform.jpg", "coral")
+    s = image_panel_slide(prs, "panel-multi.jpg", "coral")
     heading(s, "MUAMMO 2", "Faqat sayt yetarli emas — real hayot")
     shape(s, Inches(0.5), Inches(1.4), Inches(7.5), Inches(5.4), PROBLEM_BG, line=CORAL, rounded=True)
     textbox(s, Inches(0.8), Inches(1.7), Inches(7.0), Inches(4.9), [
@@ -594,12 +592,12 @@ def build(out: Path) -> None:
     # ---- 16. Conclusion with image ----
     s = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg(s, NAVY)
-    add_pic(s, ASSETS / "conclusion-path.jpg", 0, 0, W, H)
-    add_pic(s, ASSETS / "overlay-dark.png", 0, 0, W, H)
+    add_pic(s, ASSETS / "conclusion-baked.jpg", 0, 0, W, H)
     shape(s, 0, 0, Inches(0.18), H, GREEN)
+    shape(s, Inches(0.4), Inches(0.45), Inches(12.5), Inches(6.6), RGBColor(0x0B, 0x12, 0x20), rounded=True)
     pill(s, Inches(0.7), Inches(0.7), Inches(2.2), Inches(0.38), "XULOSA", GREEN)
-    textbox(s, Inches(0.7), Inches(1.3), Inches(11.8), Inches(0.7), [
-        ("Bugungi darsdan olib ketiladigan asoslar", {"size": 26, "bold": True, "color": WHITE, "space_after": 0}),
+    textbox(s, Inches(0.7), Inches(1.25), Inches(11.8), Inches(0.6), [
+        ("Bugungi darsdan olib ketiladigan asoslar", {"size": 24, "bold": True, "color": WHITE, "space_after": 0}),
     ])
     points = [
         ("1", "Python", "Umumiy maqsadli til: o‘qilishi oson, tipni o‘zi aniqlaydi, ekotizimi boy."),
@@ -608,13 +606,12 @@ def build(out: Path) -> None:
         ("4", "DRF", "Yechim: bitta dasturiy interfeys (API) orqali barcha platformalar ulanadi."),
     ]
     for i, (n, t, b) in enumerate(points):
-        y = Inches(2.15) + Inches(i * 1.15)
+        y = Inches(2.05) + Inches(i * 1.15)
         circle(s, Inches(0.75), y + Inches(0.15), Inches(0.55), (CYAN, AMBER, CORAL, GREEN)[i])
         textbox(s, Inches(0.75), y + Inches(0.22), Inches(0.55), Inches(0.4), [
             (n, {"size": 14, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0}),
         ], align=PP_ALIGN.CENTER)
-        shape(s, Inches(1.55), y, Inches(10.8), Inches(1.0), RGBColor(0x0F, 0x17, 0x2A), line=RGBColor(0x33, 0x41, 0x55), rounded=True)
-        # make panel slightly see-through look via lighter navy border card
+        shape(s, Inches(1.55), y, Inches(10.8), Inches(1.0), RGBColor(0x15, 0x23, 0x3B), line=RGBColor(0x33, 0x41, 0x55), rounded=True)
         textbox(s, Inches(1.85), y + Inches(0.15), Inches(10.3), Inches(0.75), [
             (t, {"size": 16, "bold": True, "color": WHITE, "space_after": 3}),
             (b, {"size": 13, "color": RGBColor(0xCB, 0xD5, 0xE1), "space_after": 0}),
@@ -627,9 +624,10 @@ def build(out: Path) -> None:
 
 if __name__ == "__main__":
     out_dir = Path(__file__).resolve().parent
-    primary = out_dir / "Python-Django-PBL-v7.pptx"
+    primary = out_dir / "Python-Django-PBL-v8.pptx"
     build(primary)
     for name in (
+        "Python-Django-PBL-v7.pptx",
         "Python-Django-PBL-v6.pptx",
         "Python-Django-PBL-v5.pptx",
         "Python-Dars-01-YANGI.pptx",
