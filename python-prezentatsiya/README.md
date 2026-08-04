@@ -1,18 +1,15 @@
 # Python × Django taqdimot (YORQIN)
 
-## Asosiy fayl — YANGI
-
-```text
-python-prezentatsiya/Python-Django-Yorqin.pptx
-```
-
-**Oq fon + to‘q matn + yorqin accentlar.** Eski qorong‘u faylni ochmang.
-
-### Yuklash
+## Yuklash
 https://github.com/DilshodZokirov/bgalaxy-app/raw/cursor/python-prezentatsiya-5498/python-prezentatsiya/Python-Django-Yorqin.pptx
 
-## Qayta yasash
-```bash
-pip install python-pptx
-python3 build_pptx.py
-```
+## Yangi: Compiler / Interpretator
+Boshlovchilar uchun alohida slaydlar:
+1. Kompyuter nima uchun tarjimon kerak?
+2. Compiler nima? (kitob tarjimasi misoli)
+3. Interpretator nima? (jonli tarjimon misoli)
+4. Solishtirish jadvali
+5. Python ikkalasidan qanday foydalanadi
+6. 3 jumlada xulosa
+
+Oq fon, to‘q matn.
