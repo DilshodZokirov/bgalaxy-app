@@ -190,6 +190,24 @@ def build(out: Path) -> None:
 
     # ---- 1. Serious intro ----
     s = new_slide(prs)
+    # Aniq versiya belgisi — eski fayl bilan chalkashmaslik uchun
+    banner = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.55), Inches(0.35), Inches(12.2), Inches(0.55))
+    banner.fill.solid()
+    banner.fill.fore_color.rgb = CORAL
+    banner.line.fill.background()
+    textbox(
+        s,
+        Inches(0.55),
+        Inches(0.4),
+        Inches(12.2),
+        Inches(0.45),
+        [(
+            "YANGI VERSIYA · 2026-08-04 · 2-slaydda Java vs Python kod bo‘lsa — to‘g‘ri fayl",
+            {"size": 14, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0},
+        )],
+        align=PP_ALIGN.CENTER,
+        anchor=MSO_ANCHOR.MIDDLE,
+    )
     pill(s, Inches(0.7), Inches(1.55), Inches(2.2), Inches(0.38), "DARS 01")
     textbox(s, Inches(0.7), Inches(2.15), Inches(11.5), Inches(3.8), [
         ("Python asoslari va Django yo‘nalishi", {"size": 34, "bold": True, "color": NAVY, "space_after": 14}),
@@ -509,5 +527,8 @@ def build(out: Path) -> None:
 
 if __name__ == "__main__":
     out_dir = Path(__file__).resolve().parent
-    build(out_dir / "Python-Django-Yorqin.pptx")
-    shutil.copyfile(out_dir / "Python-Django-Yorqin.pptx", out_dir / "Python-Django-Vaaav.pptx")
+    # Asosiy yangi nom — eski Yorqin/Vaaav cache bilan chalkashmaslik uchun
+    primary = out_dir / "Python-Dars-01-YANGI.pptx"
+    build(primary)
+    shutil.copyfile(primary, out_dir / "Python-Django-Yorqin.pptx")
+    shutil.copyfile(primary, out_dir / "Python-Django-Vaaav.pptx")
