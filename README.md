@@ -1,40 +1,40 @@
-# Python taqdimoti (boshlovchilar / bolalar uchun)
+# Python × Django — “Vaaav” taqdimot
 
-Dasturlashni hali bilmaydiganlar uchun sodda taqdimot.
-
-## Ochish
-
-Brauzerda oching:
+## Asosiy fayl (PPTX)
 
 ```text
-python-prezentatsiya/index.html
+python-prezentatsiya/Python-Django-Vaaav.pptx
 ```
 
-yoki:
+16 ta slayd, 16:9. PowerPoint / Google Slides / LibreOffice da ochiladi.
+
+## Ichida nima bor
+
+1. Hook — Python nima uchun “jaaav”
+2. Dasturlash nima?
+3. **Python qanday ishlaydi** (`.py` → bytecode → PVM)
+4. Compiler + interpretator haqiqati
+5. Xotira (havola / GC)
+6. Boshqa tillar qiyin qiladigan narsalar (AI, prototip, fan…)
+7. Mashhur frameworklar: Django, FastAPI, Flask, PyTorch, Pandas…
+8. **Django qanday ishlaydi** (request journey)
+9. MTV arxitektura
+10. Django superpowers (Admin, ORM, Auth…)
+11. Django vs Flask vs FastAPI
+12. Real dunyo (Instagram, YouTube…)
+13. Yo‘l xarita + xulosa
+
+## Qayta yasash
 
 ```bash
-cd python-prezentatsiya
-python3 -m http.server 8080
-# http://localhost:8080
+pip install python-pptx
+python3 build_pptx.py
 ```
 
-## Boshqarish
+## HTML versiya (ixtiyoriy)
 
-| Tugma | Amal |
-|--------|------|
-| → / Space / Enter | Keyingi slayd |
-| ← / Backspace | Oldingi |
-| Telefon | Chap–o‘ng swipe |
+`index.html` — soddaroq brauzer versiyasi. Asosiy taqdimot — **PPTX**.
 
-## Slaydlar nima haqida
+## Yuklab olish
 
-1. Dasturlash nima?
-2. Nima uchun o‘rganiladi?
-3. Python nima va nima uchun?
-4. Xususiyatlari va imkoniyatlari
-5. Boshqa tillarga nisbatan yutuqlari
-6. Haqiqiy dunyo misollari
-7. **Django** nima va nima qiladi?
-8. Qanday boshlash yo‘li
-
-PDF kerak bo‘lsa: brauzerda ochib **Print → Save as PDF** (landscape tavsiya etiladi).
+https://github.com/DilshodZokirov/bgalaxy-app/raw/cursor/python-prezentatsiya-5498/python-prezentatsiya/Python-Django-Vaaav.pptx
