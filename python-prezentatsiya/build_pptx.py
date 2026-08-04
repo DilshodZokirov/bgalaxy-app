@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-PBL taqdimot (v6):
-- Python boyitilgan: nima?, xususiyatlar, boshqa tillar bilan solishtirma
-- Keyin muammo→Django, muammo→DRF
-- Oxirgi xulosa/zanjir/keyingi qadam slaydlari yo‘q
-- Kod: ochiq fon + qora matn
+PBL taqdimot (v7):
+- Yoshlarga mos rasmlar
+- Boyroq vizual dizayn
+- O‘zbekcha atamalar + (inglizcha)
+- Oxirida xulosa
 """
 
 from __future__ import annotations
@@ -20,9 +20,10 @@ from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
 W, H = Inches(13.333), Inches(7.5)
+ASSETS = Path(__file__).resolve().parent / "assets"
 
-BG = RGBColor(0xFF, 0xFF, 0xFF)
-CARD = RGBColor(0xF1, 0xF5, 0xF9)
+BG = RGBColor(0xF7, 0xF9, 0xFC)
+CARD = RGBColor(0xFF, 0xFF, 0xFF)
 INK = RGBColor(0x0B, 0x12, 0x20)
 MUTED = RGBColor(0x33, 0x41, 0x55)
 CYAN = RGBColor(0x02, 0x84, 0xC7)
@@ -30,9 +31,13 @@ AMBER = RGBColor(0xC2, 0x41, 0x0C)
 CORAL = RGBColor(0xBE, 0x12, 0x3C)
 GREEN = RGBColor(0x04, 0x78, 0x57)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LINE = RGBColor(0x94, 0xA3, 0xB8)
+LINE = RGBColor(0xCB, 0xD5, 0xE1)
 NAVY = RGBColor(0x0F, 0x17, 0x2A)
-CODE_BG = RGBColor(0xF8, 0xFA, 0xFC)
+SOFT = RGBColor(0xE0, 0xF2, 0xFE)
+SOFT2 = RGBColor(0xFE, 0xF3, 0xC7)
+SOFT3 = RGBColor(0xD1, 0xFA, 0xE5)
+SOFT4 = RGBColor(0xFE, 0xE2, 0xE2)
+CODE_BG = RGBColor(0xFF, 0xFF, 0xFF)
 CODE_FG = RGBColor(0x0B, 0x12, 0x20)
 CODE_COMMENT = RGBColor(0x04, 0x78, 0x57)
 PROBLEM_BG = RGBColor(0xFE, 0xF2, 0xF2)
@@ -60,17 +65,49 @@ def set_run(run, size=20, bold=False, color=INK, font="Calibri"):
         el.set("typeface", font)
 
 
-def add_bg(slide):
+def add_bg(slide, color=BG):
     fill = slide.background.fill
     fill.solid()
-    fill.fore_color.rgb = BG
+    fill.fore_color.rgb = color
 
 
-def accent_bar(slide, color=CYAN):
-    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.14), H)
-    bar.fill.solid()
-    bar.fill.fore_color.rgb = color
-    bar.line.fill.background()
+def shape(slide, left, top, width, height, fill, *, line=None, rounded=False):
+    kind = MSO_SHAPE.ROUNDED_RECTANGLE if rounded else MSO_SHAPE.RECTANGLE
+    shp = slide.shapes.add_shape(kind, left, top, width, height)
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = fill
+    if line is None:
+        shp.line.fill.background()
+    else:
+        shp.line.color.rgb = line
+        shp.line.width = Pt(1.25)
+    return shp
+
+
+def circle(slide, left, top, size, fill):
+    shp = slide.shapes.add_shape(MSO_SHAPE.OVAL, left, top, size, size)
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = fill
+    shp.line.fill.background()
+    return shp
+
+
+def decor(slide, tone="teal"):
+    """Boyroq fon: yumshoq doira va burchak aksentlari."""
+    if tone == "teal":
+        circle(slide, Inches(11.2), Inches(-0.8), Inches(3.2), SOFT)
+        circle(slide, Inches(-0.9), Inches(5.4), Inches(2.6), SOFT3)
+        shape(slide, 0, 0, Inches(0.16), H, CYAN)
+    elif tone == "coral":
+        circle(slide, Inches(11.0), Inches(-1.0), Inches(3.4), SOFT4)
+        circle(slide, Inches(-1.0), Inches(5.2), Inches(2.8), SOFT2)
+        shape(slide, 0, 0, Inches(0.16), H, CORAL)
+    elif tone == "green":
+        circle(slide, Inches(11.1), Inches(-0.9), Inches(3.3), SOFT3)
+        circle(slide, Inches(-0.8), Inches(5.3), Inches(2.5), SOFT)
+        shape(slide, 0, 0, Inches(0.16), H, GREEN)
+    else:
+        shape(slide, 0, 0, Inches(0.16), H, CYAN)
 
 
 def textbox(slide, left, top, width, height, paragraphs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
@@ -103,21 +140,9 @@ def textbox(slide, left, top, width, height, paragraphs, *, align=PP_ALIGN.LEFT,
     return box
 
 
-def panel(slide, left, top, width, height, fill, border=LINE):
-    shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
-    shp.fill.solid()
-    shp.fill.fore_color.rgb = fill
-    shp.line.color.rgb = border
-    shp.line.width = Pt(1.5)
-    return shp
-
-
 def card(slide, left, top, width, height, title, body, accent=CYAN, fill=CARD):
-    panel(slide, left, top, width, height, fill, accent)
-    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, Inches(0.12), height)
-    strip.fill.solid()
-    strip.fill.fore_color.rgb = accent
-    strip.line.fill.background()
+    shape(slide, left, top, width, height, fill, line=LINE, rounded=True)
+    shape(slide, left, top, Inches(0.12), height, accent)
     textbox(
         slide,
         left + Inches(0.28),
@@ -125,25 +150,22 @@ def card(slide, left, top, width, height, title, body, accent=CYAN, fill=CARD):
         width - Inches(0.42),
         height - Inches(0.3),
         [
-            (title, {"size": 16, "bold": True, "color": NAVY, "space_after": 8}),
-            (body, {"size": 13, "color": MUTED, "space_after": 0}),
+            (title, {"size": 15, "bold": True, "color": NAVY, "space_after": 7}),
+            (body, {"size": 12, "color": MUTED, "space_after": 0}),
         ],
     )
 
 
 def code_box(slide, left, top, width, height, title, lines, accent=CYAN):
-    panel(slide, left, top, width, height, CODE_BG, accent)
-    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, Inches(0.42))
-    strip.fill.solid()
-    strip.fill.fore_color.rgb = accent
-    strip.line.fill.background()
+    shape(slide, left, top, width, height, CODE_BG, line=accent, rounded=True)
+    shape(slide, left, top, width, Inches(0.42), accent, rounded=False)
     textbox(
         slide,
         left + Inches(0.2),
         top + Inches(0.05),
         width - Inches(0.3),
         Inches(0.35),
-        [(title, {"size": 14, "bold": True, "color": WHITE, "space_after": 0})],
+        [(title, {"size": 13, "bold": True, "color": WHITE, "space_after": 0})],
     )
     paras = []
     for line in lines:
@@ -151,8 +173,7 @@ def code_box(slide, left, top, width, height, title, lines, accent=CYAN):
         paras.append((
             line if line else " ",
             {
-                "size": 14,
-                "bold": False,
+                "size": 13,
                 "color": CODE_COMMENT if is_comment else CODE_FG,
                 "space_after": 2,
                 "font": "Consolas",
@@ -162,30 +183,46 @@ def code_box(slide, left, top, width, height, title, lines, accent=CYAN):
 
 
 def pill(slide, left, top, width, height, text, bg=CYAN):
-    shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
-    shp.fill.solid()
-    shp.fill.fore_color.rgb = bg
-    shp.line.fill.background()
+    shape(slide, left, top, width, height, bg, rounded=True)
     textbox(
-        slide,
-        left, top, width, height,
-        [(text, {"size": 12, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})],
+        slide, left, top, width, height,
+        [(text, {"size": 11, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})],
         align=PP_ALIGN.CENTER,
         anchor=MSO_ANCHOR.MIDDLE,
     )
 
 
 def heading(slide, eyebrow, title):
-    textbox(slide, Inches(0.65), Inches(0.28), Inches(12), Inches(1.05), [
-        (eyebrow, {"size": 13, "bold": True, "color": CYAN, "space_after": 4}),
-        (title, {"size": 24, "bold": True, "color": NAVY, "space_after": 0}),
+    textbox(slide, Inches(0.55), Inches(0.28), Inches(8.5), Inches(1.05), [
+        (eyebrow, {"size": 12, "bold": True, "color": CYAN, "space_after": 4}),
+        (title, {"size": 23, "bold": True, "color": NAVY, "space_after": 0}),
     ])
 
 
-def new_slide(prs, bar=CYAN):
+def add_pic(slide, path: Path, left, top, width, height=None):
+    if not path.exists():
+        return None
+    if height is None:
+        return slide.shapes.add_picture(str(path), left, top, width=width)
+    return slide.shapes.add_picture(str(path), left, top, width=width, height=height)
+
+
+def new_slide(prs, tone="teal"):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_bg(slide)
-    accent_bar(slide, bar)
+    add_bg(slide, BG)
+    decor(slide, tone)
+    return slide
+
+
+def image_panel_slide(prs, image_name, tone="teal"):
+    """Chap matn, o‘ngda rasm paneli."""
+    slide = new_slide(prs, tone)
+    # o‘ng panel fon
+    shape(slide, Inches(8.35), 0, Inches(5.0), H, NAVY)
+    add_pic(slide, ASSETS / image_name, Inches(8.35), 0, Inches(5.0), H)
+    overlay = ASSETS / "overlay-soft.png"
+    if overlay.exists():
+        add_pic(slide, overlay, Inches(8.35), 0, Inches(5.0), H)
     return slide
 
 
@@ -194,109 +231,105 @@ def build(out: Path) -> None:
     prs.slide_width = W
     prs.slide_height = H
 
-    # ---- 1. Title ----
-    s = new_slide(prs)
-    banner = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.55), Inches(0.35), Inches(12.2), Inches(0.5))
-    banner.fill.solid()
-    banner.fill.fore_color.rgb = CORAL
-    banner.line.fill.background()
-    textbox(
-        s, Inches(0.55), Inches(0.38), Inches(12.2), Inches(0.42),
-        [("PBL v6 · Python chuqurroq · muammo → yechim", {
-            "size": 14, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0,
-        })],
-        align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
-    )
-    pill(s, Inches(0.7), Inches(1.15), Inches(3.4), Inches(0.38), "PROBLEM-BASED LEARNING")
-    textbox(s, Inches(0.7), Inches(1.75), Inches(11.8), Inches(4.8), [
-        ("Python → Django → Django REST", {"size": 34, "bold": True, "color": NAVY, "space_after": 14}),
-        ("Bugungi yo‘l:\n1) Python nima? Xususiyatlari va boshqa tillarga nisbatan yutuqlari\n2) Muammo: veb kerak → Django\n3) Muammo: telefon + desktop + sayt parallel → DRF", {
-            "size": 18, "color": MUTED, "space_after": 16,
+    # ---- 1. Hero ----
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    add_bg(s, NAVY)
+    add_pic(s, ASSETS / "hero-youth-coding.jpg", 0, 0, W, H)
+    add_pic(s, ASSETS / "overlay-dark.png", 0, 0, W, H)
+    shape(s, 0, 0, Inches(0.18), H, CORAL)
+    pill(s, Inches(0.7), Inches(1.35), Inches(4.6), Inches(0.4), "MUAMMOGA ASOSLANGAN O‘QITISH (PBL)")
+    textbox(s, Inches(0.7), Inches(2.0), Inches(9.5), Inches(4.2), [
+        ("Python → Django → Django REST", {"size": 34, "bold": True, "color": WHITE, "space_after": 14}),
+        ("1) Python nima? Xususiyatlari va boshqa tillarga nisbatan yutuqlari\n2) Muammo: veb kerak → Django\n3) Muammo: telefon + ish stoli + sayt parallel → DRF", {
+            "size": 17, "color": RGBColor(0xE2, 0xE8, 0xF0), "space_after": 16,
         }),
-        ("Qoida: avval MUAMMO, keyin YECHIM. Ma’lumot oson, lekin teran.", {
-            "size": 17, "bold": True, "color": AMBER,
-        }),
+        ("Qoida: avval MUAMMO, keyin YECHIM.", {"size": 18, "bold": True, "color": RGBColor(0xFD, 0xBA, 0x74)}),
+    ])
+    textbox(s, Inches(0.7), Inches(6.7), Inches(10), Inches(0.4), [
+        ("v7 · rasmlar + o‘zbekcha atamalar (inglizchasi qavsda)", {"size": 12, "color": RGBColor(0xCB, 0xD5, 0xE1)}),
     ])
 
-    # ---- 2. What is Python? ----
-    s = new_slide(prs)
+    # ---- 2. Python nima? + image ----
+    s = image_panel_slide(prs, "python-concept.jpg", "teal")
     heading(s, "PYTHON · SAVOL", "Python nima?")
-    panel(s, Inches(0.55), Inches(1.3), Inches(12.2), Inches(1.55), CARD, CYAN)
-    textbox(s, Inches(0.85), Inches(1.5), Inches(11.6), Inches(1.25), [
-        ("Python — umumiy maqsadli (general-purpose), yuqori darajali dasturlash tili.\nKod avval yoziladi, keyin interpreter orqali bajariladi. Maqsad: inson uchun o‘qilishi oson bo‘lgan dastur yozish.", {
-            "size": 16, "color": NAVY, "space_after": 0,
+    shape(s, Inches(0.5), Inches(1.35), Inches(7.5), Inches(1.7), CARD, line=CYAN, rounded=True)
+    textbox(s, Inches(0.75), Inches(1.55), Inches(7.1), Inches(1.4), [
+        ("Python — umumiy maqsadli (general-purpose), yuqori darajali dasturlash tili.\nKod yoziladi, keyin talqinchi (interpreter) orqali bajariladi. Maqsad: odam o‘qishi oson bo‘lgan dastur yozish.", {
+            "size": 14, "color": NAVY, "space_after": 0,
         }),
     ])
     facts = [
-        ("Yuqori darajali", "Past darajadagi xotira / mashina buyruqlari bilan emas — mantiq va masala bilan ishlaysiz."),
-        ("Interpretatsiya", "Ko‘pincha alohida “compile → exe” majburiy emas. .py faylni interpreter ishga tushiradi."),
-        ("Ko‘p paradigmalı", "Procedural, OOP, funksional uslub — bir tilda birga ishlatiladi."),
-        ("Open source", "Erkin, katta jamiyat. Windows / macOS / Linux da bir xil fikrlash bilan ishlaydi."),
+        ("Yuqori darajali", "Past darajadagi xotira buyruqlari bilan emas — masala va mantiq bilan ishlaysiz."),
+        ("Talqin qilinadi (interpreted)", "Ko‘pincha alohida exe majburiy emas. .py faylni talqinchi ishga tushiradi."),
+        ("Ko‘p uslubli (multi-paradigm)", "Oddiy tartib, obyektli (OOP), funksiyaviy uslub — bir tilda birga."),
+        ("Ochiq kodli (open source)", "Erkin, katta jamiyat. Windows / macOS / Linux da bir xil fikrlash."),
     ]
     for i, (t, b) in enumerate(facts):
         card(
             s,
-            Inches(0.55) + Inches((i % 2) * 6.3),
-            Inches(3.15) + Inches((i // 2) * 1.95),
-            Inches(6.05),
-            Inches(1.8),
+            Inches(0.5) + Inches((i % 2) * 3.75),
+            Inches(3.3) + Inches((i // 2) * 1.9),
+            Inches(3.55),
+            Inches(1.75),
             t, b, (CYAN, AMBER, GREEN, CORAL)[i],
         )
 
-    # ---- 3. Core characteristics (dense) ----
-    s = new_slide(prs)
-    heading(s, "PYTHON · XUSUSIYATLAR", "Ichida nima bor — qisqa, lekin teran")
+    # ---- 3. Features ----
+    s = new_slide(prs, "teal")
+    # yuqori rasm lenti
+    add_pic(s, ASSETS / "python-concept.jpg", Inches(9.4), Inches(0.2), Inches(3.6), Inches(1.05))
+    heading(s, "PYTHON · XUSUSIYATLAR", "Ichida nima bor — oson, lekin teran")
     items = [
-        ("Sintaksis", "Indentatsiya majburiy. Bloklar {} emas — bo‘sh joy. Bu stilni bir xil qiladi va o‘qishni osonlashtiradi."),
-        ("Dinamik tip", "O‘zgaruvchiga tipni majburan yozmaysiz. Tip qiymatga qarab aniqlanadi. Katta loyihada type hint ixtiyoriy."),
-        ("Batteries included", "Standart kutubxona boy: fayl, JSON, HTTP, vaqt, regex… Ko‘p vazifa uchun tashqi paket shart emas."),
-        ("Kuchli ekotizim", "PyPI orqali minglab paket: Django, FastAPI, Pandas, NumPy, PyTorch…"),
-        ("Tez ishlab chiqish", "Kam “rasmiyatchilik” → prototip tez chiqadi. Startup va o‘quv loyihalarida shu uchun sevimli."),
-        ("Portativlik", "Bir xil kod turli OS da ishlashi oson. Virtual environment orqali muhit izolyatsiya qilinadi."),
+        ("Sintaksis (syntax)", "Bo‘sh joy bilan blok (indentatsiya) majburiy. Stil bir xil bo‘ladi, o‘qish osonlashadi."),
+        ("O‘zgaruvchan tip (dynamic typing)", "Tipni majburan yozmaysiz. Qiymatga qarab aniqlanadi. Katta loyihada tip ko‘rsatmasi (type hint) ixtiyoriy."),
+        ("Ichki boylik (batteries included)", "Standart kutubxona boy: fayl, JSON, tarmoq so‘rovi, vaqt, qidiruv andozasi…"),
+        ("Keng ekotizim", "Tashqi ombor (PyPI) orqali minglab paket: Django, FastAPI, Pandas, NumPy…"),
+        ("Tez ishlab chiqish", "Kam ortiqcha shablon-kod (boilerplate) → prototip tez chiqadi."),
+        ("Ko‘chma (portable)", "Bir xil kod turli tizimlarda ishlashi oson. Izolyatsiya muhiti (virtual environment) bilan boshqariladi."),
     ]
     for i, (t, b) in enumerate(items):
         col, row = i % 3, i // 3
         card(
             s,
-            Inches(0.5) + Inches(col * 4.2),
+            Inches(0.45) + Inches(col * 4.2),
             Inches(1.35) + Inches(row * 2.85),
-            Inches(4.05),
+            Inches(4.0),
             Inches(2.7),
             t, b, (CYAN, AMBER, GREEN, CORAL, CYAN, AMBER)[i],
         )
 
-    # ---- 4. Comparison advantages ----
-    s = new_slide(prs)
+    # ---- 4. Comparison ----
+    s = new_slide(prs, "amber" if False else "teal")
     heading(s, "PYTHON · SOLISHTIRMA", "Boshqa tillarga nisbatan yutuqli tomonlari")
-    textbox(s, Inches(0.7), Inches(1.25), Inches(12), Inches(0.4), [
+    textbox(s, Inches(0.55), Inches(1.25), Inches(12), Inches(0.35), [
         ("Bu “boshqa tillar yomon” degani emas — Python qayerda yutadi, shu yerda aniq aytamiz.", {
-            "size": 14, "color": MUTED, "space_after": 0,
+            "size": 13, "color": MUTED,
         }),
     ])
     comps = [
-        ("vs Java / C#", "Kamroq “boilerplate”. Tip va klass e’lonlari kamroq. O‘rganish egri chizig‘i yumshoqroq. Veb/AI prototipida tezroq."),
-        ("vs C / C++", "Xotirani qo‘lda boshqarmaysiz. Pointer / segfault kam uchraydi. Buning evaziga sof tezlik pastroq bo‘lishi mumkin — lekin ko‘p vazifa uchun yetarli."),
-        ("vs JavaScript", "JS asosan brauzer + Node. Python esa AI, data, avtomatlashtirish, veb backend da kengroq “standart” tanlov."),
-        ("vs Go / Rust", "Go/Rust tizim/servis tezligi uchun kuchli. Python esa o‘qiluvchanlik + ekotizim + tez ishlab chiqishda yutadi."),
+        ("Java / C# ga nisbatan", "Kamroq ortiqcha shablon-kod. Tip va klass e’lonlari kamroq. O‘rganish egri chizig‘i yumshoqroq. Veb va sun’iy intellekt prototipida tezroq."),
+        ("C / C++ ga nisbatan", "Xotirani qo‘lda boshqarmaysiz. Ko‘rsatkich (pointer) xatolari kam. Sof tezlik pastroq bo‘lishi mumkin — ko‘p vazifa uchun yetarli."),
+        ("JavaScript ga nisbatan", "JS asosan brauzer + Node. Python esa sun’iy intellekt, ma’lumot tahlili, avtomatlashtirish, veb orqa qismida kengroq tanlov."),
+        ("Go / Rust ga nisbatan", "Go/Rust tizim tezligi uchun kuchli. Python o‘qiluvchanlik, ekotizim va tez ishlab chiqishda yutadi."),
     ]
     for i, (t, b) in enumerate(comps):
         card(
             s,
-            Inches(0.55) + Inches((i % 2) * 6.3),
-            Inches(1.8) + Inches((i // 2) * 2.55),
-            Inches(6.05),
+            Inches(0.45) + Inches((i % 2) * 6.35),
+            Inches(1.75) + Inches((i // 2) * 2.55),
+            Inches(6.1),
             Inches(2.4),
             t, b, (CYAN, AMBER, GREEN, CORAL)[i],
         )
 
-    # ---- 5. Code comparison Java vs Python ----
-    s = new_slide(prs)
+    # ---- 5. Code compare ----
+    s = new_slide(prs, "teal")
     heading(s, "PYTHON · AMALIY SOLISHTIRMA", "Bir xil vazifa: juft sonlarni olish")
-    textbox(s, Inches(0.7), Inches(1.25), Inches(12), Inches(0.35), [
-        ("Yutuq shu yerda ko‘rinadi: kam qator, aniq ma’no, o‘qish oson.", {"size": 15, "color": MUTED}),
+    textbox(s, Inches(0.55), Inches(1.25), Inches(12), Inches(0.35), [
+        ("Yutuq shu yerda: kam qator, aniq ma’no, o‘qish oson.", {"size": 14, "color": MUTED}),
     ])
     code_box(
-        s, Inches(0.5), Inches(1.75), Inches(6.05), Inches(5.1),
+        s, Inches(0.45), Inches(1.75), Inches(6.1), Inches(5.1),
         "Java (uzunroq)",
         [
             "List<Integer> nums = Arrays.asList(1,2,3,4,5);",
@@ -326,23 +359,23 @@ def build(out: Path) -> None:
         CYAN,
     )
 
-    # ---- 6. Typing comparison ----
-    s = new_slide(prs)
-    heading(s, "PYTHON · TIP TIZIMI", "Nima farqi? Tipni kim aniqlaydi?")
+    # ---- 6. Typing ----
+    s = new_slide(prs, "teal")
+    heading(s, "PYTHON · TIP TIZIMI", "Tipni kim aniqlaydi?")
     card(
-        s, Inches(0.5), Inches(1.35), Inches(6.05), Inches(2.15),
+        s, Inches(0.45), Inches(1.35), Inches(6.1), Inches(2.1),
         "Ko‘p tillarda",
-        "O‘zgaruvchi ochilganda tip yoziladi: int, String, boolean…\nKompilyator/IDE tipni oldindan tekshiradi. Aniqlik yuqori, lekin yozish uzunroq.",
+        "O‘zgaruvchi ochilganda tip yoziladi: butun son (int), matn (String)…\nTekshiruv oldindan bo‘ladi. Aniqlik yuqori, yozish uzunroq.",
         AMBER,
     )
     card(
-        s, Inches(6.8), Inches(1.35), Inches(5.95), Inches(2.15),
+        s, Inches(6.8), Inches(1.35), Inches(5.95), Inches(2.1),
         "Python da",
-        "Tip majburiy yozilmaydi — qiymatga qarab aniqlanadi.\nTez yozish. Katta loyihada type hint (masalan, yosh: int) qo‘shish mumkin.",
+        "Tip majburiy yozilmaydi — qiymatga qarab aniqlanadi.\nTez yozish. Katta loyihada tip ko‘rsatmasi (type hint) qo‘shish mumkin.",
         CYAN,
     )
     code_box(
-        s, Inches(0.5), Inches(3.7), Inches(6.05), Inches(3.2),
+        s, Inches(0.45), Inches(3.65), Inches(6.1), Inches(3.25),
         "Java",
         [
             "int yosh = 18;",
@@ -353,7 +386,7 @@ def build(out: Path) -> None:
         AMBER,
     )
     code_box(
-        s, Inches(6.8), Inches(3.7), Inches(5.95), Inches(3.2),
+        s, Inches(6.8), Inches(3.65), Inches(5.95), Inches(3.25),
         "Python",
         [
             "yosh = 18",
@@ -365,11 +398,11 @@ def build(out: Path) -> None:
         CYAN,
     )
 
-    # ---- 7. Practical building blocks ----
-    s = new_slide(prs)
-    heading(s, "PYTHON · AMALIY ASOSLAR", "List, dict, funksiya — kundalik vositalar")
+    # ---- 7. Practical blocks ----
+    s = new_slide(prs, "teal")
+    heading(s, "PYTHON · AMALIY ASOSLAR", "Ro‘yxat, lug‘at, funksiya — kundalik vositalar")
     code_box(
-        s, Inches(0.5), Inches(1.35), Inches(6.05), Inches(5.5),
+        s, Inches(0.45), Inches(1.35), Inches(6.1), Inches(5.5),
         "Ma’lumot tuzilmalari",
         [
             "talaba = {",
@@ -380,14 +413,14 @@ def build(out: Path) -> None:
             "",
             "fanlar = [\"Python\", \"Django\"]",
             "fanlar.append(\"REST\")",
-            "# dict = kalit→qiymat",
-            "# list = tartibli ro‘yxat",
+            "# lug‘at (dict) = kalit→qiymat",
+            "# ro‘yxat (list) = tartibli to‘plam",
         ],
         CYAN,
     )
     code_box(
         s, Inches(6.8), Inches(1.35), Inches(5.95), Inches(5.5),
-        "Funksiya",
+        "Funksiya (function)",
         [
             "def yigindi(a, b):",
             "    return a + b",
@@ -403,157 +436,189 @@ def build(out: Path) -> None:
         GREEN,
     )
 
-    # ---- 8. Where Python is used ----
-    s = new_slide(prs)
+    # ---- 8. Domains + image strip ----
+    s = new_slide(prs, "teal")
+    add_pic(s, ASSETS / "hero-youth-coding.jpg", Inches(9.4), Inches(0.2), Inches(3.6), Inches(1.05))
     heading(s, "PYTHON · QAYERDA ISHLATILADI?", "Bitta til — bir necha yo‘nalish")
     domains = [
-        ("Veb backend", "Django, Flask, FastAPI.\nSayt va API yoziladi."),
-        ("Ma’lumot / Data", "Pandas, NumPy.\nExcel dan kuchli tahlil."),
-        ("AI / ML", "PyTorch, TensorFlow, scikit-learn.\nModel o‘qitish va bashorat."),
-        ("Avtomatlashtirish", "Fayl, Excel, email, scraping.\nKundalik ishlarni skript qilish."),
-        ("Ilmiy hisob", "SciPy, Matplotlib.\nGrafik, matematik modellar."),
-        ("Scripting / DevOps", "Server skriptlari, CI yordamchi vositalar, API bilan bog‘lanish."),
+        ("Veb orqa qismi (backend)", "Django, Flask, FastAPI.\nSayt va dasturiy interfeys (API)."),
+        ("Ma’lumot tahlili (data)", "Pandas, NumPy.\nJadvallar ustida kuchli tahlil."),
+        ("Sun’iy intellekt (AI / ML)", "PyTorch, TensorFlow.\nModel o‘qitish va bashorat."),
+        ("Avtomatlashtirish", "Fayl, jadval, pochta, saytdan ma’lumot olish (scraping)."),
+        ("Ilmiy hisob", "SciPy, Matplotlib.\nGrafik va matematik modellar."),
+        ("Skript / DevOps", "Server skriptlari, yordamchi vositalar, tarmoq so‘rovlari."),
     ]
     for i, (t, b) in enumerate(domains):
         col, row = i % 3, i // 3
         card(
             s,
-            Inches(0.5) + Inches(col * 4.2),
+            Inches(0.45) + Inches(col * 4.2),
             Inches(1.35) + Inches(row * 2.85),
-            Inches(4.05),
+            Inches(4.0),
             Inches(2.7),
             t, b, (CYAN, AMBER, GREEN, CORAL, CYAN, AMBER)[i],
         )
 
-    # ---- 9. PROBLEM: web ----
-    s = new_slide(prs, CORAL)
+    # ---- 9. PROBLEM 1 + web image ----
+    s = image_panel_slide(prs, "web-django.jpg", "coral")
     heading(s, "MUAMMO 1", "Python o‘zi — lekin veb kerak")
-    panel(s, Inches(0.55), Inches(1.35), Inches(12.2), Inches(5.5), PROBLEM_BG, CORAL)
-    textbox(s, Inches(0.9), Inches(1.65), Inches(11.5), Inches(5.0), [
-        ("MUAMMO", {"size": 15, "bold": True, "color": CORAL, "space_after": 10}),
-        ("Python da skript yozishni o‘rgandik. Lekin real mahsulot ko‘pincha brauzerda:\nsayt, kabinet, admin panel, forma, foydalanuvchi ro‘yxati…", {
-            "size": 20, "bold": True, "color": NAVY, "space_after": 16,
+    shape(s, Inches(0.5), Inches(1.4), Inches(7.5), Inches(5.4), PROBLEM_BG, line=CORAL, rounded=True)
+    textbox(s, Inches(0.8), Inches(1.7), Inches(7.0), Inches(4.9), [
+        ("MUAMMO", {"size": 14, "bold": True, "color": CORAL, "space_after": 10}),
+        ("Python da skript yozishni o‘rgandik. Lekin real mahsulot ko‘pincha brauzerda: sayt, kabinet, boshqaruv paneli, forma…", {
+            "size": 17, "bold": True, "color": NAVY, "space_after": 14,
         }),
-        ("Savol: faqat print() va oddiy fayllar bilan to‘liq veb-tizim bo‘ladimi?\nURL marshrutlash, baza, login, xavfsizlik, HTML — bularni noldan yig‘ish og‘ir.", {
-            "size": 17, "color": MUTED, "space_after": 16,
+        ("Savol: faqat print() bilan to‘liq veb-tizim bo‘ladimi?\nManzil yo‘naltirish (URL routing), ma’lumotlar bazasi, kirish (login), xavfsizlik, sahifa andozasi — bularni noldan yig‘ish og‘ir.", {
+            "size": 14, "color": MUTED, "space_after": 14,
         }),
-        ("Shuning uchun boshlang‘ich web uchun framework tanlaymiz.", {
-            "size": 18, "bold": True, "color": AMBER,
+        ("Shuning uchun boshlang‘ich veb uchun dasturiy asos (framework) tanlaymiz.", {
+            "size": 15, "bold": True, "color": AMBER,
         }),
     ])
 
-    # ---- 10. SOLUTION: Django ----
-    s = new_slide(prs, GREEN)
-    heading(s, "YECHIM 1 · DJANGO", "Boshlang‘ich web uchun asosiy tavsiya")
-    panel(s, Inches(0.55), Inches(1.3), Inches(12.2), Inches(1.35), SOLUTION_BG, GREEN)
-    textbox(s, Inches(0.85), Inches(1.5), Inches(11.6), Inches(1.05), [
-        ("Django — Python dagi to‘liq (full-stack) veb framework.\n“Batteries included”: auth, admin, ORM, template, xavfsizlik — tayyor karkas.", {
-            "size": 16, "bold": True, "color": NAVY, "space_after": 0,
+    # ---- 10. Django solution ----
+    s = new_slide(prs, "green")
+    add_pic(s, ASSETS / "web-django.jpg", Inches(9.4), Inches(0.2), Inches(3.6), Inches(1.05))
+    heading(s, "YECHIM 1 · DJANGO", "Boshlang‘ich veb uchun asosiy tavsiya")
+    shape(s, Inches(0.45), Inches(1.3), Inches(12.4), Inches(1.35), SOLUTION_BG, line=GREEN, rounded=True)
+    textbox(s, Inches(0.75), Inches(1.5), Inches(11.9), Inches(1.05), [
+        ("Django — Python dagi to‘liq veb dasturiy asosi (full-stack framework).\nIchida tayyor: kirish tizimi, boshqaruv paneli, ORM, sahifa andozasi, xavfsizlik.", {
+            "size": 15, "bold": True, "color": NAVY, "space_after": 0,
         }),
     ])
     reasons = [
-        ("Nima uchun Django?", "Boshlang‘ich uchun yo‘l aniq: Project/App, URL, View, Model, Template. Ko‘p narsa ichida."),
-        ("Nima beradi?", "Login/ro‘yxat, admin panel, baza bilan ORM orqali ishlash, HTML sahifalar, CSRF himoya."),
-        ("Qanday o‘rganamiz?", "Avval so‘rov qanday yurishini tushunamiz. Keyin kichik sayt. Keyin API bosqichi."),
+        ("Nima uchun Django?", "Boshlang‘ich uchun yo‘l aniq: loyiha/ilova (Project/App), manzil (URL), boshqaruvchi (View), model, andoza (Template)."),
+        ("Nima beradi?", "Kirish/ro‘yxat, admin panel, baza bilan ORM, HTML sahifalar, himoya vositalari (CSRF va boshqalar)."),
+        ("Qanday o‘rganamiz?", "Avval so‘rov qanday yurishini tushunamiz. Keyin kichik sayt. Keyin dasturiy interfeys (API)."),
     ]
     for i, (t, b) in enumerate(reasons):
-        card(s, Inches(0.5) + Inches(i * 4.2), Inches(2.95), Inches(4.05), Inches(3.8), t, b, (GREEN, CYAN, AMBER)[i], SOLUTION_BG)
+        card(s, Inches(0.45) + Inches(i * 4.2), Inches(2.95), Inches(4.0), Inches(3.8), t, b, (GREEN, CYAN, AMBER)[i], SOLUTION_BG)
 
-    # ---- 11. Django request flow ----
-    s = new_slide(prs)
-    heading(s, "DJANGO · QANDAY ISHLAYDI?", "Bitta so‘rovning ketma-ketligi")
+    # ---- 11. Request flow ----
+    s = new_slide(prs, "teal")
+    heading(s, "DJANGO · QANDAY ISHLAYDI?", "Bitta so‘rovning (request) ketma-ketligi")
     steps = [
-        ("1. Request", "Brauzer manzil ochadi\nyoki forma yuboradi"),
-        ("2. URL", "Django to‘g‘ri yo‘lni\ntopadi (urls.py)"),
-        ("3. View", "Mantiq ishlaydi:\ntekshiruv, hisob"),
-        ("4. Model", "Kerak bo‘lsa bazadan\no‘qiydi / yozadi"),
-        ("5. Template", "HTML sahifa yasaydi\n(klassik usul)"),
-        ("6. Response", "Javob brauzerga\nqaytadi"),
+        ("1. So‘rov (request)", "Brauzer manzil ochadi\nyoki forma yuboradi"),
+        ("2. Manzil (URL)", "Django to‘g‘ri yo‘lni\ntopadi (urls.py)"),
+        ("3. Boshqaruvchi (View)", "Mantiq ishlaydi:\ntekshiruv, hisob"),
+        ("4. Model (Model)", "Kerak bo‘lsa bazadan\no‘qiydi / yozadi"),
+        ("5. Andoza (Template)", "HTML sahifa yasaydi\n(klassik usul)"),
+        ("6. Javob (response)", "Natija brauzerga\nqaytadi"),
     ]
     for i, (t, b) in enumerate(steps):
         col, row = i % 3, i // 3
         card(
             s,
-            Inches(0.5) + Inches(col * 4.2),
+            Inches(0.45) + Inches(col * 4.2),
             Inches(1.35) + Inches(row * 2.85),
-            Inches(4.05),
+            Inches(4.0),
             Inches(2.7),
             t, b, (CYAN, AMBER, GREEN, CORAL, CYAN, AMBER)[i],
         )
 
     # ---- 12. MTV ----
-    s = new_slide(prs)
-    heading(s, "DJANGO · MTV", "Uchta rol — eslab qolish oson")
-    card(s, Inches(0.5), Inches(1.4), Inches(4.05), Inches(5.3),
-         "Model",
+    s = new_slide(prs, "teal")
+    heading(s, "DJANGO · MTV ANDAZASI", "Uchta rol — eslab qolish oson")
+    card(s, Inches(0.45), Inches(1.4), Inches(4.0), Inches(5.3),
+         "Model (Model)",
          "Ma’lumot modeli.\n\nMasalan: User, Product, Post.\n\nORM orqali SQL kamroq yoziladi — Python klasslari bilan baza boshqariladi.",
          CYAN)
-    card(s, Inches(4.7), Inches(1.4), Inches(4.05), Inches(5.3),
-         "Template",
-         "Ko‘rinish (HTML).\n\nFoydalanuvchi brauzerda shuni ko‘radi.\n\nView dan kelgan ma’lumot sahifaga joylanadi.",
+    card(s, Inches(4.65), Inches(1.4), Inches(4.0), Inches(5.3),
+         "Andoza (Template)",
+         "Ko‘rinish (HTML).\n\nFoydalanuvchi brauzerda shuni ko‘radi.\n\nBoshqaruvchidan kelgan ma’lumot sahifaga joylanadi.",
          AMBER)
-    card(s, Inches(8.9), Inches(1.4), Inches(3.9), Inches(5.3),
-         "View",
-         "Mantiq markazi.\n\nSo‘rov keldi → qaror:\nqaysi model? qaysi template?\n\nJavobni tayyorlaydi.",
+    card(s, Inches(8.85), Inches(1.4), Inches(3.95), Inches(5.3),
+         "Boshqaruvchi (View)",
+         "Mantiq markazi.\n\nSo‘rov keldi → qaror:\nqaysi model? qaysi andoza?\n\nJavobni tayyorlaydi.",
          GREEN)
 
-    # ---- 13. PROBLEM 2: multi-platform ----
-    s = new_slide(prs, CORAL)
+    # ---- 13. PROBLEM 2 + multi image ----
+    s = image_panel_slide(prs, "multi-platform.jpg", "coral")
     heading(s, "MUAMMO 2", "Faqat sayt yetarli emas — real hayot")
-    panel(s, Inches(0.55), Inches(1.3), Inches(12.2), Inches(5.55), PROBLEM_BG, CORAL)
-    textbox(s, Inches(0.9), Inches(1.55), Inches(11.5), Inches(5.1), [
-        ("MUAMMO", {"size": 15, "bold": True, "color": CORAL, "space_after": 10}),
-        ("Biz yozgan kod faqat kompyuter brauzerida emas.\nTelefon ilova + desktop dastur + veb — parallel ishlashi kerak.", {
-            "size": 20, "bold": True, "color": NAVY, "space_after": 14,
+    shape(s, Inches(0.5), Inches(1.4), Inches(7.5), Inches(5.4), PROBLEM_BG, line=CORAL, rounded=True)
+    textbox(s, Inches(0.8), Inches(1.7), Inches(7.0), Inches(4.9), [
+        ("MUAMMO", {"size": 14, "bold": True, "color": CORAL, "space_after": 10}),
+        ("Biz yozgan kod faqat kompyuter brauzerida emas.\nTelefon ilova + ish stoli dasturi (desktop) + veb — parallel ishlashi kerak.", {
+            "size": 16, "bold": True, "color": NAVY, "space_after": 12,
         }),
-        ("Klassik Django ko‘pincha HTML qaytaradi.\nMobil/desktop ilova esa HTML emas — ma’lumot (odatda JSON) so‘raydi.", {
-            "size": 17, "color": MUTED, "space_after": 14,
+        ("Klassik Django ko‘pincha HTML qaytaradi.\nMobil/ish stoli ilova esa HTML emas — ma’lumot (odatda JSON) so‘raydi.", {
+            "size": 14, "color": MUTED, "space_after": 12,
         }),
-        ("Xulosa-muammo: faqat Template bilan bitta backendni\nuchala platformaga to‘g‘ri ulash qiyin. Kuchliroq tushuncha kerak: API.", {
-            "size": 17, "bold": True, "color": AMBER,
+        ("Xulosa-muammo: faqat andoza (Template) bilan bitta orqa qismni uchala platformaga to‘g‘ri ulash qiyin. Kuchliroq tushuncha kerak: dasturiy interfeys (API).", {
+            "size": 14, "bold": True, "color": AMBER,
         }),
     ])
 
-    # ---- 14. See clients ----
-    s = new_slide(prs, CORAL)
+    # ---- 14. Three clients ----
+    s = new_slide(prs, "coral")
     heading(s, "MUAMMO 2 · KO‘RINISH", "Uchta mijoz — bitta ma’lumot")
     for i, (t, b) in enumerate([
-        ("Telefon", "Mobil ilova.\nHTML emas — API kerak."),
-        ("Desktop", "Kompyuter dasturi.\nHam ma’lumot so‘raydi."),
-        ("Veb", "Brauzer / SPA.\nHTML yoki API."),
+        ("Telefon (mobile)", "Mobil ilova.\nHTML emas — dasturiy interfeys (API) kerak."),
+        ("Ish stoli (desktop)", "Kompyuter dasturi.\nHam ma’lumot so‘raydi."),
+        ("Veb (web)", "Brauzer / yagona sahifa ilova (SPA).\nHTML yoki API."),
     ]):
-        card(s, Inches(0.5) + Inches(i * 4.2), Inches(1.4), Inches(4.05), Inches(2.5), t, b, CORAL, PROBLEM_BG)
-    panel(s, Inches(0.55), Inches(4.2), Inches(12.2), Inches(2.55), CARD, AMBER)
-    textbox(s, Inches(0.9), Inches(4.45), Inches(11.5), Inches(2.15), [
+        card(s, Inches(0.45) + Inches(i * 4.2), Inches(1.4), Inches(4.0), Inches(2.5), t, b, CORAL, PROBLEM_BG)
+    shape(s, Inches(0.45), Inches(4.2), Inches(12.4), Inches(2.55), CARD, line=AMBER, rounded=True)
+    textbox(s, Inches(0.8), Inches(4.45), Inches(11.8), Inches(2.15), [
         ("Savol: mahsulot/foydalanuvchi ma’lumotini uchalasiga qanday beramiz?", {
-            "size": 18, "bold": True, "color": NAVY, "space_after": 10,
+            "size": 17, "bold": True, "color": NAVY, "space_after": 10,
         }),
-        ("Agar faqat HTML bersak — telefon va desktop “tushunmaydi”.\nYechim sifatida Django REST Framework (DRF) tavsiya qilinadi.", {
-            "size": 16, "color": MUTED,
+        ("Agar faqat HTML bersak — telefon va ish stoli “tushunmaydi”.\nYechim sifatida Django REST Framework (DRF) tavsiya qilinadi.", {
+            "size": 15, "color": MUTED,
         }),
     ])
 
-    # ---- 15. SOLUTION: DRF (final substantive slide) ----
-    s = new_slide(prs, GREEN)
-    heading(s, "YECHIM 2 · DJANGO REST FRAMEWORK", "Bir backend — ko‘p platforma")
-    panel(s, Inches(0.55), Inches(1.3), Inches(12.2), Inches(1.4), SOLUTION_BG, GREEN)
-    textbox(s, Inches(0.85), Inches(1.5), Inches(11.6), Inches(1.1), [
-        ("DRF — Django ustida API qatlami. Ma’lumotni JSON qilib beradi.\nTelefon, desktop, veb — parallel ulanadi. Django o‘rnini bosmaydi — uni kengaytiradi.", {
-            "size": 16, "bold": True, "color": NAVY, "space_after": 0,
+    # ---- 15. DRF ----
+    s = new_slide(prs, "green")
+    add_pic(s, ASSETS / "multi-platform.jpg", Inches(9.4), Inches(0.2), Inches(3.6), Inches(1.05))
+    heading(s, "YECHIM 2 · DJANGO REST (DRF)", "Bir orqa qism — ko‘p platforma")
+    shape(s, Inches(0.45), Inches(1.3), Inches(12.4), Inches(1.4), SOLUTION_BG, line=GREEN, rounded=True)
+    textbox(s, Inches(0.75), Inches(1.5), Inches(11.9), Inches(1.1), [
+        ("DRF — Django ustida dasturiy interfeys (API) qatlami. Ma’lumotni JSON qilib beradi.\nTelefon, ish stoli, veb — parallel ulanadi. Django o‘rnini bosmaydi — uni kengaytiradi.", {
+            "size": 15, "bold": True, "color": NAVY, "space_after": 0,
         }),
     ])
-    card(s, Inches(0.5), Inches(2.95), Inches(4.05), Inches(3.8),
+    card(s, Inches(0.45), Inches(2.95), Inches(4.0), Inches(3.8),
          "Nima qiladi?",
-         "HTML o‘rniga JSON.\nMasalan: /api/products/\n\nSerializer, ViewSet, Router, auth — API uchun asosiy vositalar.",
+         "HTML o‘rniga JSON.\nMasalan: /api/products/\n\nSerializator, ViewSet, yo‘naltirgich (router), autentifikatsiya — API uchun asosiy vositalar.",
          GREEN, SOLUTION_BG)
-    card(s, Inches(4.7), Inches(2.95), Inches(4.05), Inches(3.8),
+    card(s, Inches(4.65), Inches(2.95), Inches(4.0), Inches(3.8),
          "Nima uchun kerak?",
-         "Bir marta yozilgan biznes-mantiq\nbarcha mijozlarga xizmat qiladi.\n\nReal hayotdagi “parallel ishlash” shu yerda yechiladi.",
+         "Bir marta yozilgan biznes-mantiq barcha mijozlarga xizmat qiladi.\n\nReal hayotdagi “parallel ishlash” shu yerda yechiladi.",
          CYAN, SOLUTION_BG)
-    card(s, Inches(8.9), Inches(2.95), Inches(3.9), Inches(3.8),
+    card(s, Inches(8.85), Inches(2.95), Inches(3.95), Inches(3.8),
          "O‘rganish tartibi",
          "1) Python asoslari\n2) Django (sayt)\n3) DRF (API)\n\nAvval muammo, keyin yechim — shu tartibda.",
          AMBER, SOLUTION_BG)
+
+    # ---- 16. Conclusion with image ----
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    add_bg(s, NAVY)
+    add_pic(s, ASSETS / "conclusion-path.jpg", 0, 0, W, H)
+    add_pic(s, ASSETS / "overlay-dark.png", 0, 0, W, H)
+    shape(s, 0, 0, Inches(0.18), H, GREEN)
+    pill(s, Inches(0.7), Inches(0.7), Inches(2.2), Inches(0.38), "XULOSA", GREEN)
+    textbox(s, Inches(0.7), Inches(1.3), Inches(11.8), Inches(0.7), [
+        ("Bugungi darsdan olib ketiladigan asoslar", {"size": 26, "bold": True, "color": WHITE, "space_after": 0}),
+    ])
+    points = [
+        ("1", "Python", "Umumiy maqsadli til: o‘qilishi oson, tipni o‘zi aniqlaydi, ekotizimi boy."),
+        ("2", "Django", "Boshlang‘ich veb uchun to‘liq dasturiy asos (framework) — asosiy tavsiya."),
+        ("3", "Muammo", "Faqat sayt yetarli emas: telefon + ish stoli + veb parallel kerak."),
+        ("4", "DRF", "Yechim: bitta dasturiy interfeys (API) orqali barcha platformalar ulanadi."),
+    ]
+    for i, (n, t, b) in enumerate(points):
+        y = Inches(2.15) + Inches(i * 1.15)
+        circle(s, Inches(0.75), y + Inches(0.15), Inches(0.55), (CYAN, AMBER, CORAL, GREEN)[i])
+        textbox(s, Inches(0.75), y + Inches(0.22), Inches(0.55), Inches(0.4), [
+            (n, {"size": 14, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0}),
+        ], align=PP_ALIGN.CENTER)
+        shape(s, Inches(1.55), y, Inches(10.8), Inches(1.0), RGBColor(0x0F, 0x17, 0x2A), line=RGBColor(0x33, 0x41, 0x55), rounded=True)
+        # make panel slightly see-through look via lighter navy border card
+        textbox(s, Inches(1.85), y + Inches(0.15), Inches(10.3), Inches(0.75), [
+            (t, {"size": 16, "bold": True, "color": WHITE, "space_after": 3}),
+            (b, {"size": 13, "color": RGBColor(0xCB, 0xD5, 0xE1), "space_after": 0}),
+        ])
 
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
@@ -562,9 +627,13 @@ def build(out: Path) -> None:
 
 if __name__ == "__main__":
     out_dir = Path(__file__).resolve().parent
-    primary = out_dir / "Python-Django-PBL-v6.pptx"
+    primary = out_dir / "Python-Django-PBL-v7.pptx"
     build(primary)
-    shutil.copyfile(primary, out_dir / "Python-Django-PBL-v5.pptx")
-    shutil.copyfile(primary, out_dir / "Python-Dars-01-YANGI.pptx")
-    shutil.copyfile(primary, out_dir / "Python-Django-Yorqin.pptx")
-    shutil.copyfile(primary, out_dir / "Python-Django-Vaaav.pptx")
+    for name in (
+        "Python-Django-PBL-v6.pptx",
+        "Python-Django-PBL-v5.pptx",
+        "Python-Dars-01-YANGI.pptx",
+        "Python-Django-Yorqin.pptx",
+        "Python-Django-Vaaav.pptx",
+    ):
+        shutil.copyfile(primary, out_dir / name)
