@@ -15,17 +15,19 @@ from pptx.util import Emu, Inches, Pt
 # 16:9
 W, H = Inches(13.333), Inches(7.5)
 
-# Palette — deep tech, not purple
-BG = RGBColor(0x0B, 0x14, 0x22)
-BG2 = RGBColor(0x12, 0x22, 0x38)
-CARD = RGBColor(0x16, 0x2A, 0x44)
-INK = RGBColor(0xF2, 0xF6, 0xFB)
-MUTED = RGBColor(0x9A, 0xB0, 0xC6)
-CYAN = RGBColor(0x2E, 0xD3, 0xB7)
-AMBER = RGBColor(0xF5, 0xB3, 0x2E)
-CORAL = RGBColor(0xFF, 0x6B, 0x6B)
+# Palette — yorqin, yuqori kontrast (xirra emas)
+BG = RGBColor(0xEF, 0xF8, 0xFF)       # ochiq osmon
+BG2 = RGBColor(0xFF, 0xF7, 0xE8)      # issiq ochiq
+CARD = RGBColor(0xFF, 0xFF, 0xFF)     # oq kartochka
+INK = RGBColor(0x0F, 0x1F, 0x2E)      # qora-ko'k matn
+MUTED = RGBColor(0x3D, 0x55, 0x6B)    # o'qiladigan kulrang-ko'k
+CYAN = RGBColor(0x00, 0x9E, 0xE0)     # yorqin moviy
+AMBER = RGBColor(0xFF, 0x8C, 0x00)    # yorqin apelsin
+CORAL = RGBColor(0xFF, 0x3D, 0x6E)    # yorqin qizil-pushti
+GREEN = RGBColor(0x00, 0xC2, 0x73)    # yorqin yashil
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LINE = RGBColor(0x2A, 0x40, 0x5C)
+LINE = RGBColor(0xB8, 0xD4, 0xEA)     # ochiq chiziq
+NAVY = RGBColor(0x0B, 0x3D, 0x6E)     # sarlavha uchun to'q moviy
 
 
 def set_run(run, size=20, bold=False, color=INK, font="Calibri"):
@@ -106,26 +108,27 @@ def card(slide, left, top, width, height, title, body, accent=CYAN):
     shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
     shp.fill.solid()
     shp.fill.fore_color.rgb = CARD
-    shp.line.color.rgb = LINE
+    shp.line.color.rgb = accent
+    shp.line.width = Pt(2.25)
     # accent strip
-    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, Inches(0.1), height)
+    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, Inches(0.14), height)
     strip.fill.solid()
     strip.fill.fore_color.rgb = accent
     strip.line.fill.background()
     textbox(
         slide,
-        left + Inches(0.28),
+        left + Inches(0.32),
         top + Inches(0.22),
-        width - Inches(0.4),
+        width - Inches(0.45),
         height - Inches(0.35),
         [
-            (title, {"size": 18, "bold": True, "color": WHITE, "space_after": 8}),
+            (title, {"size": 18, "bold": True, "color": NAVY, "space_after": 8}),
             (body, {"size": 14, "color": MUTED, "space_after": 0}),
         ],
     )
 
 
-def pill(slide, left, top, width, height, text, bg=CYAN, fg=BG):
+def pill(slide, left, top, width, height, text, bg=CYAN, fg=WHITE):
     shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
     shp.fill.solid()
     shp.fill.fore_color.rgb = bg
@@ -157,8 +160,8 @@ def build(out: Path) -> None:
 
     # ---- 1 Title ----
     s = new_slide(prs)
-    glow_orb(s, Inches(10.2), Inches(-0.8), Inches(4), RGBColor(0x1A, 0x3A, 0x55))
-    glow_orb(s, Inches(-1.2), Inches(5.2), Inches(3.2), RGBColor(0x14, 0x35, 0x30))
+    glow_orb(s, Inches(10.2), Inches(-0.8), Inches(4), RGBColor(0x7E, 0xD6, 0xFF))
+    glow_orb(s, Inches(-1.2), Inches(5.2), Inches(3.2), RGBColor(0xFF, 0xD0, 0x80))
     pill(s, Inches(0.7), Inches(1.5), Inches(2.4), Inches(0.38), "PYTHON × DJANGO", CYAN, BG)
     textbox(
         s,
@@ -168,7 +171,7 @@ def build(out: Path) -> None:
         Inches(2.2),
         [
             ("Kompyuterlarni boshqaradigan", {"size": 28, "color": MUTED, "space_after": 4}),
-            ("ENG KUCHLI BOSHLANG‘ICH TIL", {"size": 44, "bold": True, "color": WHITE, "space_after": 10}),
+            ("ENG KUCHLI BOSHLANG‘ICH TIL", {"size": 44, "bold": True, "color": NAVY, "space_after": 10}),
             ("Qanday ishlaydi? Django nima? Nima uchun millionlab dasturchilar tanlaydi?", {"size": 18, "color": MUTED}),
         ],
     )
@@ -185,7 +188,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.4), Inches(11), Inches(1), [
         ("BIRINCHI “VAAAV”", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Python — shunchaki maktab tili emas", {"size": 32, "bold": True, "color": WHITE}),
+        ("Python — shunchaki maktab tili emas", {"size": 32, "bold": True, "color": NAVY}),
     ])
     stats = [
         ("#1", "Ko‘p reytinglarda\neng ommabop tillardan"),
@@ -208,7 +211,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.4), Inches(11), Inches(1.2), [
         ("ASOS", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Dasturlash = kompyuterga aniq buyruq berish", {"size": 30, "bold": True, "color": WHITE}),
+        ("Dasturlash = kompyuterga aniq buyruq berish", {"size": 30, "bold": True, "color": NAVY}),
     ])
     steps = [
         ("Siz g‘oya o‘ylaysiz", "Masalan: son topish o‘yini"),
@@ -222,10 +225,10 @@ def build(out: Path) -> None:
         n.fill.fore_color.rgb = CYAN if i < 2 else AMBER
         n.line.fill.background()
         textbox(s, Inches(0.8), y + Inches(0.12), Inches(0.7), Inches(0.5), [
-            (str(i + 1), {"size": 18, "bold": True, "color": BG, "align": PP_ALIGN.CENTER, "space_after": 0})
+            (str(i + 1), {"size": 18, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})
         ], align=PP_ALIGN.CENTER)
         textbox(s, Inches(1.8), y, Inches(10), Inches(1.1), [
-            (t, {"size": 22, "bold": True, "color": WHITE, "space_after": 4}),
+            (t, {"size": 22, "bold": True, "color": NAVY, "space_after": 4}),
             (b, {"size": 16, "color": MUTED}),
         ])
 
@@ -233,7 +236,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
         ("PYTHON QANDAY ISHLAYDI?", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Siz yozgan kod → mashina tushunadigan yo‘l", {"size": 28, "bold": True, "color": WHITE}),
+        ("Siz yozgan kod → mashina tushunadigan yo‘l", {"size": 28, "bold": True, "color": NAVY}),
     ])
     pipeline = [
         (".py fayl", "Siz yozgan\nmatn"),
@@ -254,7 +257,7 @@ def build(out: Path) -> None:
         top.fill.fore_color.rgb = top_c
         top.line.fill.background()
         textbox(s, x + Inches(0.15), Inches(2.55), Inches(2.0), Inches(2.6), [
-            (t, {"size": 18, "bold": True, "color": WHITE, "space_after": 12}),
+            (t, {"size": 18, "bold": True, "color": NAVY, "space_after": 12}),
             (b, {"size": 14, "color": MUTED}),
         ])
         if i < len(pipeline) - 1:
@@ -266,7 +269,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
         ("SIR OCHILADI", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Python — sof interpretator emas", {"size": 30, "bold": True, "color": WHITE}),
+        ("Python — sof interpretator emas", {"size": 30, "bold": True, "color": NAVY}),
     ])
     card(s, Inches(0.7), Inches(1.8), Inches(5.8), Inches(4.5),
          "Ko‘pchilik o‘ylaydi",
@@ -281,7 +284,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
         ("XOTIRA SEHRI", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("O‘zgaruvchi — quti emas, ishora", {"size": 30, "bold": True, "color": WHITE}),
+        ("O‘zgaruvchi — quti emas, ishora", {"size": 30, "bold": True, "color": NAVY}),
     ])
     card(s, Inches(0.7), Inches(1.7), Inches(4), Inches(4.6),
          "Boshqa tillarda",
@@ -300,7 +303,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
         ("BOSHQA TILLAR QIYIN QILADIGAN NARSALAR", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Pythonning “super kuchlari”", {"size": 30, "bold": True, "color": WHITE}),
+        ("Pythonning “super kuchlari”", {"size": 30, "bold": True, "color": NAVY}),
     ])
     powers = [
         ("AI / Machine Learning", "TensorFlow, PyTorch, scikit-learn — dunyo standarti deyarli Python."),
@@ -327,7 +330,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.0), [
         ("FRAMEWORK GALAKTIKASI", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Pythonning eng mashhur “qurollari”", {"size": 28, "bold": True, "color": WHITE}),
+        ("Pythonning eng mashhur “qurollari”", {"size": 28, "bold": True, "color": NAVY}),
     ])
     fws = [
         ("Django", "To‘liq veb platforma\nInstagram darajasi", AMBER),
@@ -350,17 +353,17 @@ def build(out: Path) -> None:
         strip.fill.fore_color.rgb = c
         strip.line.fill.background()
         textbox(s, x + Inches(0.25), y + Inches(0.4), Inches(3.5), Inches(1.8), [
-            (t, {"size": 24, "bold": True, "color": WHITE, "space_after": 10}),
+            (t, {"size": 24, "bold": True, "color": NAVY, "space_after": 10}),
             (b, {"size": 15, "color": MUTED}),
         ])
 
     # ---- 9 Django title ----
     s = new_slide(prs)
-    glow_orb(s, Inches(9.5), Inches(-1), Inches(5), RGBColor(0x0E, 0x3A, 0x2A))
+    glow_orb(s, Inches(9.5), Inches(-1), Inches(5), RGBColor(0x7C, 0xF0, 0xB8))
     pill(s, Inches(0.7), Inches(2.0), Inches(2.0), Inches(0.38), "DJANGO", AMBER, BG)
     textbox(s, Inches(0.7), Inches(2.6), Inches(11), Inches(2.5), [
         ("Sayt qurish uchun", {"size": 26, "color": MUTED, "space_after": 6}),
-        ("TAYYOR “SHAHAR INFRASTRUKTURASI”", {"size": 36, "bold": True, "color": WHITE, "space_after": 12}),
+        ("TAYYOR “SHAHAR INFRASTRUKTURASI”", {"size": 36, "bold": True, "color": NAVY, "space_after": 12}),
         ("Login, baza, admin, xavfsizlik — hammasi ichida. Siz g‘oya va mantiqqa e’tibor qaratasiz.", {"size": 18, "color": MUTED}),
     ])
 
@@ -368,7 +371,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.0), [
         ("DJANGO QANDAY ISHLAYDI?", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Bir so‘rovning sayohati (Request Journey)", {"size": 28, "bold": True, "color": WHITE}),
+        ("Bir so‘rovning sayohati (Request Journey)", {"size": 28, "bold": True, "color": NAVY}),
     ])
     journey = [
         ("1. Brauzer", "Foydalanuvchi\ntugmani bosadi"),
@@ -395,7 +398,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
         ("DJANGO ARXITEKTURASI", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("MTV — Model · Template · View", {"size": 30, "bold": True, "color": WHITE}),
+        ("MTV — Model · Template · View", {"size": 30, "bold": True, "color": NAVY}),
     ])
     mtv = [
         ("MODEL", "Ma’lumotlar\n(foydalanuvchi, mahsulot…)\nBazaga bog‘lanadi", CYAN),
@@ -413,7 +416,7 @@ def build(out: Path) -> None:
         head.fill.fore_color.rgb = c
         head.line.fill.background()
         textbox(s, x, Inches(2.1), Inches(3.9), Inches(0.6), [
-            (t, {"size": 22, "bold": True, "color": BG, "align": PP_ALIGN.CENTER, "space_after": 0})
+            (t, {"size": 22, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})
         ], align=PP_ALIGN.CENTER)
         textbox(s, x + Inches(0.3), Inches(3.2), Inches(3.3), Inches(2.7), [
             (b, {"size": 18, "color": MUTED}),
@@ -423,7 +426,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.0), [
         ("DJANGO SUPERPOWERS", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Boshqa yondashuvlarda qo‘lda yoziladigan narsalar", {"size": 26, "bold": True, "color": WHITE}),
+        ("Boshqa yondashuvlarda qo‘lda yoziladigan narsalar", {"size": 26, "bold": True, "color": NAVY}),
     ])
     supers = [
         ("Admin panel", "1 buyruq bilan boshqaruv paneli — mahsulot/user qo‘shish."),
@@ -442,7 +445,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.0), [
         ("QAYSI FRAMEWORK?", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Django · Flask · FastAPI", {"size": 28, "bold": True, "color": WHITE}),
+        ("Django · Flask · FastAPI", {"size": 28, "bold": True, "color": NAVY}),
     ])
     rows = [
         ("Django", "Katta sayt, admin, tez start", "To‘liq “kombayn”", AMBER),
@@ -460,7 +463,7 @@ def build(out: Path) -> None:
         mark.fill.fore_color.rgb = c
         mark.line.fill.background()
         textbox(s, Inches(1.1), y + Inches(0.3), Inches(2.5), Inches(1.0), [
-            (name, {"size": 24, "bold": True, "color": WHITE, "space_after": 0})
+            (name, {"size": 24, "bold": True, "color": NAVY, "space_after": 0})
         ])
         textbox(s, Inches(4.0), y + Inches(0.25), Inches(4.2), Inches(1.1), [
             ("Qachon?", {"size": 12, "bold": True, "color": MUTED, "space_after": 4}),
@@ -475,7 +478,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.0), [
         ("HAQIQIY DUNYO", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Python + Django — kim ishlatadi?", {"size": 28, "bold": True, "color": WHITE}),
+        ("Python + Django — kim ishlatadi?", {"size": 28, "bold": True, "color": NAVY}),
     ])
     brands = [
         ("Instagram", "Django"),
@@ -494,7 +497,7 @@ def build(out: Path) -> None:
         box.fill.fore_color.rgb = CARD
         box.line.color.rgb = LINE
         textbox(s, x + Inches(0.3), y + Inches(0.55), Inches(3.3), Inches(1.3), [
-            (a, {"size": 26, "bold": True, "color": WHITE, "space_after": 8}),
+            (a, {"size": 26, "bold": True, "color": NAVY, "space_after": 8}),
             (b, {"size": 16, "bold": True, "color": CYAN if b == "Python" else AMBER}),
         ])
 
@@ -502,7 +505,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.0), [
         ("YO‘L XARITA", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Noldan “vaaav” gacha", {"size": 30, "bold": True, "color": WHITE}),
+        ("Noldan “vaaav” gacha", {"size": 30, "bold": True, "color": NAVY}),
     ])
     roadmap = [
         ("01", "Python asoslari", "print, if, funksiya"),
@@ -519,16 +522,16 @@ def build(out: Path) -> None:
         box.line.color.rgb = LINE
         textbox(s, x + Inches(0.15), Inches(2.5), Inches(2.1), Inches(3.0), [
             (n, {"size": 20, "bold": True, "color": CYAN if i < 3 else AMBER, "space_after": 12}),
-            (t, {"size": 16, "bold": True, "color": WHITE, "space_after": 10}),
+            (t, {"size": 16, "bold": True, "color": NAVY, "space_after": 10}),
             (b, {"size": 13, "color": MUTED}),
         ])
 
     # ---- 16 Close ----
     s = new_slide(prs)
-    glow_orb(s, Inches(-1), Inches(-1), Inches(4), RGBColor(0x15, 0x35, 0x50))
+    glow_orb(s, Inches(-1), Inches(-1), Inches(4), RGBColor(0xFF, 0xB4, 0xC8))
     textbox(s, Inches(0.7), Inches(1.8), Inches(12), Inches(3.5), [
         ("XULOSA", {"size": 14, "bold": True, "color": CYAN, "space_after": 10}),
-        ("Python — oson ko‘rinadi.\nIchida esa jiddiy motor.", {"size": 34, "bold": True, "color": WHITE, "space_after": 16}),
+        ("Python — oson ko‘rinadi.\nIchida esa jiddiy motor.", {"size": 34, "bold": True, "color": NAVY, "space_after": 16}),
         ("Django — shu motor bilan butun sayt shaharini qurish.", {"size": 20, "color": MUTED, "space_after": 20}),
         ("Keyingi qadam: birinchi print(\"Salom\") — keyin Django.", {"size": 18, "bold": True, "color": AMBER}),
     ])
