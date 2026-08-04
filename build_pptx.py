@@ -227,53 +227,153 @@ def build(out: Path) -> None:
             (b, {"size": 16, "color": MUTED}),
         ])
 
+    # ---- 3b Why translator needed ----
+    s = new_slide(prs)
+    textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.3), [
+        ("MUHIM SAVOL", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
+        ("Kompyuter sizning tilngizni tushunmaydi", {"size": 28, "bold": True, "color": NAVY}),
+    ])
+    card(s, Inches(0.7), Inches(1.9), Inches(5.8), Inches(4.4),
+         "Siz yozasiz",
+         "print(\"Salom\")\n\nBu — odam uchun o‘qiladigan matn.\n\nKompyuter esa faqat 0 va 1 ni tushunadi (elektr signal).",
+         CYAN)
+    card(s, Inches(6.8), Inches(1.9), Inches(5.8), Inches(4.4),
+         "Shuning uchun kerak: TARJIMON",
+         "Sizning kodingizni kompyuter tushunadigan shaklga o‘tkazuvchi dastur.\n\nBu tarjimonning 2 asosiy turi bor:\n\n1) COMPILER\n2) INTERPRETATOR",
+         AMBER)
+
+    # ---- 3c Compiler explained ----
+    s = new_slide(prs)
+    textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.1), [
+        ("1-TUR", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
+        ("COMPILER (kompilyator) nima?", {"size": 30, "bold": True, "color": NAVY}),
+    ])
+    card(s, Inches(0.7), Inches(1.6), Inches(6.0), Inches(5.0),
+         "Oddiy misol",
+         "Kitobni BUTUNLAY tarjima qilib, keyin o‘qiysiz.\n\nAvval hammasi tayyorlanadi,\nkeyin ishga tushadi.\n\nMisollar: C, C++, Go, Rust\n\nNatija: .exe / dastur fayli",
+         CYAN)
+    card(s, Inches(7.0), Inches(1.6), Inches(5.6), Inches(5.0),
+         "Qanday ishlaydi?",
+         "1. Siz kod yozasiz\n2. Compiler BIR MARTA tarjima qiladi\n3. Chiqadi: tayyor dastur\n4. Keyin shu dasturni ishga tushirasiz\n\nYutuq: odatda TEZROQ ishlaydi\nKamchilik: har o‘zgarishda qayta tarjima",
+         GREEN)
+
+    # ---- 3d Interpreter explained ----
+    s = new_slide(prs)
+    textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.1), [
+        ("2-TUR", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
+        ("INTERPRETATOR nima?", {"size": 30, "bold": True, "color": NAVY}),
+    ])
+    card(s, Inches(0.7), Inches(1.6), Inches(6.0), Inches(5.0),
+         "Oddiy misol",
+         "Jonli tarjimon: gapirish bilan birga tarjima qiladi.\n\nKodni qatorma-qator (yoki bo‘lakma-bo‘lak) o‘qib bajaradi.\n\nMisollar: shell skriptlar, ba’zi tillar",
+         AMBER)
+    card(s, Inches(7.0), Inches(1.6), Inches(5.6), Inches(5.0),
+         "Qanday ishlaydi?",
+         "1. Siz kod yozasiz\n2. Interpretator ochiladi\n3. Kodni o‘qiydi va DARHOL bajaradi\n4. Alohida .exe yasash shart emas\n\nYutuq: oson sinash, tez o‘rganish\nKamchilik: ba’zan sekinroq",
+         CORAL)
+
+    # ---- 3e Side by side ----
+    s = new_slide(prs)
+    textbox(s, Inches(0.7), Inches(0.25), Inches(12), Inches(0.95), [
+        ("SOLISHTIRISH", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
+        ("Compiler vs Interpretator — bir qarashda", {"size": 26, "bold": True, "color": NAVY}),
+    ])
+    rows = [
+        ("Nima qiladi?", "Oldindan to‘liq tarjima", "Ishlatish paytida o‘qiydi"),
+        ("Natija", "Tayyor dastur (.exe)", "To‘g‘ridan-to‘g‘ri ishlaydi"),
+        ("Tezlik", "Ko‘pincha tezroq", "Ko‘pincha sekinroq"),
+        ("O‘rganish", "Biroz murakkabroq", "Boshlash osonroq"),
+        ("Misol", "C, C++, Go", "Shell, klassik BASIC"),
+    ]
+    # header
+    for i, (h, c) in enumerate([("COMPILER", CYAN), ("INTERPRETATOR", AMBER)]):
+        x = Inches(4.2) + Inches(i * 4.3)
+        box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, Inches(1.35), Inches(4.1), Inches(0.55))
+        box.fill.solid()
+        box.fill.fore_color.rgb = c
+        box.line.fill.background()
+        textbox(s, x, Inches(1.4), Inches(4.1), Inches(0.45), [
+            (h, {"size": 16, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})
+        ], align=PP_ALIGN.CENTER)
+    for r, (label, a, b) in enumerate(rows):
+        y = Inches(2.05) + Inches(r * 0.95)
+        textbox(s, Inches(0.55), y + Inches(0.15), Inches(3.4), Inches(0.7), [
+            (label, {"size": 15, "bold": True, "color": NAVY, "space_after": 0})
+        ])
+        for i, val in enumerate((a, b)):
+            x = Inches(4.2) + Inches(i * 4.3)
+            box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, Inches(4.1), Inches(0.85))
+            box.fill.solid()
+            box.fill.fore_color.rgb = CARD
+            box.line.color.rgb = LINE
+            textbox(s, x + Inches(0.15), y + Inches(0.2), Inches(3.8), Inches(0.55), [
+                (val, {"size": 14, "bold": True, "color": MUTED, "space_after": 0})
+            ])
+
     # ---- 4 How Python works BIG ----
     s = new_slide(prs)
-    textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
+    textbox(s, Inches(0.7), Inches(0.25), Inches(12), Inches(1.15), [
         ("PYTHON QANDAY ISHLAYDI?", {"size": 14, "bold": True, "color": CYAN, "space_after": 4}),
-        ("Siz yozgan kod → mashina tushunadigan yo‘l", {"size": 28, "bold": True, "color": NAVY}),
+        ("Python — ikkalasidan ham foydalanadi", {"size": 28, "bold": True, "color": NAVY}),
+    ])
+    textbox(s, Inches(0.7), Inches(1.35), Inches(12), Inches(0.5), [
+        ("Avval COMPILER kabi tarjima qiladi, keyin INTERPRETATOR kabi bajaradi.", {"size": 16, "bold": True, "color": AMBER, "space_after": 0}),
     ])
     pipeline = [
-        (".py fayl", "Siz yozgan\nmatn"),
+        (".py fayl", "Siz yozgan\noddiy matn"),
         ("Compiler", "Bytecode\nga aylantiradi"),
-        (".pyc", "Tezroq\nyuklanadigan shakl"),
-        ("PVM", "Python Virtual\nMachine bajaradi"),
+        ("Bytecode", "Oraliq\n“retsept”"),
+        ("Interpretator\n(PVM)", "Retseptni\nbajaradi"),
         ("Natija", "Ekran / sayt\n/ hisob"),
     ]
     for i, (t, b) in enumerate(pipeline):
         x = Inches(0.45) + Inches(i * 2.55)
-        box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, Inches(2.2), Inches(2.3), Inches(3.2))
+        box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, Inches(2.1), Inches(2.3), Inches(3.5))
         box.fill.solid()
         box.fill.fore_color.rgb = CARD
         box.line.color.rgb = LINE
-        top_c = CYAN if i != 4 else AMBER
-        top = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, Inches(2.2), Inches(2.3), Inches(0.12))
+        top_c = CYAN if i in (0, 1, 2) else (AMBER if i == 3 else GREEN)
+        top = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, Inches(2.1), Inches(2.3), Inches(0.14))
         top.fill.solid()
         top.fill.fore_color.rgb = top_c
         top.line.fill.background()
-        textbox(s, x + Inches(0.15), Inches(2.55), Inches(2.0), Inches(2.6), [
-            (t, {"size": 18, "bold": True, "color": NAVY, "space_after": 12}),
+        textbox(s, x + Inches(0.15), Inches(2.45), Inches(2.0), Inches(2.9), [
+            (t, {"size": 16, "bold": True, "color": NAVY, "space_after": 12}),
             (b, {"size": 14, "color": MUTED}),
         ])
         if i < len(pipeline) - 1:
-            textbox(s, x + Inches(2.05), Inches(3.4), Inches(0.5), Inches(0.4), [
+            textbox(s, x + Inches(2.05), Inches(3.5), Inches(0.5), Inches(0.4), [
                 ("→", {"size": 22, "bold": True, "color": AMBER, "align": PP_ALIGN.CENTER, "space_after": 0})
             ], align=PP_ALIGN.CENTER)
 
-    # ---- 5 Interpreter vs compiler wow ----
+    # ---- 5 Python = both, simple ----
     s = new_slide(prs)
-    textbox(s, Inches(0.7), Inches(0.35), Inches(12), Inches(1.1), [
-        ("SIR OCHILADI", {"size": 14, "bold": True, "color": AMBER, "space_after": 4}),
-        ("Python — sof interpretator emas", {"size": 30, "bold": True, "color": NAVY}),
+    textbox(s, Inches(0.7), Inches(0.3), Inches(12), Inches(1.1), [
+        ("ESLAB QOLING", {"size": 14, "bold": True, "color": GREEN, "space_after": 4}),
+        ("3 jumla — hammasi shu", {"size": 30, "bold": True, "color": NAVY}),
     ])
-    card(s, Inches(0.7), Inches(1.8), Inches(5.8), Inches(4.5),
-         "Ko‘pchilik o‘ylaydi",
-         "“Python qatorma-qator o‘qiydi.”\n\nBu yarim rost.\n\nAslida CPython avval bytecode yasaydi, keyin Virtual Machine uni uchirib bajaradi.\n\nShuning uchun ham tezroq va aqlliroq ishlaydi.",
-         CORAL)
-    card(s, Inches(6.8), Inches(1.8), Inches(5.8), Inches(4.5),
-         "Haqiqat (CPython)",
-         "1) Parser → AST (daraxt)\n2) Compiler → bytecode\n3) PVM → bajarish\n4) Xotira: havola + GC\n\nNatija: yozish oson, lekin ichida jiddiy “motor” bor.",
-         CYAN)
+    points = [
+        ("1", "COMPILER", "Kodni oldindan boshqa shaklga aylantiradi (masalan C)."),
+        ("2", "INTERPRETATOR", "Kodni ishga tushirish paytida o‘qib bajaradi."),
+        ("3", "PYTHON", "Avval bytecode qiladi (compile), keyin PVM bajaradi (interpret)."),
+    ]
+    for i, (n, t, b) in enumerate(points):
+        y = Inches(1.7) + Inches(i * 1.7)
+        oval = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.8), y + Inches(0.15), Inches(0.85), Inches(0.85))
+        oval.fill.solid()
+        oval.fill.fore_color.rgb = (CYAN, AMBER, GREEN)[i]
+        oval.line.fill.background()
+        textbox(s, Inches(0.8), y + Inches(0.32), Inches(0.85), Inches(0.55), [
+            (n, {"size": 22, "bold": True, "color": WHITE, "align": PP_ALIGN.CENTER, "space_after": 0})
+        ], align=PP_ALIGN.CENTER)
+        box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(2.0), y, Inches(10.5), Inches(1.45))
+        box.fill.solid()
+        box.fill.fore_color.rgb = CARD
+        box.line.color.rgb = LINE
+        textbox(s, Inches(2.3), y + Inches(0.25), Inches(10), Inches(1.1), [
+            (t, {"size": 20, "bold": True, "color": NAVY, "space_after": 6}),
+            (b, {"size": 16, "color": MUTED, "space_after": 0}),
+        ])
 
     # ---- 6 Memory wow ----
     s = new_slide(prs)
