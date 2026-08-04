@@ -162,7 +162,7 @@ def build(out: Path) -> None:
     s = new_slide(prs)
     glow_orb(s, Inches(10.2), Inches(-0.8), Inches(4), RGBColor(0x7E, 0xD6, 0xFF))
     glow_orb(s, Inches(-1.2), Inches(5.2), Inches(3.2), RGBColor(0xFF, 0xD0, 0x80))
-    pill(s, Inches(0.7), Inches(1.5), Inches(2.4), Inches(0.38), "PYTHON × DJANGO", CYAN, BG)
+    pill(s, Inches(0.7), Inches(1.5), Inches(2.4), Inches(0.38), "PYTHON × DJANGO", CYAN, WHITE)
     textbox(
         s,
         Inches(0.7),
@@ -335,10 +335,10 @@ def build(out: Path) -> None:
     fws = [
         ("Django", "To‘liq veb platforma\nInstagram darajasi", AMBER),
         ("FastAPI", "Zamonaviy API\nJuda tez", CYAN),
-        ("Flask", "Yengil veb\nKichik loyihalar", RGBColor(0x6E, 0xC6, 0xFF)),
+        ("Flask", "Yengil veb\nKichik loyihalar", RGBColor(0x00, 0xB4, 0xFF)),
         ("PyTorch", "AI / deep learning\nTadqiqot + sanoat", CORAL),
-        ("Pandas", "Ma’lumotlar jami\nExcel dan kuchli", RGBColor(0x9B, 0xDE, 0xAC)),
-        ("Selenium", "Brauzer avtomat\nTest va botlar", RGBColor(0xF7, 0xA1, 0xC4)),
+        ("Pandas", "Ma’lumotlar jami\nExcel dan kuchli", GREEN),
+        ("Selenium", "Brauzer avtomat\nTest va botlar", RGBColor(0xFF, 0x4F, 0x9A)),
     ]
     for i, (t, b, c) in enumerate(fws):
         col, row = i % 3, i // 3
@@ -360,7 +360,7 @@ def build(out: Path) -> None:
     # ---- 9 Django title ----
     s = new_slide(prs)
     glow_orb(s, Inches(9.5), Inches(-1), Inches(5), RGBColor(0x7C, 0xF0, 0xB8))
-    pill(s, Inches(0.7), Inches(2.0), Inches(2.0), Inches(0.38), "DJANGO", AMBER, BG)
+    pill(s, Inches(0.7), Inches(2.0), Inches(2.0), Inches(0.38), "DJANGO", AMBER, WHITE)
     textbox(s, Inches(0.7), Inches(2.6), Inches(11), Inches(2.5), [
         ("Sayt qurish uchun", {"size": 26, "color": MUTED, "space_after": 6}),
         ("TAYYOR “SHAHAR INFRASTRUKTURASI”", {"size": 36, "bold": True, "color": NAVY, "space_after": 12}),
