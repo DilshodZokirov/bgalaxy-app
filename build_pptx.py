@@ -15,19 +15,19 @@ from pptx.util import Emu, Inches, Pt
 # 16:9
 W, H = Inches(13.333), Inches(7.5)
 
-# Palette — yorqin, yuqori kontrast (xirra emas)
-BG = RGBColor(0xEF, 0xF8, 0xFF)       # ochiq osmon
-BG2 = RGBColor(0xFF, 0xF7, 0xE8)      # issiq ochiq
-CARD = RGBColor(0xFF, 0xFF, 0xFF)     # oq kartochka
-INK = RGBColor(0x0F, 0x1F, 0x2E)      # qora-ko'k matn
-MUTED = RGBColor(0x3D, 0x55, 0x6B)    # o'qiladigan kulrang-ko'k
-CYAN = RGBColor(0x00, 0x9E, 0xE0)     # yorqin moviy
-AMBER = RGBColor(0xFF, 0x8C, 0x00)    # yorqin apelsin
-CORAL = RGBColor(0xFF, 0x3D, 0x6E)    # yorqin qizil-pushti
-GREEN = RGBColor(0x00, 0xC2, 0x73)    # yorqin yashil
+# Palette — OQ / ochiq fon, to'q matn (proyektorda aniq)
+BG = RGBColor(0xFF, 0xFF, 0xFF)       # sof oq
+BG2 = RGBColor(0xE8, 0xF6, 0xFF)      # ochiq moviy
+CARD = RGBColor(0xF4, 0xFB, 0xFF)     # ochiq kartochka
+INK = RGBColor(0x11, 0x18, 0x27)      # deyarli qora
+MUTED = RGBColor(0x33, 0x41, 0x55)    # to'q kulrang (o'qiladi)
+CYAN = RGBColor(0x02, 0x84, 0xC7)     # kuchli moviy
+AMBER = RGBColor(0xEA, 0x58, 0x00)    # kuchli apelsin
+CORAL = RGBColor(0xE1, 0x1D, 0x48)    # kuchli qizil
+GREEN = RGBColor(0x05, 0x96, 0x69)    # kuchli yashil
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LINE = RGBColor(0xB8, 0xD4, 0xEA)     # ochiq chiziq
-NAVY = RGBColor(0x0B, 0x3D, 0x6E)     # sarlavha uchun to'q moviy
+LINE = RGBColor(0x7D, 0xD3, 0xFC)     # yorqin chegara
+NAVY = RGBColor(0x0C, 0x4A, 0x6E)     # sarlavha
 
 
 def set_run(run, size=20, bold=False, color=INK, font="Calibri"):
@@ -46,31 +46,26 @@ def set_run(run, size=20, bold=False, color=INK, font="Calibri"):
 
 
 def add_bg(slide, color=BG):
-    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, W, H)
-    shape.fill.solid()
-    shape.fill.fore_color.rgb = color
-    shape.line.fill.background()
-    # send to back
-    spTree = slide.shapes._spTree
-    sp = shape._element
-    spTree.remove(sp)
-    spTree.insert(2, sp)
-    return shape
+    """Haqiqiy slide background — shape orqaga surish XML ni buzardi."""
+    fill = slide.background.fill
+    fill.solid()
+    fill.fore_color.rgb = color
+    return None
 
 
 def accent_bar(slide, color=CYAN):
-    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.12), H)
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.18), H)
     bar.fill.solid()
     bar.fill.fore_color.rgb = color
     bar.line.fill.background()
 
 
 def glow_orb(slide, left, top, size, color):
+    # Ochiq fonda pastel doira — yordamchi dekor
     orb = slide.shapes.add_shape(MSO_SHAPE.OVAL, left, top, size, size)
     orb.fill.solid()
     orb.fill.fore_color.rgb = color
     orb.line.fill.background()
-    # soft look via transparency not fully supported; keep solid accent
 
 
 def textbox(slide, left, top, width, height, paragraphs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
@@ -160,8 +155,8 @@ def build(out: Path) -> None:
 
     # ---- 1 Title ----
     s = new_slide(prs)
-    glow_orb(s, Inches(10.2), Inches(-0.8), Inches(4), RGBColor(0x7E, 0xD6, 0xFF))
-    glow_orb(s, Inches(-1.2), Inches(5.2), Inches(3.2), RGBColor(0xFF, 0xD0, 0x80))
+    glow_orb(s, Inches(10.2), Inches(-0.8), Inches(4), RGBColor(0xBA, 0xE6, 0xFD))
+    glow_orb(s, Inches(-1.2), Inches(5.2), Inches(3.2), RGBColor(0xFE, 0xE4, 0xC7))
     pill(s, Inches(0.7), Inches(1.5), Inches(2.4), Inches(0.38), "PYTHON × DJANGO", CYAN, WHITE)
     textbox(
         s,
@@ -359,7 +354,7 @@ def build(out: Path) -> None:
 
     # ---- 9 Django title ----
     s = new_slide(prs)
-    glow_orb(s, Inches(9.5), Inches(-1), Inches(5), RGBColor(0x7C, 0xF0, 0xB8))
+    glow_orb(s, Inches(9.5), Inches(-1), Inches(5), RGBColor(0xBB, 0xF7, 0xD0))
     pill(s, Inches(0.7), Inches(2.0), Inches(2.0), Inches(0.38), "DJANGO", AMBER, WHITE)
     textbox(s, Inches(0.7), Inches(2.6), Inches(11), Inches(2.5), [
         ("Sayt qurish uchun", {"size": 26, "color": MUTED, "space_after": 6}),
@@ -528,7 +523,7 @@ def build(out: Path) -> None:
 
     # ---- 16 Close ----
     s = new_slide(prs)
-    glow_orb(s, Inches(-1), Inches(-1), Inches(4), RGBColor(0xFF, 0xB4, 0xC8))
+    glow_orb(s, Inches(-1), Inches(-1), Inches(4), RGBColor(0xFE, 0xCD, 0xD3))
     textbox(s, Inches(0.7), Inches(1.8), Inches(12), Inches(3.5), [
         ("XULOSA", {"size": 14, "bold": True, "color": CYAN, "space_after": 10}),
         ("Python — oson ko‘rinadi.\nIchida esa jiddiy motor.", {"size": 34, "bold": True, "color": NAVY, "space_after": 16}),
@@ -542,4 +537,8 @@ def build(out: Path) -> None:
 
 
 if __name__ == "__main__":
-    build(Path(__file__).resolve().parent / "Python-Django-Vaaav.pptx")
+    out_dir = Path(__file__).resolve().parent
+    build(out_dir / "Python-Django-Yorqin.pptx")
+    # eski nomga ham nusxa (havolalar uchun)
+    import shutil
+    shutil.copyfile(out_dir / "Python-Django-Yorqin.pptx", out_dir / "Python-Django-Vaaav.pptx")
