@@ -1,17 +1,17 @@
-# Python → Django → DRF taqdimot
+# Python → Django → DRF (dars taqdimoti)
 
 ## Yuklash
 https://github.com/DilshodZokirov/bgalaxy-app/raw/cursor/python-prezentatsiya-5498/python-prezentatsiya/Python-Django-Yorqin.pptx
 
-## Tartib (14 slayd)
-1. Python nima qila oladi
-2. Sintaksis / boshqa tillardan ajralib turadigan xislatlar
-3. Mashhur framework va kutubxonalar
-4. Vebda eng mashhuri — Django
-5. Django da qilingan katta ishlar
-6. Nega Django ga qiziqish kerak
-7. Django nima vazifa bajaradi (savol-javob)
-8. Siz nima qilasiz
-9. Django yetkazmaydigan joylar → REST
-10. Django REST Framework (1 slayd)
-11. Yo‘l xarita + xulosa
+## Dars tartibi
+1. Jiddiy kirish (dars mavzusi)
+2. Qisqa sintaksis — Java vs Python **misol bilan**
+3. Tip tizimi — Java da tip yoziladi, Python da avtomatik (**misol**)
+4. Kuchli xususiyatlar — har biriga misol
+5. Mashhur framework/kutubxonalar
+6. Vebda eng mashhuri — Django
+7. Django oldidan muhim tushunchalar
+8. Django qanday ishlaydi + MTV
+9. Template kamchiligi → Django REST
+10. DRF (1 blok)
+11. Xulosa + keyingi qadam
