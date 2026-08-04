@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Python nima? — Sodda taqdimot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #e8f4fc;
+      --bg2: #fff8e7;
+      --ink: #1a2b3c;
+      --muted: #4a6070;
+      --card: #ffffff;
+      --line: rgba(26, 43, 60, 0.12);
+      --blue: #1f7aaf;
+      --green: #2a9d6a;
+      --sun: #e8a317;
+      --coral: #e07a5f;
+      --shadow: 0 12px 40px rgba(26, 43, 60, 0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "Nunito", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(900px 500px at 10% -5%, rgba(31, 122, 175, 0.18), transparent 55%),
+        radial-gradient(700px 480px at 95% 15%, rgba(232, 163, 23, 0.2), transparent 50%),
+        radial-gradient(600px 400px at 50% 110%, rgba(42, 157, 106, 0.12), transparent 50%),
+        linear-gradient(165deg, #e8f4fc 0%, #f7fbfe 45%, #fff8e7 100%);
+    }
+    .deck { position: relative; z-index: 1; height: 100%; width: 100%; }
+    .slide {
+      position: absolute; inset: 0;
+      display: grid;
+      align-content: center;
+      padding: clamp(1.4rem, 4vw, 3.5rem) clamp(1.4rem, 6vw, 5.5rem);
+      opacity: 0; visibility: hidden;
+      transform: translateY(16px);
+      transition: opacity .4s ease, transform .4s ease, visibility .4s;
+      overflow: auto;
+    }
+    .slide.active { opacity: 1; visibility: visible; transform: none; }
+    .brand {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 700;
+      font-size: clamp(2.4rem, 6vw, 4.2rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.7rem;
+    }
+    h1, h2 {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    h1 { font-size: clamp(2rem, 5vw, 3.4rem); margin-bottom: 0.8rem; }
+    h2 { font-size: clamp(1.7rem, 4vw, 2.8rem); margin-bottom: 1rem; }
+    .lead {
+      font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+      color: var(--muted);
+      max-width: 42rem;
+      line-height: 1.55;
+      font-weight: 600;
+    }
+    .sub {
+      display: inline-block;
+      margin-bottom: 0.85rem;
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--blue);
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.4rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1.15rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .card h3 {
+      font-family: "Fraunces", Georgia, serif;
+      font-size: 1.25rem;
+      margin-bottom: 0.4rem;
+    }
+    .card p { color: var(--muted); font-weight: 600; line-height: 1.45; font-size: 1.02rem; }
+    .big-list { list-style: none; margin-top: 1.2rem; display: grid; gap: 0.75rem; max-width: 48rem; }
+    .big-list li {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.95rem 1.15rem;
+      font-weight: 700;
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      box-shadow: var(--shadow);
+      display: flex; gap: 0.85rem; align-items: flex-start;
+    }
+    .num {
+      flex: 0 0 auto;
+      width: 2rem; height: 2rem;
+      border-radius: 999px;
+      display: grid; place-items: center;
+      background: var(--blue); color: #fff;
+      font-weight: 800; font-size: 0.95rem;
+    }
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1.3rem;
+    }
+    @media (max-width: 720px) { .compare { grid-template-columns: 1fr; } }
+    .compare .card h3 { color: var(--blue); }
+    .compare .other h3 { color: var(--coral); }
+    .tag {
+      display: inline-block;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(31, 122, 175, 0.12);
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+    .tag.green { background: rgba(42, 157, 106, 0.15); color: var(--green); }
+    .tag.sun { background: rgba(232, 163, 23, 0.2); color: #9a6a00; }
+    .code {
+      margin-top: 1.2rem;
+      background: #1a2b3c;
+      color: #e8f4fc;
+      border-radius: 16px;
+      padding: 1.1rem 1.3rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      line-height: 1.55;
+      max-width: 36rem;
+      box-shadow: var(--shadow);
+    }
+    .code .c { color: #8fd6a8; }
+    .code .s { color: #ffd27a; }
+    .note {
+      margin-top: 1rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .footer-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.85rem 1.25rem;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--line);
+    }
+    .footer-nav button {
+      border: 0;
+      background: var(--blue);
+      color: #fff;
+      font-family: inherit;
+      font-weight: 800;
+      padding: 0.65rem 1.1rem;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .footer-nav button:disabled { opacity: 0.4; cursor: default; }
+    .progress-wrap { flex: 1; margin: 0 1rem; max-width: 280px; }
+    .progress-bar {
+      height: 6px; border-radius: 999px; background: rgba(26,43,60,0.1); overflow: hidden;
+    }
+    .progress-bar > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width .3s ease;
+    }
+    .page { font-weight: 800; color: var(--muted); font-size: 0.9rem; min-width: 4rem; text-align: center; }
+    .hero-mark {
+      width: 72px; height: 72px; border-radius: 22px;
+      background: linear-gradient(145deg, var(--blue), #3aa0d4);
+      display: grid; place-items: center;
+      color: #fff; font-family: "Fraunces", serif; font-size: 2.2rem; font-weight: 700;
+      margin-bottom: 1.2rem;
+      box-shadow: 0 10px 30px rgba(31, 122, 175, 0.35);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 1.2rem;
+      margin-top: 1.2rem;
+      align-items: start;
+    }
+    @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+    .path {
+      display: flex; flex-wrap: wrap; gap: 0.55rem; align-items: center;
+      margin-top: 1.3rem; font-weight: 800;
+    }
+    .path span {
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 0.55rem 0.9rem;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+    }
+    .path b { color: var(--muted); font-weight: 800; }
+    .django-box {
+      margin-top: 1.2rem;
+      background: linear-gradient(135deg, #0c4b33, #2a9d6a);
+      color: #fff;
+      border-radius: 20px;
+      padding: 1.4rem 1.5rem;
+      box-shadow: var(--shadow);
+      max-width: 40rem;
+    }
+    .django-box h3 {
+      font-family: "Fraunces", serif;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      margin-bottom: 0.5rem;
+    }
+    .django-box p { font-weight: 600; opacity: 0.95; line-height: 1.5; font-size: 1.1rem; }
+    .hint {
+      position: fixed; top: 1rem; right: 1rem; z-index: 6;
+      font-size: 0.85rem; font-weight: 700; color: var(--muted);
+      background: rgba(255,255,255,0.8);
+      padding: 0.4rem 0.75rem; border-radius: 999px;
+      border: 1px solid var(--line);
+    }
+    @media print {
+      body { overflow: visible; background: #fff; }
+      .bg, .footer-nav, .hint { display: none !important; }
+      .slide {
+        position: relative; opacity: 1 !important; visibility: visible !important;
+        transform: none !important; page-break-after: always; min-height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="hint">← → yoki Space</div>
+  <div class="deck" id="deck">
+
+    <!-- 1 -->
+    <section class="slide active">
+      <div class="hero-mark">Py</div>
+      <p class="brand">Python</p>
+      <p class="lead">Dasturlashni hali bilmaydiganlar uchun — oddiy tilda.</p>
+      <p class="note" style="margin-top:1.6rem">Bugun bilib olamiz: dasturlash nima, Python nima uchun kerak, u nima qila oladi va <strong>Django</strong> nima.</p>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide">
+      <p class="sub">Birinchi savol</p>
+      <h2>Dasturlash nima?</h2>
+      <p class="lead">Kompyuterga <strong>tushunarli buyruqlar</strong> berish.</p>
+      <ul class="big-list">
+        <li><span class="num">1</span><span>Oshpazga retsept berasiz — ovqat chiqadi.</span></li>
+        <li><span class="num">2</span><span>Kompyuterga dastur yozasiz — u ishni o‘zi bajaradi.</span></li>
+        <li><span class="num">3</span><span>Dasturlash tili — kompyuter bilan “gaplashish” usuli.</span></li>
+      </ul>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide">
+      <p class="sub">Nima uchun kerak?</p>
+      <h2>Dasturlash nima uchun o‘rganiladi?</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>O‘yinchalar</h3>
+          <p>O‘yin, ilova, sayt — o‘zingiz yarata olasiz.</p>
+        </div>
+        <div class="card">
+          <h3>Ish</h3>
+          <p>Dasturchilar, sun’iy intellekt, veb, ma’lumotlar — ko‘p kasb ochiladi.</p>
+        </div>
+        <div class="card">
+          <h3>Muammo yechish</h3>
+          <p>Katta ishlarni kichik qadamlarga bo‘lib, mantiq bilan yechishni o‘rgatadi.</p>
+        </div>
+        <div class="card">
+          <h3>Kelajak</h3>
+          <p>Telefon, mashina, maktab, bank — hamma joyda dastur ishlaydi.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="slide">
+      <p class="sub">Asosiy qahramon</p>
+      <h2>Python nima?</h2>
+      <p class="lead"><strong>Python</strong> — o‘rganishga eng qulay dasturlash tillaridan biri. Matni oddiy, deyarli oddiy gapga o‘xshaydi.</p>
+      <div class="code">
+        <div><span class="c"># Kompyuterga: ekranga yoz</span></div>
+        <div>print(<span class="s">"Salom, dunyo!"</span>)</div>
+      </div>
+      <p class="note">Bu 1 qator — ekranda “Salom, dunyo!” chiqadi. Boshqa tillarda ko‘pincha uzunroq bo‘ladi.</p>
+    </section>
+
+    <!-- 5 -->
+    <section class="slide">
+      <p class="sub">Nima uchun aynan Python?</p>
+      <h2>Boshlovchilar uchun eng yaxshi tanlov</h2>
+      <ul class="big-list">
+        <li><span class="num">1</span><span><strong>Oddiy yoziladi</strong> — o‘qish oson, qo‘rquv kam.</span></li>
+        <li><span class="num">2</span><span><strong>Tez natija</strong> — birinchi dasturingizni tez ko‘rasiz.</span></li>
+        <li><span class="num">3</span><span><strong>Dunyo bo‘ylab mashhur</strong> — maktab, universitet, kompaniyalar o‘rgatadi.</span></li>
+        <li><span class="num">4</span><span><strong>Ko‘p yo‘nalish</strong> — o‘yin, sayt, sun’iy intellekt, robot…</span></li>
+      </ul>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide">
+      <p class="sub">Xususiyatlari</p>
+      <h2>Pythonning asosiy xususiyatlari</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">Oddiy</span>
+          <h3>O‘qilishi oson</h3>
+          <p>Kod deyarli inglizcha gap kabi ko‘rinadi.</p>
+        </div>
+        <div class="card">
+          <span class="tag green">Kuchli</span>
+          <h3>Kutubxonalar ko‘p</h3>
+          <p>Tayyor “asboblar” bor — qayta ixtiro qilish shart emas.</p>
+        </div>
+        <div class="card">
+          <span class="tag sun">Erkin</span>
+          <h3>Bepul va ochiq</h3>
+          <p>Hamma bepul o‘rnatib, o‘rganishi mumkin.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Universal</span>
+          <h3>Ko‘p joyda ishlaydi</h3>
+          <p>Windows, Mac, Linux — deyarli hamma kompyuterda.</p>
+        </div>
+        <div class="card">
+          <span class="tag green">Jamoa</span>
+          <h3>Katta community</h3>
+          <p>Savol bersangiz — yordam topish oson.</p>
+        </div>
+        <div class="card">
+          <span class="tag sun">Moslashuvchan</span>
+          <h3>Kichikdan kattagacha</h3>
+          <p>Mini o‘yindan tortib yirik saytgacha.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="slide">
+      <p class="sub">Imkoniyatlar</p>
+      <h2>Python bilan nima qilish mumkin?</h2>
+      <div class="grid">
+        <div class="card"><h3>Veb-saytlar</h3><p>Instagram tipidagi sayt va ilovalar (Django yordamida).</p></div>
+        <div class="card"><h3>O‘yinlar</h3><p>Oddiy 2D o‘yinlar, o‘quv o‘yinlari.</p></div>
+        <div class="card"><h3>Sun’iy intellekt</h3><p>Chatbot, rasm tanish, tavsiya tizimlari.</p></div>
+        <div class="card"><h3>Ma’lumotlar</h3><p>Jadvallar, hisobot, statistika.</p></div>
+        <div class="card"><h3>Avtomatlashtirish</h3><p>Zerikarli takroriy ishlarni dastur bajarsin.</p></div>
+        <div class="card"><h3>Robot / qurilma</h3><p>Mikrokompyuterlar, sensorlar bilan ishlash.</p></div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="slide">
+      <p class="sub">Taqqoslash</p>
+      <h2>Boshqa tillarga nisbatan yutuqlari</h2>
+      <div class="compare">
+        <div class="card">
+          <h3>Python</h3>
+          <p style="margin-top:0.6rem">
+            Boshlash oson<br/>
+            Kamroq “qoida to‘siqlari”<br/>
+            Tez natija<br/>
+            Maktab va kurslar uchun qulay<br/>
+            Bir til bilan ko‘p yo‘nalish
+          </p>
+        </div>
+        <div class="card other">
+          <h3>Ba’zi boshqa tillar</h3>
+          <p style="margin-top:0.6rem">
+            Ko‘pincha qattiqroq sintaksis<br/>
+            Boshida murakkabroq tuyuladi<br/>
+            Ba’zilari faqat bitta yo‘nalishga kuchli<br/>
+            O‘rganish sekinroq ketishi mumkin
+          </p>
+        </div>
+      </div>
+      <p class="note">Bu “boshqalar yomon” degani emas. Lekin <strong>birinchi til</strong> sifatida Python eng yumshoq yo‘l.</p>
+    </section>
+
+    <!-- 9 -->
+    <section class="slide">
+      <p class="sub">Haqiqiy dunyo</p>
+      <h2>Python qayerda ishlatiladi?</h2>
+      <div class="grid">
+        <div class="card"><h3>YouTube</h3><p>Katta qismlari Python bilan ishlaydi.</p></div>
+        <div class="card"><h3>Instagram</h3><p>Veb qismi Django (Python) asosida.</p></div>
+        <div class="card"><h3>Spotify</h3><p>Tavsiyalar va ichki tizimlarda.</p></div>
+        <div class="card"><h3>NASA, fan</h3><p>Hisob-kitob, tadqiqot, ma’lumot tahlili.</p></div>
+      </div>
+      <p class="note">Demak, Python — faqat “maktab tili” emas, <strong>katta kompaniyalar</strong> ham ishlatadi.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide">
+      <p class="sub">Muhim bo‘lim</p>
+      <h2>Django nima?</h2>
+      <div class="django-box">
+        <h3>Django = Python uchun veb “qurilish to‘plami”</h3>
+        <p>Sayt yoki onlayn xizmat yasashda kerak bo‘ladigan tayyor qismlar: login, ma’lumotlar bazasi, admin panel, xavfsizlik…</p>
+      </div>
+      <p class="note">Oddiy misol: lego. Python — g‘ishtlar. <strong>Django</strong> — tayyor to‘plam + yo‘riqnoma: uy (sayt) tezroq quriladi.</p>
+    </section>
+
+    <!-- 11 -->
+    <section class="slide">
+      <p class="sub">Django imkoniyatlari</p>
+      <h2>Django bilan nima qilish mumkin?</h2>
+      <ul class="big-list">
+        <li><span class="num">1</span><span>Maktab / kurs uchun veb-sayt</span></li>
+        <li><span class="num">2</span><span>Blog, yangiliklar sayti</span></li>
+        <li><span class="num">3</span><span>Do‘kon (mahsulot, savatcha)</span></li>
+        <li><span class="num">4</span><span>Ro‘yxatdan o‘tish, login, profil</span></li>
+        <li><span class="num">5</span><span>Admin panel — saytni boshqarish oynasi</span></li>
+      </ul>
+    </section>
+
+    <!-- 12 -->
+    <section class="slide">
+      <p class="sub">Nima uchun Django?</p>
+      <h2>Django — Pythonning kuchli tomoni</h2>
+      <div class="two-col">
+        <div>
+          <ul class="big-list">
+            <li><span class="num">1</span><span>Python bilan yoziladi — yangi til o‘rganish shart emas</span></li>
+            <li><span class="num">2</span><span>“Batareyalar ichida” — ko‘p narsa tayyor</span></li>
+            <li><span class="num">3</span><span>Xavfsizlikka e’tiborli</span></li>
+            <li><span class="num">4</span><span>Katta loyihalargacha o‘sadi</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag green">Eslab qoling</span>
+          <h3>Avval Python, keyin Django</h3>
+          <p>Avval oddiy Pythonni tushunasiz. Keyin Django bilan go‘zal sayt yasaysiz. Bu eng to‘g‘ri tartib.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section class="slide">
+      <p class="sub">Yo‘l xarita</p>
+      <h2>Qanday boshlasa bo‘ladi?</h2>
+      <div class="path">
+        <span>1. Dasturlash nima?</span><b>→</b>
+        <span>2. Python asoslari</span><b>→</b>
+        <span>3. Kichik loyihalar</span><b>→</b>
+        <span>4. Django bilan sayt</span>
+      </div>
+      <div class="grid" style="margin-top:1.6rem">
+        <div class="card">
+          <h3>Bugun</h3>
+          <p>print, son, matn, oddiy o‘yin (masalan, son topish).</p>
+        </div>
+        <div class="card">
+          <h3>Keyin</h3>
+          <p>Ro‘yxatlar, funksiyalar, fayllar.</p>
+        </div>
+        <div class="card">
+          <h3>Django bosqichi</h3>
+          <p>O‘z blogingiz yoki kichik do‘kon sayti.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14 -->
+    <section class="slide">
+      <p class="sub">Xulosa</p>
+      <h2>Eslab qoling</h2>
+      <ul class="big-list">
+        <li><span class="num">1</span><span><strong>Dasturlash</strong> — kompyuterga buyruq berish.</span></li>
+        <li><span class="num">2</span><span><strong>Python</strong> — boshlovchilar uchun qulay, kuchli til.</span></li>
+        <li><span class="num">3</span><span>U bilan o‘yin, sayt, AI, ma’lumot — ko‘p narsa qilinadi.</span></li>
+        <li><span class="num">4</span><span><strong>Django</strong> — Python bilan professional sayt qurish vositasi.</span></li>
+        <li><span class="num">5</span><span>Eng muhimi: kichik qadam — har kuni biroz mashq.</span></li>
+      </ul>
+    </section>
+
+    <!-- 15 -->
+    <section class="slide">
+      <div class="hero-mark">?</div>
+      <h1>Savollar bormi?</h1>
+      <p class="lead">Python — qo‘rquv uchun emas, o‘yin va ijod uchun.</p>
+      <div class="django-box" style="margin-top:1.5rem">
+        <h3>Keyingi qadam</h3>
+        <p>Kompyuterda Python o‘rnating → birinchi `print("Salom!")` ni yozing → keyin kichik loyiha. Django — Python mustahkam bo‘lgach.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="footer-nav">
+    <button type="button" id="prev" disabled>← Orqaga</button>
+    <div class="progress-wrap">
+      <div class="progress-bar"><i id="bar"></i></div>
+    </div>
+    <div class="page" id="page">1 / 1</div>
+    <button type="button" id="next">Oldinga →</button>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    let i = 0;
+    const page = document.getElementById("page");
+    const bar = document.getElementById("bar");
+    const prev = document.getElementById("prev");
+    const next = document.getElementById("next");
+
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      page.textContent = (i + 1) + " / " + slides.length;
+      bar.style.width = ((i + 1) / slides.length * 100) + "%";
+      prev.disabled = i === 0;
+      next.disabled = i === slides.length - 1;
+    }
+
+    prev.addEventListener("click", () => show(i - 1));
+    next.addEventListener("click", () => show(i + 1));
+    document.addEventListener("keydown", (e) => {
+      if (["ArrowRight", " ", "Enter", "PageDown"].includes(e.key)) {
+        e.preventDefault(); show(i + 1);
+      } else if (["ArrowLeft", "Backspace", "PageUp"].includes(e.key)) {
+        e.preventDefault(); show(i - 1);
+      } else if (e.key === "Home") show(0);
+      else if (e.key === "End") show(slides.length - 1);
+    });
+
+    let touchX = null;
+    document.addEventListener("touchstart", (e) => { touchX = e.changedTouches[0].screenX; }, { passive: true });
+    document.addEventListener("touchend", (e) => {
+      if (touchX == null) return;
+      const dx = e.changedTouches[0].screenX - touchX;
+      if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+      touchX = null;
+    }, { passive: true });
+
+    show(0);
+  </script>
+</body>
+</html>
