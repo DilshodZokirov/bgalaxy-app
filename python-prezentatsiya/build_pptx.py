@@ -289,7 +289,7 @@ def build(out: Path) -> None:
     card(s, Inches(0.7), Inches(1.7), Inches(4), Inches(4.6),
          "Boshqa tillarda",
          "Ko‘pincha qiymat to‘g‘ridan-to‘g‘ri “quti”ga yoziladi.\n\nNusxa olish chalkash bo‘lishi mumkin.",
-         MUTED)
+         CORAL)
     card(s, Inches(4.95), Inches(1.7), Inches(4), Inches(4.6),
          "Python da",
          "x = [1,2,3]\n\nx — bu listga HAVOLA.\ny = x desangiz — yangi list emas, XUDDI SHU obyekt.",
