@@ -1,0 +1,723 @@
+From f185e3357de2779e24f01b623c3544cad2d312c2 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Fri, 7 Aug 2026 08:59:47 +0000
+Subject: [PATCH] feat(webrtc): mustahkam audio/video qo'ng'iroq
+
+- Perfect negotiation + ICE candidate buffer
+- Video yoqish/o'chirish (renegotiation)
+- TURN: Metered yoki static TURN_URLS
+- Botda Mini App keyboard tugmasi
+- requirements.txt UTF-8 ga o'tkazildi
+- README video sozlash bo'yicha yangilandi
+---
+ .env.example          |  27 ++--
+ README.md             |  55 ++++-----
+ app/api/webapp.py     |  26 ++--
+ app/bot/handlers.py   |  31 ++++-
+ app/config.py         |   9 +-
+ app/webapp/index.html | 278 ++++++++++++++++++++++++++++--------------
+ docker-compose.yml    |  13 ++
+ requirements.txt      | Bin 1446 -> 682 bytes
+ 8 files changed, 290 insertions(+), 149 deletions(-)
+
+diff --git a/.env.example b/.env.example
+index 660242f..098385f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,17 +1,26 @@
+-BOT_TOKEN
+-WEBAPP_URL
++BOT_TOKEN=
++WEBAPP_URL=
++
+ # Database
+-POSTGRES_USER
+-POSTGRES_PASSWORD
+-POSTGRES_DB
+-POSTGRES_HOST
+-POSTGRES_PORT
+-DATABASE_URL
++POSTGRES_USER=postgres
++POSTGRES_PASSWORD=change-me
++POSTGRES_DB=dating_bot
++POSTGRES_HOST=db
++POSTGRES_PORT=5432
++DATABASE_URL=postgresql+asyncpg://postgres:change-me@db:5432/dating_bot
+ 
+ # Redis
+-REDIS_URL=
++REDIS_URL=redis://redis:6379/0
+ 
+ # App
+ MIN_AGE=18
+ MAX_AGE_GAP=5
+ 
++# WebRTC TURN (mobil tarmoqda video/audio uchun tavsiya etiladi)
++# Variant A — Metered.ca
++METERED_DOMAIN=
++METERED_SECRET_KEY=
++# Variant B — o'z coturn / static TURN
++TURN_URLS=
++TURN_USERNAME=
++TURN_PASSWORD=
+diff --git a/README.md b/README.md
+index ec13e22..a6751d1 100644
+--- a/README.md
++++ b/README.md
+@@ -1,52 +1,41 @@
+-# Dating Bot — Telegram + FastAPI
++# Dating Bot — Telegram + FastAPI + WebRTC
+ 
+-Tasodifiy suhbatdosh topish boti: foydalanuvchilar ro'yxatdan o'tadi (ism, yosh, jins,
+-qidirayotgan jins), so'ng `/search` orqali navbatga qo'shiladi va mos kishi topilganda
+-ikkalasi bir-biriga ulanadi.
++Tasodifiy suhbatdosh topish: ro'yxat → matching → Mini App ichida **audio/video qo'ng'iroq**.
+ 
+-## Hozirgi holat (skeleton)
++## Imkoniyatlar
+ 
+-- ✅ Ro'yxatdan o'tish (aiogram FSM)
+-- ✅ Redis asosidagi matching navbati (yosh oralig'i va jins bo'yicha)
+-- ✅ PostgreSQL orqali foydalanuvchi va sessiya saqlash
+-- ⏳ **Audio/video qo'ng'iroq hali ulanmagan** — hozircha faqat "xona ID" generatsiya
+-  qilinadi. Buni real qo'ng'iroqqa aylantirish uchun WebRTC provayder (masalan LiveKit,
+-  Agora yoki Daily.co) bilan integratsiya va Telegram Mini App (Web App) frontend kerak
+-  bo'ladi. Bu keyingi bosqich.
++- ✅ Ro'yxatdan o'tish (aiogram FSM, 18+)
++- ✅ Redis matching (yosh/jins/til/shahar) + ikki tomonlama rozilik
++- ✅ PostgreSQL (user + CallSession)
++- ✅ Telegram Mini App (qidiruv, profil, qo'ng'iroq)
++- ✅ WebRTC P2P audio + video (mute/video toggle, perfect negotiation)
++- ✅ TURN credential API (Metered yoki static TURN)
+ 
+ ## Ishga tushirish
+ 
+-1. `.env.example` faylini `.env` deb nusxalang va `BOT_TOKEN` hamda parollarni to'ldiring:
++1. `.env` yarating:
+    ```bash
+    cp .env.example .env
+    ```
++   `BOT_TOKEN` va `WEBAPP_URL` (HTTPS, masalan ngrok / cloud) ni to'ldiring.
+ 
+-2. Docker orqali barcha servislarni ishga tushiring:
++2. Docker:
+    ```bash
+    docker compose up --build
+    ```
+ 
+-   Bu quyidagilarni ishga tushiradi:
+-   - `db` — PostgreSQL
+-   - `redis` — Redis (matching navbati va FSM holatlari uchun)
+-   - `api` — FastAPI (hozircha faqat `/health` endpoint bor)
+-   - `bot` — Telegram bot (polling rejimida)
++3. Telegram botda `/start` → Mini App tugmasi → Qidirish.
+ 
+-3. Botga Telegram’da `/start` yuboring.
++## Video qo'ng'iroq ishlashi uchun
+ 
+-## Muhim: xavfsizlik bo'yicha eslatma
+-
+-- `MIN_AGE` sozlamasi orqali botdan faqat voyaga yetganlar (standart: 18 yosh)
+-  foydalanishi ta'minlangan. Buni pasaytirish tavsiya etilmaydi.
+-- Hozirgi `is_verified` maydoni hali ishlatilmayapti — real loyihada yoshni faqat
+-  o'z so'zi bilan emas, biror tasdiqlash mexanizmi (masalan hujjat yoki
+-  telefon raqami orqali) bilan tekshirish tavsiya etiladi.
+-- Foydalanuvchilarni bloklash (`is_banned`) va shikoyat qilish funksiyasini
+-  qo'shish kerak bo'ladi — bu hali qo'shilmagan.
++1. **WEBAPP_URL** — ochiq HTTPS (Telegram Mini App talabi).
++2. **TURN** (mobil tarmoqda shart):
++   - Metered: `METERED_DOMAIN` + `METERED_SECRET_KEY`
++   - Yoki static: `TURN_URLS` + `TURN_USERNAME` + `TURN_PASSWORD`
++3. Ikkalasi ham Mini App ochiq bo'lsin, mikrofon/kamera ruxsati berilsin.
+ 
+ ## Keyingi qadamlar
+ 
+-- WebRTC/Mini App integratsiyasi (real audio/video qo'ng'iroq)
+-- Shikoyat va bloklash tizimi
+-- Admin panel (banned foydalanuvchilar, statistikalar)
+-- Yoshni tasdiqlash bosqichi
++- Shikoyat / bloklash
++- Admin panel
++- Yosh tasdiqlash
+diff --git a/app/api/webapp.py b/app/api/webapp.py
+index 54ae8e4..5a1e6b6 100644
+--- a/app/api/webapp.py
++++ b/app/api/webapp.py
+@@ -104,15 +104,27 @@ async def get_cities():
+ async def get_turn_credentials(x_telegram_init_data: str | None = Header(default=None)):
+     _auth(x_telegram_init_data)  # faqat ro'yxatdan o'tgan/haqiqiy Telegram foydalanuvchisi so'rasin
+ 
+-    fallback = [{"urls": "stun:stun.l.google.com:19302"}]
++    ice_servers: list[dict] = [{"urls": "stun:stun.l.google.com:19302"}]
++
++    # 1) O'z TURN (coturn / static) — eng oddiy yo'l
++    if settings.turn_urls and settings.turn_username and settings.turn_password:
++        urls = [u.strip() for u in settings.turn_urls.split(",") if u.strip()]
++        ice_servers.append(
++            {
++                "urls": urls if len(urls) > 1 else urls[0],
++                "username": settings.turn_username,
++                "credential": settings.turn_password,
++            }
++        )
++        return {"iceServers": ice_servers}
+ 
++    # 2) Metered.ca dinamik credential
+     if not settings.metered_domain or not settings.metered_secret_key:
+-        return {"iceServers": fallback}
++        return {"iceServers": ice_servers}
+ 
+     base = f"https://{settings.metered_domain}/api/v1/turn"
+     try:
+         async with httpx.AsyncClient(timeout=8) as client:
+-            # 1-bosqich: SECRET_KEY bilan vaqtinchalik credential (username/password) yaratamiz
+             create_resp = await client.post(
+                 f"{base}/credential",
+                 params={"secretKey": settings.metered_secret_key},
+@@ -121,15 +133,15 @@ async def get_turn_credentials(x_telegram_init_data: str | None = Header(default
+             create_resp.raise_for_status()
+             api_key = create_resp.json()["apiKey"]
+ 
+-            # 2-bosqich: shu vaqtinchalik apiKey orqali haqiqiy iceServers ro'yxatini olamiz
+             ice_resp = await client.get(f"{base}/credentials", params={"apiKey": api_key})
+             ice_resp.raise_for_status()
+-            ice_servers = ice_resp.json()
++            metered_servers = ice_resp.json()
++        if isinstance(metered_servers, list) and metered_servers:
++            return {"iceServers": metered_servers}
+         return {"iceServers": ice_servers}
+     except Exception as e:
+-        # TURN xizmati javob bermasa ham, qo'ng'iroq hech bo'lmasa STUN bilan urinib ko'rsin
+         print(f"TURN credentials error: {e}")
+-        return {"iceServers": fallback}
++        return {"iceServers": ice_servers}
+ 
+ 
+ @router.post("/profile")
+diff --git a/app/bot/handlers.py b/app/bot/handlers.py
+index 7101f3d..0d83f3d 100644
+--- a/app/bot/handlers.py
++++ b/app/bot/handlers.py
+@@ -6,6 +6,7 @@ from aiogram.types import (
+     ReplyKeyboardMarkup,
+     KeyboardButton,
+     ReplyKeyboardRemove,
++    WebAppInfo,
+ )
+ 
+ from app.bot.states import Registration
+@@ -17,6 +18,19 @@ from app.models import Gender, Language, LookingFor, User
+ 
+ router = Router()
+ 
++
++def _webapp_kb(lang: str = "uz") -> ReplyKeyboardMarkup | ReplyKeyboardRemove:
++    """Mini App ochish tugmasi — video qo'ng'iroq shu yerda."""
++    if not settings.webapp_url:
++        return ReplyKeyboardRemove()
++    label = {"uz": "🔍 Qidirish / Qo'ng'iroq", "ru": "🔍 Поиск / Звонок", "en": "🔍 Search / Call"}.get(
++        lang, "🔍 Qidirish / Qo'ng'iroq"
++    )
++    return ReplyKeyboardMarkup(
++        keyboard=[[KeyboardButton(text=label, web_app=WebAppInfo(url=f"{settings.webapp_url.rstrip('/')}/webapp/"))]],
++        resize_keyboard=True,
++    )
++
+ gender_kb = ReplyKeyboardMarkup(
+     keyboard=[[KeyboardButton(text="Erkak"), KeyboardButton(text="Ayol")]],
+     resize_keyboard=True,
+@@ -38,7 +52,10 @@ async def cmd_start(message: Message, state: FSMContext):
+         user = await session.get(User, message.from_user.id)
+ 
+     if user:
+-        await message.answer(t(user.language.value, "welcome_back", name=user.name))
++        await message.answer(
++            t(user.language.value, "welcome_back", name=user.name),
++            reply_markup=_webapp_kb(user.language.value),
++        )
+         return
+ 
+     await message.answer("Salom! Ro'yxatdan o'tishni boshlaymiz.\nIsmingizni kiriting:")
+@@ -98,11 +115,12 @@ async def process_language(message: Message, state: FSMContext):
+         await session.commit()
+ 
+     await state.clear()
++    lang = data["language"].value if hasattr(data["language"], "value") else data["language"]
+     await message.answer(
+         "✅ Ro'yxatdan o'tish tugadi!\n\n"
+-        "Suhbatdosh qidirish, taklifga javob berish va suhbatni tugatish endi "
+-        "pastdagi <b>Menu</b> tugmasi orqali ochiladigan ilova ichida amalga oshiriladi.",
+-        reply_markup=ReplyKeyboardRemove(),
++        "Suhbatdosh qidirish va <b>audio/video qo'ng'iroq</b> Mini App ichida.\n"
++        "Pastdagi tugmani bosing yoki Menu → Qidirish.",
++        reply_markup=_webapp_kb(lang),
+     )
+ 
+ 
+@@ -119,7 +137,10 @@ async def cmd_search(message: Message, state: FSMContext):
+         await message.answer("Avval ro'yxatdan o'ting: /start")
+         return
+ 
+-    await message.answer(t(user.language.value, "search_check_app"))
++    await message.answer(
++        t(user.language.value, "search_check_app"),
++        reply_markup=_webapp_kb(user.language.value),
++    )
+ 
+ 
+ @router.message(Command("stop"))
+diff --git a/app/config.py b/app/config.py
+index 41eb23a..3e7b71d 100644
+--- a/app/config.py
++++ b/app/config.py
+@@ -10,10 +10,15 @@ class Settings(BaseSettings):
+     min_age: int = 18
+     max_age_gap: int = 5  # matching qilinadigan foydalanuvchilar orasidagi maksimal yosh farqi
+ 
+-    webapp_url: str = ""  # Mini App uchun ochiq HTTPS manzil (masalan ngrok)
++    webapp_url: str = ""  # Mini App uchun ochiq HTTPS manzil (masalan ngrok / Render)
+ 
+-    metered_domain: str = ""  # masalan: soylaibot.metered.live
++    # TURN (WebRTC) — mobil tarmoqda audio/video uchun muhim
++    metered_domain: str = ""  # masalan: xxx.metered.live
+     metered_secret_key: str = ""
++    # Ixtiyoriy o'z TURN (masalan docker coturn): turn:host:3478?transport=udp
++    turn_urls: str = ""
++    turn_username: str = ""
++    turn_password: str = ""
+ 
+     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+ 
+diff --git a/app/webapp/index.html b/app/webapp/index.html
+index dd7057c..ebe4c1c 100644
+--- a/app/webapp/index.html
++++ b/app/webapp/index.html
+@@ -463,7 +463,7 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
+ });
+ 
+ // ============================================================
+-// Qo'ng'iroq (WebRTC audio/video)
++// Qo'ng'iroq (WebRTC audio/video) — perfect negotiation + ICE buffer
+ // ============================================================
+ let pc = null;
+ let ws = null;
+@@ -473,6 +473,12 @@ let callRoomId = null;
+ let callPollTimer = null;
+ let isMuted = false;
+ let videoOn = false;
++let videoTrack = null;
++let makingOffer = false;
++let ignoreOffer = false;
++let polite = false;
++let pendingIce = [];
++let pendingLocalSdp = null;
+ 
+ function dlog(msg) {
+   const el = document.getElementById("debugLog");
+@@ -485,19 +491,45 @@ function dlog(msg) {
+   console.log(msg);
+ }
+ 
++async function flushIce() {
++  while (pendingIce.length && pc && pc.remoteDescription) {
++    const c = pendingIce.shift();
++    try {
++      await pc.addIceCandidate(c);
++      dlog("ICE (buffer) qo'shildi.");
++    } catch (e) {
++      dlog("ICE buffer xato: " + e.message);
++    }
++  }
++}
++
+ async function enterCall(roomId, partnerId) {
+   callRoomId = roomId;
+   callPartnerId = partnerId;
++  isMuted = false;
++  videoOn = false;
++  videoTrack = null;
++  pendingIce.length = 0;
++  makingOffer = false;
++  ignoreOffer = false;
++  // Past ID — impolite (offer beradi), katta ID — polite (collisionda chekinadi)
++  polite = myId > partnerId;
++
+   document.getElementById("debugLog").innerHTML = "";
+-  dlog(`Qo'ng'iroq boshlandi. room=${roomId} partner=${partnerId} myId=${myId}`);
++  dlog(`Call start room=${roomId} me=${myId} partner=${partnerId} polite=${polite}`);
+   searchView.classList.remove("active");
+   bottomNav.style.display = "none";
+   callView.style.display = "flex";
+   document.getElementById("callStatus").textContent = tr("connecting");
++  document.getElementById("muteBtn").classList.remove("active-toggle");
++  document.getElementById("videoBtn").classList.remove("active-toggle");
+ 
+   try {
+-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+-    dlog("Mikrofon olindi.");
++    localStream = await navigator.mediaDevices.getUserMedia({
++      audio: { echoCancellation: true, noiseSuppression: true },
++      video: false,
++    });
++    dlog("Mikrofon OK.");
+   } catch (e) {
+     dlog("Mikrofon xatosi: " + e.message);
+     document.getElementById("callStatus").textContent = tr("mic_error");
+@@ -507,117 +539,139 @@ async function enterCall(roomId, partnerId) {
+   let iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+   try {
+     const turnData = await api("/api/turn-credentials");
+-    if (turnData.iceServers && turnData.iceServers.length) {
++    if (turnData.iceServers?.length) {
+       iceServers = turnData.iceServers;
+-      dlog(`TURN ma'lumotlari olindi (${iceServers.length} ta server).`);
++      dlog(`ICE servers: ${iceServers.length}`);
+     }
+   } catch (e) {
+-    dlog("TURN olishda xato, faqat STUN bilan davom etamiz: " + e.message);
++    dlog("TURN olishda xato, STUN only: " + e.message);
+   }
+ 
+-  pc = new RTCPeerConnection({ iceServers });
++  pc = new RTCPeerConnection({ iceServers, iceCandidatePoolSize: 4 });
+   localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+ 
+-  const isOfferer = myId < partnerId;
+-  dlog(`isOfferer=${isOfferer}`);
+-  let negotiating = false;
+-  let wsReady = false;
+-  let pendingNegotiation = false;
+-
+-  async function sendOffer() {
+-    if (negotiating) return;
+-    negotiating = true;
+-    try {
+-      const offer = await pc.createOffer();
+-      await pc.setLocalDescription(offer);
+-      ws.send(JSON.stringify({ type: "offer", sdp: pc.localDescription }));
+-      dlog("Offer yuborildi.");
+-    } finally {
+-      negotiating = false;
+-    }
+-  }
+-
+   pc.onicecandidate = (event) => {
+-    if (event.candidate) {
+-      dlog("ICE nomzod topildi: " + (event.candidate.type || "?"));
+-      if (ws && ws.readyState === WebSocket.OPEN) {
+-        ws.send(JSON.stringify({ type: "ice", candidate: event.candidate }));
+-      } else {
+-        dlog("OGOHLANTIRISH: WS ochiq emas, ICE nomzod yo'qotildi!");
+-      }
++    if (!event.candidate) {
++      dlog("ICE gathering done.");
++      return;
++    }
++    if (ws && ws.readyState === WebSocket.OPEN) {
++      ws.send(JSON.stringify({ type: "ice", candidate: event.candidate }));
+     } else {
+-      dlog("ICE gathering tugadi.");
++      dlog("WS ochiq emas — ICE yo'qotildi!");
+     }
+   };
+ 
+   pc.ontrack = (event) => {
+-    dlog("Remote track keldi: " + event.track.kind);
+-    const remoteAudio = document.getElementById("remoteAudio");
+-    remoteAudio.srcObject = event.streams[0];
+-    remoteAudio.muted = false;
+-    remoteAudio.volume = 1.0;
+-    remoteAudio.play().then(() => dlog("Audio play() muvaffaqiyatli.")).catch((e) => {
+-      dlog("Audio play() bloklandi: " + e.message);
+-      document.getElementById("callStatus").textContent = tr("tap_to_enable_audio");
+-      document.getElementById("callStatus").style.cursor = "pointer";
+-      document.getElementById("callStatus").onclick = () => {
+-        remoteAudio.play().then(() => { dlog("Qo'lda play() muvaffaqiyatli."); document.getElementById("callStatus").onclick = null; }).catch(() => {});
+-      };
+-    });
++    dlog("Remote track: " + event.track.kind);
++    const stream = event.streams[0] || new MediaStream([event.track]);
++    if (event.track.kind === "audio") {
++      const remoteAudio = document.getElementById("remoteAudio");
++      remoteAudio.srcObject = stream;
++      remoteAudio.play().catch(() => {
++        document.getElementById("callStatus").textContent = tr("tap_to_enable_audio");
++        document.getElementById("callStatus").onclick = () => {
++          remoteAudio.play().catch(() => {});
++          document.getElementById("callStatus").onclick = null;
++          document.getElementById("callStatus").textContent = tr("connected");
++        };
++      });
++    }
+     if (event.track.kind === "video") {
+       const remoteVideo = document.getElementById("remoteVideo");
+-      remoteVideo.srcObject = event.streams[0];
++      remoteVideo.srcObject = stream;
+       remoteVideo.style.display = "block";
++      document.querySelector(".call-avatar").style.display = "none";
+     }
+   };
+ 
+-  pc.onnegotiationneeded = () => {
+-    dlog("negotiationneeded hodisasi.");
+-    if (!isOfferer) return;
+-    if (!wsReady) { pendingNegotiation = true; return; }
+-    sendOffer();
++  pc.onnegotiationneeded = async () => {
++    try {
++      makingOffer = true;
++      await pc.setLocalDescription();
++      const payload = JSON.stringify({ type: "sdp", description: pc.localDescription });
++      if (ws && ws.readyState === WebSocket.OPEN) {
++        ws.send(payload);
++        dlog("Local SDP yuborildi: " + pc.localDescription.type);
++      } else {
++        pendingLocalSdp = payload;
++        dlog("SDP WS ochilishini kutmoqda...");
++      }
++    } catch (e) {
++      dlog("negotiationneeded xato: " + e.message);
++    } finally {
++      makingOffer = false;
++    }
+   };
+ 
+   pc.oniceconnectionstatechange = () => {
+-    dlog("ICE holati: " + pc.iceConnectionState);
++    dlog("ICE: " + pc.iceConnectionState);
+     const statusEl = document.getElementById("callStatus");
+-    if (pc.iceConnectionState === "checking") statusEl.textContent = tr("connecting") + " (ICE: checking)";
+-    else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") statusEl.textContent = tr("connected") + " (ICE: " + pc.iceConnectionState + ")";
+-    else if (pc.iceConnectionState === "failed") statusEl.textContent = tr("connecting") + " (ICE: failed — tarmoq NAT muammosi)";
+-    else if (pc.iceConnectionState === "disconnected") statusEl.textContent = tr("connecting") + " (ICE: disconnected)";
++    if (["connected", "completed"].includes(pc.iceConnectionState)) {
++      statusEl.textContent = tr("connected");
++    } else if (pc.iceConnectionState === "failed") {
++      statusEl.textContent = "ICE failed — TURN kerak (mobil tarmoq)";
++    } else if (pc.iceConnectionState === "checking") {
++      statusEl.textContent = tr("connecting");
++    }
+   };
+ 
+   const wsProto = location.protocol === "https:" ? "wss" : "ws";
+   const wsUrl = `${wsProto}://${location.host}/ws/call/${roomId}?init_data=${encodeURIComponent(initData)}`;
+-  dlog("WebSocket ulanmoqda: " + location.host);
+   ws = new WebSocket(wsUrl);
+ 
+   ws.onopen = () => {
+     dlog("WebSocket ochildi.");
+-    wsReady = true;
+-    if (pendingNegotiation) {
+-      pendingNegotiation = false;
+-      sendOffer();
++    if (pendingLocalSdp) {
++      ws.send(pendingLocalSdp);
++      dlog("Kutilgan SDP yuborildi.");
++      pendingLocalSdp = null;
+     }
+   };
+-
+-  ws.onerror = (e) => dlog("WebSocket XATOSI!");
+-  ws.onclose = (e) => dlog(`WebSocket yopildi. code=${e.code}`);
++  ws.onerror = () => dlog("WebSocket XATOSI");
++  ws.onclose = (e) => dlog(`WebSocket yopildi code=${e.code}`);
+ 
+   ws.onmessage = async (event) => {
+-    const msg = JSON.parse(event.data);
+-    dlog("WS xabar keldi: " + msg.type);
+-    if (msg.type === "offer") {
+-      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+-      const answer = await pc.createAnswer();
+-      await pc.setLocalDescription(answer);
+-      ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription }));
+-      dlog("Answer yuborildi.");
+-    } else if (msg.type === "answer") {
+-      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+-      dlog("Answer o'rnatildi.");
++    let msg;
++    try { msg = JSON.parse(event.data); } catch { return; }
++
++    // Eski format (offer/answer) + yangi (sdp) bilan mos
++    if (msg.type === "offer" || msg.type === "answer") {
++      msg = { type: "sdp", description: msg.sdp };
++    }
++
++    if (msg.type === "sdp" && msg.description) {
++      const desc = msg.description;
++      const offerCollision =
++        desc.type === "offer" && (makingOffer || pc.signalingState !== "stable");
++      ignoreOffer = !polite && offerCollision;
++      if (ignoreOffer) {
++        dlog("Offer collision — impolite, ignore.");
++        return;
++      }
++      try {
++        await pc.setRemoteDescription(desc);
++        dlog("Remote SDP: " + desc.type);
++        await flushIce();
++        if (desc.type === "offer") {
++          await pc.setLocalDescription();
++          ws.send(JSON.stringify({ type: "sdp", description: pc.localDescription }));
++          dlog("Answer yuborildi.");
++        }
++      } catch (e) {
++        dlog("SDP xato: " + e.message);
++      }
+     } else if (msg.type === "ice" && msg.candidate) {
+-      try { await pc.addIceCandidate(msg.candidate); dlog("ICE nomzod qo'shildi."); } catch (e) { dlog("ICE qo'shishda xato: " + e.message); }
++      if (!pc.remoteDescription) {
++        pendingIce.push(msg.candidate);
++        dlog("ICE bufferlandi.");
++      } else {
++        try {
++          await pc.addIceCandidate(msg.candidate);
++        } catch (e) {
++          dlog("ICE xato: " + e.message);
++        }
++      }
+     }
+   };
+ 
+@@ -635,17 +689,29 @@ async function enterCall(roomId, partnerId) {
+ function cleanupCall(notifyServer) {
+   clearInterval(callPollTimer);
+   if (notifyServer && callRoomId && callPartnerId) {
+-    api("/api/call/end", { method: "POST", body: JSON.stringify({ room_id: callRoomId, partner_id: callPartnerId }) }).catch(() => {});
++    api("/api/call/end", {
++      method: "POST",
++      body: JSON.stringify({ room_id: callRoomId, partner_id: callPartnerId }),
++    }).catch(() => {});
++  }
++  if (videoTrack) {
++    try { videoTrack.stop(); } catch (_) {}
++    videoTrack = null;
+   }
+   if (pc) { pc.close(); pc = null; }
+   if (ws) { ws.close(); ws = null; }
+-  if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
++  if (localStream) {
++    localStream.getTracks().forEach((t) => t.stop());
++    localStream = null;
++  }
+   document.getElementById("remoteVideo").style.display = "none";
+   document.getElementById("localVideo").style.display = "none";
++  document.querySelector(".call-avatar").style.display = "flex";
+   callView.style.display = "none";
+   bottomNav.style.display = "flex";
+   searchView.classList.add("active");
+   setSearchingUI(false);
++  videoOn = false;
+ }
+ 
+ document.getElementById("endCallBtn").addEventListener("click", () => cleanupCall(true));
+@@ -658,18 +724,44 @@ document.getElementById("muteBtn").addEventListener("click", () => {
+ });
+ 
+ document.getElementById("videoBtn").addEventListener("click", async () => {
+-  if (videoOn || !pc || !localStream) return;
+-  try {
+-    const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+-    const videoTrack = videoStream.getVideoTracks()[0];
+-    localStream.addTrack(videoTrack);
+-    pc.addTrack(videoTrack, localStream);
+-    const localVideo = document.getElementById("localVideo");
+-    localVideo.srcObject = new MediaStream([videoTrack]);
+-    localVideo.style.display = "block";
+-    videoOn = true;
+-    document.getElementById("videoBtn").classList.add("active-toggle");
+-  } catch (e) { /* kamera ruxsati berilmadi */ }
++  if (!pc || !localStream) return;
++  const btn = document.getElementById("videoBtn");
++  const localVideo = document.getElementById("localVideo");
++
++  if (!videoOn) {
++    try {
++      const vs = await navigator.mediaDevices.getUserMedia({
++        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
++      });
++      videoTrack = vs.getVideoTracks()[0];
++      localStream.addTrack(videoTrack);
++      pc.addTrack(videoTrack, localStream);
++      localVideo.srcObject = new MediaStream([videoTrack]);
++      localVideo.style.display = "block";
++      videoOn = true;
++      btn.classList.add("active-toggle");
++      dlog("Video yoqildi.");
++    } catch (e) {
++      dlog("Kamera xato: " + e.message);
++      tg?.showAlert(currentLang === "ru" ? "Камера недоступна" : "Kamera ruxsati berilmadi");
++    }
++  } else {
++    // Video o'chirish
++    const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
++    if (sender) {
++      try { pc.removeTrack(sender); } catch (_) {}
++    }
++    if (videoTrack) {
++      videoTrack.stop();
++      localStream.removeTrack(videoTrack);
++      videoTrack = null;
++    }
++    localVideo.srcObject = null;
++    localVideo.style.display = "none";
++    videoOn = false;
++    btn.classList.remove("active-toggle");
++    dlog("Video o'chirildi.");
++  }
+ });
+ 
+ loadCities();
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 50799e9..6bbfaa0 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -51,5 +51,18 @@ services:
+       redis:
+         condition: service_healthy
+ 
++  coturn:
++    image: coturn/coturn:latest
++    restart: unless-stopped
++    network_mode: host
++    command: >
++      -n --log-file=stdout
++      --realm=dating.local
++      --user=dating:datingturn
++      --lt-cred-mech
++      --fingerprint
++      --no-cli
++    profiles: ["turn"]
++
+ volumes:
+   pgdata:
+diff --git a/requirements.txt b/requirements.txt
+index ee2258b948b48366c4876ff64eef55b74b15b012..22f30d573d92e3ee5351c1f67094ee35368abb0c 100644
+GIT binary patch
+literal 682
+zcmY*XF>d295bXIE6C!0ha={{f0_2eDs(_{_i7-VH)H(_8^*5`yxC7Me?(EF$P&VW#
+zM86rMk5b7_*pTOHS7Umq@NvD^Qkrl6YGY)ee0ubW%8u)#+JRe`la0nGd1R*O*K2TG
+zf=LUTQYK4&JWwmF*ntSJ)Iv4}>PH4`Ex9uDP+xdTR9W-9n{&QWm;&k!9rT`ri^1KD
+z86c^J%Q3^e<@KXHi^*<e3-Ijl1iGo_KR(5<5!)KjnX5;`qweKN_F_?Lho3Q9LiJ;S
+ze7_&G;9i%j=haSL1lN=^XVUFl-1z1~4@fAC2}Y3NAXYmEcR<kO>(92*;?>@8w~|0`
+zQE&J1ZYQw!VDH6xj}*q>;Ox97UTQARx&??1R<$T?w23%jEieDnhs_g(G;?nM0Y84+
+zYpHP%)@jM<FlO@U^WjRowcpRLFD%I(9_J%DIf(aPFV7M3YhzxFPXg&yWJkNDen8@Q
+zS}1?`Z;);wCwRcia+vqe0Qtn``wqx2OKy4mdrE>(eEI8^-OUr0u%bi*I~&8Vsl{J^
+C*UL-*
+
+literal 1446
+zcmZ`($xg#i4D=a^Pbq3bDRAJ>J4hf-oKQ)ZM9osADNsHhnDM-qv=S&vy4ao>kNxuV
+zJ-5OdTj5#S(sp)-E47JTSb}?O=XPewSzC*5m1kUfT+bmRM|_Lx03_aT_+8?Ps26ta
+zb;lK*b*Lb#(8ivT9P#d;ZEdw<F^{^aFKVOi3S5O{j>CB3XlX#HQQd%Nj(cef8{zW+
+z*4QsOsVpMah|(3Z$q7Cq+78hgTwADO2CGxMJ*sC<ZQu12k-^IhtS#b&d(Qe42&pkk
+znb)p5gKz9;;~Y1L4jM9OD{*Tc^Iiorre3{5uRE}C9z`EdpyLWT>T`wq#=fAZb}r^e
+zf61pTPJJ12mLY?aBF?3A<v>l2IM{`1b8xeIfluuKE2%QZHGTHOyvR;RZv(b6I%KeC
+zp)fuu%%O@q^x11jJ*pilz|P$vwl?g>kt_VSc85n{`?(wKiH0Q1`~kTe@JD^Z(LONN
+zBD#lyXMA6UKA1zD@~A?*gi5O6ROK|C8cxI(I1NxTpk$T@9AeOGvGHsz5U(9e`<^1o
+z?fW}p1kX4(a@Xj1IE(+IzJh<42=P<*ZsN{SLkE2g@J3L>lf@l+@BN`>x&MgV7n|9G
+z-FsBK5nVam4Q(bT%lE^xJ)vd>*W^V7B>GP^^7YE|wB;@G)TOpa8Qc+_2c360@QTdO
+zpqcL$_90ienTel5?dKjnaa#1Ec6Q<NDcldtqH~3(Z&03hDP=DoV0;5dgUpTV6rZ@{
+P)B#BBBJP;p!J6qW>$}fU
+
+-- 
+2.43.0
+
