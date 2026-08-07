@@ -1,0 +1,6 @@
+{$DOMAIN} {
+	encode gzip
+
+	# Mini App + API + WebSocket signaling
+	reverse_proxy api:8000
+}
