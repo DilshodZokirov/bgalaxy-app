@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
@@ -14,8 +14,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.getPublicAuthConfig()
+      .then((cfg) => setEmailEnabled(cfg.email_enabled !== false))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -62,6 +69,12 @@ export default function Login() {
         </p>
       }
     >
+      {!emailEnabled && (
+        <p className="settings-success" style={{ marginBottom: 12 }}>
+          Email/SMTP vaqtincha o‘chirilgan. Test uchun <strong>Google orqali kirish</strong>ni
+          ishlating (yoki oddiy login — tasdiqlash shart emas).
+        </p>
+      )}
       <form className="auth-gate-form" onSubmit={handleSubmit}>
         <AuthField
           icon="user"

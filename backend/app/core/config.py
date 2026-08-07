@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # blocked by hosts (like Render's free tier) that block outbound SMTP
     # ports. Leave empty to fall back to smtp_host below.
     resend_api_key: str = ""
+    # Temporary kill-switch while domain/SMTP is down (e.g. Arrested domain).
+    # False → no emails sent; register auto-verifies; login skips verify gate.
+    # Re-enable (True) after bgalaxy.space + Resend/SMTP are working again.
+    email_enabled: bool = True
 
     # Google Sign-In (OAuth) — leave empty to hide the Google button
     google_client_id: str = ""

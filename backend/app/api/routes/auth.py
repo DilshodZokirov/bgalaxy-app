@@ -42,8 +42,19 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _send_verification(background_tasks: BackgroundTasks, user: User) -> None:
+    if not settings.email_enabled:
+        return
     verify_link = f"{settings.frontend_url}/verify-email/{user.verification_token}"
     background_tasks.add_task(send_verification_email, user.email, user.full_name, verify_link)
+
+
+@router.get("/public-config")
+async def public_config():
+    """Frontend banner / Google button — no auth. Safe to expose."""
+    return {
+        "email_enabled": settings.email_enabled,
+        "google_enabled": bool(settings.google_client_id),
+    }
 
 
 @router.post("/register", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
@@ -52,22 +63,29 @@ async def register(payload: UserRegister, background_tasks: BackgroundTasks, db:
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Domainsiz vaqtinchalik rejim: SMTP o‘chiq → email tasdiqlashsiz kirish.
+    auto_verify = not settings.email_enabled
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
-        email_verified=False,
-        verification_token=uuid.uuid4().hex,
+        email_verified=auto_verify,
+        verification_token=None if auto_verify else uuid.uuid4().hex,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    _send_verification(background_tasks, user)
+    if settings.email_enabled:
+        _send_verification(background_tasks, user)
+        return MessageOut(
+            message="Ro'yxatdan o'tish muvaffaqiyatli! Emailingizga tasdiqlash havolasi yuborildi — "
+            "havolani bosgach, tizimga kira olasiz."
+        )
 
     return MessageOut(
-        message="Ro'yxatdan o'tish muvaffaqiyatli! Emailingizga tasdiqlash havolasi yuborildi — "
-        "havolani bosgach, tizimga kira olasiz."
+        message="Ro'yxatdan o'tish muvaffaqiyatli! Email yuborish vaqtincha o'chirilgan — "
+        "hozir tizimga kira olasiz. Yoki Google orqali kiring."
     )
 
 
@@ -84,11 +102,16 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
         )
     if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.email_verified:
+    if settings.email_enabled and not user.email_verified:
         raise HTTPException(
             status_code=403,
             detail="Iltimos, avval emailingizni tasdiqlang — pochtangizga yuborilgan havolani bosing.",
         )
+    # Email o‘chiq bo‘lsa — eski tasdiqlanmagan hisoblarni ham kiritib qo‘yamiz
+    if not settings.email_enabled and not user.email_verified:
+        user.email_verified = True
+        await db.commit()
+        await db.refresh(user)
 
     token = create_access_token(subject=str(user.id))
     return TokenOut(access_token=token, user=user)
@@ -191,6 +214,9 @@ async def forgot_password(
     user.reset_token = uuid.uuid4().hex
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
     await db.commit()
+
+    if not settings.email_enabled:
+        return
 
     reset_link = f"{settings.frontend_url}/reset-password/{user.reset_token}"
     background_tasks.add_task(send_password_reset_email, user.email, user.full_name, reset_link)

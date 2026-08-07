@@ -24,6 +24,10 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # Domainsiz vaqtinchalik test: false → email yuborilmaydi, Google/login ishlaydi.
+      # Domen + Resend tayyor bo‘lgach true qiling.
+      - key: EMAIL_ENABLED
+        value: "false"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: INITIAL_DEVELOPER_EMAIL

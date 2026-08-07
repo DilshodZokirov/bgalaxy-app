@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
@@ -19,8 +19,15 @@ export default function Register() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.getPublicAuthConfig()
+      .then((cfg) => setEmailEnabled(cfg.email_enabled !== false))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -61,8 +68,12 @@ export default function Register() {
   if (registered) {
     return (
       <AuthOrbitShell
-        title="Emailingizni tekshiring"
-        subtitle="Galaktikaga kirish uchun tasdiqlash havolasini bosing."
+        title={emailEnabled ? "Emailingizni tekshiring" : "Hisob yaratildi"}
+        subtitle={
+          emailEnabled
+            ? "Galaktikaga kirish uchun tasdiqlash havolasini bosing."
+            : "Email yuborish vaqtincha o‘chirilgan — hozir kirishingiz mumkin."
+        }
         art="dome"
         footer={
           <p className="auth-gate-switch">
@@ -71,7 +82,15 @@ export default function Register() {
         }
       >
         <p className="auth-gate-success">
-          <strong>{email}</strong> manziliga tasdiqlash havolasi yuborildi.
+          {emailEnabled ? (
+            <>
+              <strong>{email}</strong> manziliga tasdiqlash havolasi yuborildi.
+            </>
+          ) : (
+            <>
+              <strong>{email}</strong> bilan hisob tayyor. Login qiling yoki Google orqali kiring.
+            </>
+          )}
         </p>
         <Link to="/login" className="auth-gate-cta-link">
           <span className="auth-gate-cta">Kirish sahifasiga o&apos;tish</span>
@@ -91,6 +110,11 @@ export default function Register() {
         </p>
       }
     >
+      {!emailEnabled && (
+        <p className="settings-success" style={{ marginBottom: 12 }}>
+          Email/SMTP vaqtincha o‘chirilgan. Eng oson yo‘l: <strong>Google orqali kirish</strong>.
+        </p>
+      )}
       <form className="auth-gate-form" onSubmit={handleSubmit}>
         <div className="auth-gate-row">
           <AuthField

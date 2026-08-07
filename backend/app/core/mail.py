@@ -19,6 +19,10 @@ def _send_email(to_email: str, subject: str, html: str) -> bool:
     SMTP ports entirely. Falls back to SMTP if RESEND_API_KEY isn't set
     (handy for local development). Never raises — a failed/unconfigured
     email should never break the calling request."""
+    if not settings.email_enabled:
+        logger.info("EMAIL_ENABLED=false — skipping email to %s (%s)", to_email, subject)
+        return False
+
     if settings.resend_api_key:
         try:
             response = requests.post(

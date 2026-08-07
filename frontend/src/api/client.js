@@ -61,6 +61,7 @@ export const api = {
   },
   getComplaints: (params = {}) => request(`/complaints?${new URLSearchParams(params)}`),
   resolveComplaint: (id) => request(`/complaints/${id}/resolve`, { method: "PATCH" }),
+  getPublicAuthConfig: () => request("/auth/public-config", { auth: false }),
   register: (data) => request("/auth/register", { method: "POST", body: data, auth: false }),
   login: (data) => request("/auth/login", { method: "POST", body: data, auth: false }),
   loginWithGoogle: (idToken) => request("/auth/google", { method: "POST", body: { id_token: idToken }, auth: false }),
